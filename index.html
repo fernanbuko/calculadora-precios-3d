@@ -29,6 +29,25 @@
     --teal: #5fe0c7;
     --teal-dim: #5fe0c722;
     --red: #ff6b6b;
+    --green: #6fd88a;
+  }
+
+  html[data-theme="light"]{
+    --bg: #eef3fa;
+    --bg-grid: rgba(20, 50, 90, 0.05);
+    --surface: #ffffff;
+    --surface-2: #f3f7fc;
+    --line: rgba(20, 50, 90, 0.12);
+    --line-strong: rgba(20, 50, 90, 0.28);
+    --text: #0d1b2a;
+    --text-dim: #4a5f7a;
+    --text-faint: #8598b3;
+    --orange: #e06a1f;
+    --orange-dim: #e06a1f22;
+    --teal: #1f9c85;
+    --teal-dim: #1f9c8518;
+    --red: #d94c4c;
+    --green: #2f9e57;
   }
 
   *{ box-sizing: border-box; }
@@ -48,11 +67,12 @@
     background-size: 28px 28px;
     min-height: 100vh;
     padding: 20px 14px 60px;
+    transition: background-color .15s, color .15s;
   }
 
   .wrap{ max-width: 640px; margin: 0 auto; }
 
-  header{ margin-bottom: 22px; }
+  header{ margin-bottom: 22px; display:flex; justify-content: space-between; align-items:flex-start; gap: 12px; }
 
   .eyebrow{
     font-family: 'IBM Plex Mono', monospace;
@@ -86,6 +106,20 @@
     margin: 0;
     max-width: 46ch;
   }
+
+  .header-actions{ display:flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+
+  .icon-btn{
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+    width: 34px; height: 34px;
+    border-radius: 4px;
+    font-size: 15px;
+    cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .icon-btn:hover{ border-color: var(--orange); }
 
   .card{
     background: var(--surface);
@@ -176,6 +210,18 @@
     -webkit-appearance: none; margin: 0;
   }
 
+  select{
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 7px 6px;
+    border-radius: 3px;
+    outline: none;
+  }
+  select:focus{ border-color: var(--orange); }
+
   .currency-row{
     display:flex;
     gap: 8px;
@@ -195,14 +241,17 @@
   .breakdown-row{
     display:flex;
     justify-content: space-between;
+    gap: 8px;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12.5px;
     padding: 6px 0;
     color: var(--text-dim);
     border-bottom: 1px solid var(--line);
   }
-  .breakdown-row span:last-child{ color: var(--text); }
+  .breakdown-row span:first-child{ flex: 1; }
+  .breakdown-row span:last-child{ color: var(--text); text-align: right; white-space: nowrap; }
   .breakdown-row.warn span:last-child{ color: var(--red); }
+  .breakdown-row.good span:last-child{ color: var(--green); }
 
   .total-row{
     display:flex;
@@ -242,7 +291,7 @@
     font-family: 'IBM Plex Mono', monospace;
     font-size: 34px;
     font-weight: 600;
-    color: #fff;
+    color: var(--text);
   }
   .final-price .sub{
     font-size: 12px;
@@ -303,6 +352,77 @@
     background-color: var(--orange);
   }
 
+  /* Buttons */
+  .btn-row{ display:flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .btn{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: .03em;
+    background: var(--surface-2);
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover{ border-color: var(--orange); color: var(--orange); }
+  .btn.primary{ background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
+  .btn.small{ font-size: 10.5px; padding: 6px 9px; }
+  .btn.danger:hover{ border-color: var(--red); color: var(--red); }
+
+  /* Lists: profiles / history / extra costs */
+  .list{ display:flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .list-item{
+    display:flex; justify-content: space-between; align-items:center; gap: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 9px 10px;
+  }
+  .list-item .info{ min-width:0; }
+  .list-item .info .name{ font-size: 13px; color: var(--text); font-weight: 600; }
+  .list-item .info .meta{ font-family:'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  .list-item .actions{ display:flex; gap: 6px; flex-shrink: 0; }
+  .empty-note{ color: var(--text-faint); font-size: 12px; font-style: italic; }
+
+  .extra-row{
+    display:grid;
+    grid-template-columns: 1fr 90px 30px;
+    gap: 8px;
+    align-items:center;
+    padding: 6px 0;
+  }
+  .extra-row input[type="text"]{ text-align: left; }
+
+  .save-row{ display:flex; gap: 8px; margin-top: 12px; }
+  .save-row input[type="text"]{ text-align: left; flex: 1; }
+
+  .qr-box{ display:flex; justify-content:center; padding: 12px 0 4px; }
+  .qr-box canvas, .qr-box img{ border-radius: 4px; background: #fff; padding: 8px; }
+
+  .toast{
+    position: fixed;
+    left: 50%; bottom: 22px;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--surface);
+    border: 1px solid var(--teal);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    padding: 10px 16px;
+    border-radius: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 50;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
   @media (min-width: 480px){
     h1{ font-size: 30px; }
     .final-price .value{ font-size: 40px; }
@@ -313,10 +433,27 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">CALCULADORA DE COSTOS</div>
-    <h1>¿Cuánto cobrar por tu impresión?</h1>
-    <p>Mete tus números en tu propia moneda. El precio final se recalcula solo, en tiempo real.</p>
+    <div>
+      <div class="eyebrow">CALCULADORA DE COSTOS</div>
+      <h1>¿Cuánto cobrar por tu impresión?</h1>
+      <p>Mete tus números en tu propia moneda. El precio final se recalcula solo, en tiempo real.</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="icon-btn" id="themeToggle" title="Cambiar tema">🌙</button>
+      <button type="button" class="icon-btn" id="resetBtn" title="Reiniciar valores">↺</button>
+    </div>
   </header>
+
+  <!-- PERFILES -->
+  <div class="card">
+    <p class="card-title">00 · Perfiles <span class="tag">GUARDAR IMPRESORA Y FILAMENTO</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Guarda tu impresora + filamento actuales para no volver a escribirlos. La columna "costo/hora" te sirve para comparar impresoras entre sí.</p>
+    <div class="save-row">
+      <input type="text" id="profileName" placeholder="Nombre del perfil (ej: Ender 3 + PLA genérico)">
+      <button type="button" class="btn primary" id="saveProfileBtn">Guardar perfil</button>
+    </div>
+    <div class="list" id="profileList"></div>
+  </div>
 
   <!-- MATERIAL -->
   <div class="card">
@@ -328,9 +465,27 @@
         <small>Lo que pagaste por el rollo completo</small>
       </div>
       <div class="currency-row">
-        <div class="input-box"><input type="text" id="currency" class="currency" value="$" maxlength="4"></div>
+        <div class="input-box">
+          <select id="currencyPreset">
+            <option value="$">$</option>
+            <option value="US$">US$</option>
+            <option value="€">€</option>
+            <option value="S/">S/</option>
+            <option value="Bs">Bs</option>
+            <option value="R$">R$</option>
+            <option value="custom">···</option>
+          </select>
+        </div>
         <div class="input-box"><input type="number" id="rollPrice" value="18" min="0" step="0.01"></div>
       </div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="currency">Símbolo de moneda</label>
+        <small>Editable, se usa en todo el resultado</small>
+      </div>
+      <div class="input-box"><input type="text" id="currency" class="currency" value="$" maxlength="6"></div>
     </div>
 
     <div class="field">
@@ -355,6 +510,14 @@
         <small>Cuántas copias vas a imprimir/vender juntas</small>
       </div>
       <div class="input-box"><input type="number" id="quantity" value="1" min="1" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="supportWeight">Peso de soportes</label>
+        <small>Gramos de soporte que se descartan (mismo material)</small>
+      </div>
+      <div class="input-box"><input type="number" id="supportWeight" value="0" min="0" step="1"></div>
     </div>
   </div>
 
@@ -473,12 +636,51 @@
         </div>
         <div class="input-box"><input type="number" id="extraMinPerChange" value="1.5" min="0" step="0.5"></div>
       </div>
+
+      <div class="field">
+        <div>
+          <label for="purgeCostToggle">Precio de purga distinto</label>
+          <small>Si los colores usados cuestan diferente al filamento base</small>
+        </div>
+        <div class="input-box">
+          <label class="switch">
+            <input type="checkbox" id="purgeCostToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field hidden" id="purgeCostField">
+        <div>
+          <label for="purgeCostPerGram">Costo por gramo de purga</label>
+          <small>Precio promedio del gramo de los colores extra</small>
+        </div>
+        <div class="input-box"><input type="number" id="purgeCostPerGram" value="0.02" min="0" step="0.001"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSUMIBLES Y ENVIO -->
+  <div class="card">
+    <p class="card-title">05 · Consumibles y envío <span class="tag">OPCIONAL</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Boquilla, pegamento, lijado, pintura, caja, envío... cualquier costo extra fijo de esta pieza.</p>
+    <div id="extraCostList"></div>
+    <div class="btn-row">
+      <button type="button" class="btn small" id="addExtraBtn">+ Agregar costo extra</button>
+    </div>
+
+    <div class="field" style="margin-top: 8px;">
+      <div>
+        <label for="shippingCost">Envío / empaque</label>
+        <small>Costo total de enviar o empacar el pedido</small>
+      </div>
+      <div class="input-box"><input type="number" id="shippingCost" value="0" min="0" step="0.5"></div>
     </div>
   </div>
 
   <!-- AJUSTES -->
   <div class="card">
-    <p class="card-title">05 · Ajustes <span class="tag">RIESGO Y GANANCIA</span></p>
+    <p class="card-title">06 · Ajustes <span class="tag">RIESGO Y GANANCIA</span></p>
 
     <div class="field">
       <div>
@@ -488,25 +690,57 @@
       <div class="input-box"><input type="number" id="failRate" value="10" min="0" step="1"></div>
     </div>
 
-    <div class="field">
+    <div class="field" id="profitField">
       <div>
         <label for="profit">Margen de ganancia</label>
         <small>Tu utilidad sobre el costo total</small>
       </div>
       <div class="input-box"><input type="number" id="profit" value="40" min="0" step="1"></div>
     </div>
+
+    <div class="field">
+      <div>
+        <label for="reverseToggle">Calculadora inversa</label>
+        <small>En vez de margen, defines el precio y calculamos tu ganancia</small>
+      </div>
+      <div class="input-box">
+        <label class="switch">
+          <input type="checkbox" id="reverseToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field hidden" id="targetPriceField">
+      <div>
+        <label for="targetPrice">Precio que quieres cobrar</label>
+        <small>Calculamos qué margen te deja ese precio</small>
+      </div>
+      <div class="input-box"><input type="number" id="targetPrice" value="0" min="0" step="0.5"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="marketPrice">Precio de referencia (mercado)</label>
+        <small>Opcional — para comparar contra tu competencia</small>
+      </div>
+      <div class="input-box"><input type="number" id="marketPrice" value="0" min="0" step="0.5"></div>
+    </div>
   </div>
 
   <!-- RESULTADOS -->
-  <div class="result-card">
+  <div class="result-card" id="resultCard">
     <p class="card-title" style="margin-bottom:10px;">DESGLOSE</p>
 
     <div class="breakdown-row"><span>Material</span><span id="outMaterial">—</span></div>
+    <div class="breakdown-row hidden" id="rowSupport"><span>Soportes (material)</span><span id="outSupport">—</span></div>
     <div class="breakdown-row"><span>Electricidad</span><span id="outElectricity">—</span></div>
     <div class="breakdown-row"><span>Desgaste de máquina</span><span id="outWear">—</span></div>
     <div class="breakdown-row"><span>Tu tiempo</span><span id="outLabor">—</span></div>
     <div class="breakdown-row hidden" id="rowPurge"><span>Purga multicolor (material)</span><span id="outPurge">—</span></div>
     <div class="breakdown-row hidden" id="rowExtraTime"><span>Tiempo extra multicolor</span><span id="outExtraTime">—</span></div>
+    <div class="breakdown-row hidden" id="rowExtraItems"><span>Consumibles extra</span><span id="outExtraItems">—</span></div>
+    <div class="breakdown-row hidden" id="rowShipping"><span>Envío / empaque</span><span id="outShipping">—</span></div>
     <div class="breakdown-row"><span>Margen por fallos</span><span id="outFail">—</span></div>
 
     <div class="total-row">
@@ -515,7 +749,7 @@
     </div>
 
     <div class="final-price">
-      <div class="label">PRECIO SUGERIDO DE VENTA</div>
+      <div class="label" id="outFinalLabel">PRECIO SUGERIDO DE VENTA</div>
       <div class="value" id="outFinal">—</div>
       <div class="sub" id="outFinalSub">incluye tu margen de ganancia</div>
     </div>
@@ -523,37 +757,162 @@
     <div class="breakdown-row hidden" id="rowPerPiece" style="margin-top:10px;">
       <span>Precio por pieza (÷ cantidad)</span><span id="outPerPiece">—</span>
     </div>
+    <div class="breakdown-row hidden" id="rowMarket">
+      <span>Vs. precio de referencia</span><span id="outMarket">—</span>
+    </div>
+
+    <div class="btn-row" style="margin-top:14px;">
+      <button type="button" class="btn" id="copyTextBtn">📋 Copiar texto</button>
+      <button type="button" class="btn" id="shareBtn">📤 Compartir</button>
+      <button type="button" class="btn" id="pdfBtn">📄 Exportar PDF</button>
+      <button type="button" class="btn" id="imageBtn">🖼️ Exportar imagen</button>
+      <button type="button" class="btn" id="linkBtn">🔗 Copiar link</button>
+      <button type="button" class="btn" id="qrBtn">▦ Ver QR</button>
+    </div>
+    <div class="qr-box hidden" id="qrBox"></div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="card">
+    <p class="card-title">Historial de cotizaciones <span class="tag">GUARDADAS EN ESTE DISPOSITIVO</span></p>
+    <div class="save-row">
+      <input type="text" id="quoteName" placeholder="Nombre de la pieza (ej: Maceta 12cm)">
+      <button type="button" class="btn primary" id="saveQuoteBtn">Guardar cotización</button>
+    </div>
+    <div class="list" id="historyList"></div>
   </div>
 
   <footer>
-    COSTO = MATERIAL + ELECTRICIDAD + DESGASTE + TIEMPO<br>
+    COSTO = MATERIAL + ELECTRICIDAD + DESGASTE + TIEMPO + EXTRAS<br>
     PRECIO = COSTO × (1 + % FALLOS) × (1 + % GANANCIA)
   </footer>
 
 </div>
 
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-  const ids = ['rollPrice','rollWeight','pieceWeight','quantity','hours','watts','kwhPrice',
+(function(){
+
+  const ids = ['rollPrice','rollWeight','pieceWeight','quantity','supportWeight','hours','watts','kwhPrice',
                'printerPrice','lifeHours','workHours','wage','failRate','profit','currency',
-               'multiToggle','numColors','colorChanges','purgePerChange','extraMinPerChange'];
+               'multiToggle','numColors','colorChanges','purgePerChange','extraMinPerChange',
+               'purgeCostToggle','purgeCostPerGram','shippingCost','reverseToggle','targetPrice','marketPrice'];
   const el = {};
   ids.forEach(id => el[id] = document.getElementById(id));
 
+  const DEFAULTS = {
+    currency: '$', rollPrice: '18', rollWeight: '1000', pieceWeight: '35', quantity: '1', supportWeight: '0',
+    hours: '2.5', watts: '150', kwhPrice: '0.15', printerPrice: '300', lifeHours: '4000',
+    workHours: '0.5', wage: '5', failRate: '10', profit: '40',
+    multiToggle: false, numColors: '2', colorChanges: '1', purgePerChange: '3', extraMinPerChange: '1.5',
+    purgeCostToggle: false, purgeCostPerGram: '0.02',
+    shippingCost: '0', reverseToggle: false, targetPrice: '0', marketPrice: '0'
+  };
+
   const outMaterial = document.getElementById('outMaterial');
+  const outSupport = document.getElementById('outSupport');
+  const rowSupport = document.getElementById('rowSupport');
   const outElectricity = document.getElementById('outElectricity');
   const outWear = document.getElementById('outWear');
   const outLabor = document.getElementById('outLabor');
   const outFail = document.getElementById('outFail');
   const outCost = document.getElementById('outCost');
   const outFinal = document.getElementById('outFinal');
+  const outFinalLabel = document.getElementById('outFinalLabel');
+  const outFinalSub = document.getElementById('outFinalSub');
   const outPurge = document.getElementById('outPurge');
   const outExtraTime = document.getElementById('outExtraTime');
   const rowPurge = document.getElementById('rowPurge');
   const rowExtraTime = document.getElementById('rowExtraTime');
   const rowPerPiece = document.getElementById('rowPerPiece');
   const outPerPiece = document.getElementById('outPerPiece');
+  const rowExtraItems = document.getElementById('rowExtraItems');
+  const outExtraItems = document.getElementById('outExtraItems');
+  const rowShipping = document.getElementById('rowShipping');
+  const outShipping = document.getElementById('outShipping');
+  const rowMarket = document.getElementById('rowMarket');
+  const outMarket = document.getElementById('outMarket');
   const multiFields = document.getElementById('multiFields');
+  const purgeCostField = document.getElementById('purgeCostField');
+  const profitField = document.getElementById('profitField');
+  const targetPriceField = document.getElementById('targetPriceField');
+  const extraCostList = document.getElementById('extraCostList');
+  const toast = document.getElementById('toast');
+  const qrBox = document.getElementById('qrBox');
 
+  // ---------- utils ----------
+  function num(id){
+    const v = parseFloat(el[id].value);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function fmt(n){
+    const c = el.currency.value || '';
+    return c + ' ' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('show'), 2400);
+  }
+
+  function loadJSON(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  function saveJSON(key, value){
+    try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+  }
+
+  // ---------- extra costs (consumibles) ----------
+  let extraCosts = []; // [{name, price}]
+
+  function renderExtraCosts(){
+    extraCostList.innerHTML = '';
+    extraCosts.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'extra-row';
+      row.innerHTML =
+        '<input type="text" data-i="' + i + '" data-f="name" placeholder="Ej: Boquilla, pintura, caja..." value="">' +
+        '<input type="number" data-i="' + i + '" data-f="price" min="0" step="0.01" value="">' +
+        '<button type="button" class="btn small danger" data-remove="' + i + '" title="Quitar">✕</button>';
+      const nameInput = row.querySelector('[data-f="name"]');
+      const priceInput = row.querySelector('[data-f="price"]');
+      nameInput.value = item.name;
+      priceInput.value = item.price;
+      nameInput.addEventListener('input', () => { extraCosts[i].name = nameInput.value; calculate(); });
+      priceInput.addEventListener('input', () => { extraCosts[i].price = parseFloat(priceInput.value) || 0; calculate(); });
+      row.querySelector('[data-remove]').addEventListener('click', () => {
+        extraCosts.splice(i, 1);
+        renderExtraCosts();
+        calculate();
+      });
+      extraCostList.appendChild(row);
+    });
+  }
+
+  document.getElementById('addExtraBtn').addEventListener('click', () => {
+    extraCosts.push({ name: '', price: 0 });
+    renderExtraCosts();
+  });
+
+  // ---------- currency preset ----------
+  document.getElementById('currencyPreset').addEventListener('change', (e) => {
+    if(e.target.value !== 'custom'){
+      el.currency.value = e.target.value;
+      calculate();
+    }
+  });
+
+  // ---------- multicolor UI ----------
   let userEditedChanges = false;
   el.colorChanges.addEventListener('input', () => { userEditedChanges = true; });
   el.numColors.addEventListener('input', () => {
@@ -567,21 +926,68 @@
     calculate();
   });
 
-  function num(id){
-    const v = parseFloat(el[id].value);
-    return isNaN(v) ? 0 : v;
-  }
+  el.purgeCostToggle.addEventListener('change', () => {
+    purgeCostField.classList.toggle('hidden', !el.purgeCostToggle.checked);
+    calculate();
+  });
 
-  function fmt(n){
-    const c = el.currency.value || '';
-    return c + ' ' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  el.reverseToggle.addEventListener('change', () => {
+    const isReverse = el.reverseToggle.checked;
+    targetPriceField.classList.toggle('hidden', !isReverse);
+    profitField.style.opacity = isReverse ? '0.45' : '1';
+    el.profit.disabled = isReverse;
+    calculate();
+  });
+
+  // ---------- theme ----------
+  const THEME_KEY = 'calc3d_theme';
+  const themeToggle = document.getElementById('themeToggle');
+  function applyTheme(theme){
+    if(theme === 'light'){
+      document.documentElement.setAttribute('data-theme', 'light');
+      themeToggle.textContent = '☀️';
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      themeToggle.textContent = '🌙';
+    }
   }
+  applyTheme(loadJSON(THEME_KEY, 'dark'));
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    const next = current === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    saveJSON(THEME_KEY, next);
+  });
+
+  // ---------- reset ----------
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if(!confirm('¿Reiniciar todos los valores a los de fábrica?')) return;
+    Object.keys(DEFAULTS).forEach(id => {
+      if(!el[id]) return;
+      if(el[id].type === 'checkbox'){ el[id].checked = DEFAULTS[id]; }
+      else { el[id].value = DEFAULTS[id]; }
+    });
+    extraCosts = [];
+    renderExtraCosts();
+    userEditedChanges = false;
+    multiFields.classList.toggle('hidden', !el.multiToggle.checked);
+    purgeCostField.classList.toggle('hidden', !el.purgeCostToggle.checked);
+    targetPriceField.classList.add('hidden');
+    el.profit.disabled = false;
+    profitField.style.opacity = '1';
+    calculate();
+    showToast('Valores reiniciados');
+  });
+
+  // ---------- main calculation ----------
+  let lastResult = {};
 
   function calculate(){
     const rollPrice = num('rollPrice');
     const rollWeight = num('rollWeight') || 1;
     const pieceWeight = num('pieceWeight');
     const quantity = Math.max(1, num('quantity'));
+    const supportWeight = num('supportWeight');
     const hours = num('hours');
     const watts = num('watts');
     const kwhPrice = num('kwhPrice');
@@ -591,9 +997,14 @@
     const wage = num('wage');
     const failRate = num('failRate') / 100;
     const profit = num('profit') / 100;
+    const shippingCost = num('shippingCost');
+    const marketPrice = num('marketPrice');
+    const isReverse = el.reverseToggle.checked;
+    const targetPrice = num('targetPrice');
 
     const costPerGram = rollPrice / rollWeight;
     const materialCost = costPerGram * pieceWeight * quantity;
+    const supportCost = costPerGram * supportWeight;
 
     const electricityCost = (watts * hours / 1000) * kwhPrice;
 
@@ -611,9 +1022,10 @@
       const changes = num('colorChanges');
       const purgePerChange = num('purgePerChange');
       const extraMin = num('extraMinPerChange');
+      const purgeRate = el.purgeCostToggle.checked ? num('purgeCostPerGram') : costPerGram;
 
       const purgeGrams = changes * purgePerChange;
-      purgeCost = purgeGrams * costPerGram;
+      purgeCost = purgeGrams * purgeRate;
 
       const extraHours = (changes * extraMin) / 60;
       const extraElec = (watts * extraHours / 1000) * kwhPrice;
@@ -629,10 +1041,49 @@
       rowExtraTime.classList.add('hidden');
     }
 
-    const subtotal = materialCost + electricityCost + wearCost + laborCost + purgeCost + extraTimeCost;
+    if(supportWeight > 0){
+      rowSupport.classList.remove('hidden');
+      outSupport.textContent = fmt(supportCost);
+    } else {
+      rowSupport.classList.add('hidden');
+    }
+
+    const extraItemsCost = extraCosts.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
+    if(extraCosts.length > 0){
+      rowExtraItems.classList.remove('hidden');
+      outExtraItems.textContent = fmt(extraItemsCost);
+    } else {
+      rowExtraItems.classList.add('hidden');
+    }
+
+    if(shippingCost > 0){
+      rowShipping.classList.remove('hidden');
+      outShipping.textContent = fmt(shippingCost);
+    } else {
+      rowShipping.classList.add('hidden');
+    }
+
+    const subtotal = materialCost + supportCost + electricityCost + wearCost + laborCost +
+                      purgeCost + extraTimeCost + extraItemsCost + shippingCost;
     const failCost = subtotal * failRate;
     const totalCost = subtotal + failCost;
-    const finalPrice = totalCost * (1 + profit);
+
+    let finalPrice, profitAmount, profitPercent;
+    if(isReverse){
+      finalPrice = targetPrice;
+      profitAmount = finalPrice - totalCost;
+      profitPercent = totalCost > 0 ? (profitAmount / totalCost) * 100 : 0;
+      outFinalLabel.textContent = 'TU GANANCIA CON ESE PRECIO';
+      outFinal.textContent = fmt(profitAmount);
+      outFinalSub.textContent = profitAmount >= 0
+        ? ('margen de ' + profitPercent.toFixed(1) + '% sobre el costo · precio: ' + fmt(finalPrice))
+        : ('¡estás perdiendo dinero! margen de ' + profitPercent.toFixed(1) + '%');
+    } else {
+      finalPrice = totalCost * (1 + profit);
+      outFinalLabel.textContent = 'PRECIO SUGERIDO DE VENTA';
+      outFinal.textContent = fmt(finalPrice);
+      outFinalSub.textContent = 'incluye tu margen de ganancia';
+    }
 
     outMaterial.textContent = fmt(materialCost);
     outElectricity.textContent = fmt(electricityCost);
@@ -640,20 +1091,349 @@
     outLabor.textContent = fmt(laborCost);
     outFail.textContent = fmt(failCost);
     outCost.textContent = fmt(totalCost);
-    outFinal.textContent = fmt(finalPrice);
 
     if(quantity > 1){
       rowPerPiece.classList.remove('hidden');
-      outPerPiece.textContent = fmt(finalPrice / quantity);
+      outPerPiece.textContent = fmt((isReverse ? targetPrice : finalPrice) / quantity);
     } else {
       rowPerPiece.classList.add('hidden');
     }
+
+    if(marketPrice > 0){
+      const refPrice = isReverse ? targetPrice : finalPrice;
+      const diff = refPrice - marketPrice;
+      const diffPercent = (diff / marketPrice) * 100;
+      rowMarket.classList.remove('hidden');
+      rowMarket.classList.toggle('warn', diff > 0);
+      rowMarket.classList.toggle('good', diff <= 0);
+      outMarket.textContent = (diff >= 0 ? '+' : '') + fmt(diff) + ' (' + (diffPercent >= 0 ? '+' : '') + diffPercent.toFixed(1) + '%)';
+    } else {
+      rowMarket.classList.add('hidden');
+    }
+
+    lastResult = {
+      materialCost, supportCost, electricityCost, wearCost, laborCost,
+      purgeCost, extraTimeCost, extraItemsCost, shippingCost, failCost, totalCost,
+      finalPrice: isReverse ? targetPrice : finalPrice, isReverse, profitAmount, profitPercent
+    };
   }
 
   ids.forEach(id => {
     el[id].addEventListener('input', calculate);
+    el[id].addEventListener('change', calculate);
   });
 
+  // ---------- profiles (impresora + filamento) ----------
+  const PROFILES_KEY = 'calc3d_profiles';
+  const PROFILE_FIELDS = ['rollPrice','rollWeight','currency','watts','kwhPrice','printerPrice','lifeHours'];
+  let profiles = loadJSON(PROFILES_KEY, []);
+
+  function costPerHourFor(p){
+    const watts = parseFloat(p.watts) || 0;
+    const kwh = parseFloat(p.kwhPrice) || 0;
+    const printerPrice = parseFloat(p.printerPrice) || 0;
+    const lifeHours = parseFloat(p.lifeHours) || 1;
+    return (watts * kwh / 1000) + (printerPrice / lifeHours);
+  }
+
+  function renderProfiles(){
+    const list = document.getElementById('profileList');
+    list.innerHTML = '';
+    if(profiles.length === 0){
+      list.innerHTML = '<p class="empty-note">Aún no guardas ningún perfil.</p>';
+      return;
+    }
+    profiles.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      const costHour = costPerHourFor(p);
+      row.innerHTML =
+        '<div class="info"><div class="name">' + escapeHTML(p.name) + '</div>' +
+        '<div class="meta">' + (p.currency || '$') + ' ' + costHour.toFixed(3) + '/hora · rollo ' + (p.currency || '$') + parseFloat(p.rollPrice || 0).toFixed(2) + '</div></div>' +
+        '<div class="actions">' +
+        '<button type="button" class="btn small" data-load="' + i + '">Cargar</button>' +
+        '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
+        '</div>';
+      row.querySelector('[data-load]').addEventListener('click', () => {
+        PROFILE_FIELDS.forEach(f => { if(el[f]) el[f].value = p[f]; });
+        calculate();
+        showToast('Perfil "' + p.name + '" cargado');
+      });
+      row.querySelector('[data-del]').addEventListener('click', () => {
+        profiles.splice(i, 1);
+        saveJSON(PROFILES_KEY, profiles);
+        renderProfiles();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  document.getElementById('saveProfileBtn').addEventListener('click', () => {
+    const nameInput = document.getElementById('profileName');
+    const name = nameInput.value.trim();
+    if(!name){ showToast('Ponle un nombre al perfil'); return; }
+    const profile = { name };
+    PROFILE_FIELDS.forEach(f => { profile[f] = el[f].value; });
+    profiles.push(profile);
+    saveJSON(PROFILES_KEY, profiles);
+    nameInput.value = '';
+    renderProfiles();
+    showToast('Perfil guardado');
+  });
+
+  // ---------- history (cotizaciones) ----------
+  const HISTORY_KEY = 'calc3d_history';
+  const ALL_STATE_FIELDS = ids.filter(id => id !== 'currency').concat(['currency']);
+  let history = loadJSON(HISTORY_KEY, []);
+
+  function captureState(){
+    const state = {};
+    ids.forEach(id => {
+      state[id] = el[id].type === 'checkbox' ? el[id].checked : el[id].value;
+    });
+    state.extraCosts = JSON.parse(JSON.stringify(extraCosts));
+    return state;
+  }
+
+  function applyState(state){
+    ids.forEach(id => {
+      if(!(id in state)) return;
+      if(el[id].type === 'checkbox'){ el[id].checked = state[id]; }
+      else { el[id].value = state[id]; }
+    });
+    extraCosts = state.extraCosts ? JSON.parse(JSON.stringify(state.extraCosts)) : [];
+    renderExtraCosts();
+    multiFields.classList.toggle('hidden', !el.multiToggle.checked);
+    purgeCostField.classList.toggle('hidden', !el.purgeCostToggle.checked);
+    targetPriceField.classList.toggle('hidden', !el.reverseToggle.checked);
+    el.profit.disabled = el.reverseToggle.checked;
+    profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
+    calculate();
+  }
+
+  function renderHistory(){
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    if(history.length === 0){
+      list.innerHTML = '<p class="empty-note">Aún no guardas ninguna cotización.</p>';
+      return;
+    }
+    history.slice().reverse().forEach((h) => {
+      const i = history.indexOf(h);
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      const date = new Date(h.savedAt);
+      row.innerHTML =
+        '<div class="info"><div class="name">' + escapeHTML(h.name) + '</div>' +
+        '<div class="meta">' + h.finalPriceLabel + ' · ' + date.toLocaleDateString() + '</div></div>' +
+        '<div class="actions">' +
+        '<button type="button" class="btn small" data-load="' + i + '">Cargar</button>' +
+        '<button type="button" class="btn small" data-dup="' + i + '">Duplicar</button>' +
+        '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
+        '</div>';
+      row.querySelector('[data-load]').addEventListener('click', () => {
+        applyState(history[i].state);
+        showToast('Cotización "' + history[i].name + '" cargada');
+      });
+      row.querySelector('[data-dup]').addEventListener('click', () => {
+        const copy = JSON.parse(JSON.stringify(history[i]));
+        copy.name = copy.name + ' (copia)';
+        copy.savedAt = Date.now();
+        history.push(copy);
+        saveJSON(HISTORY_KEY, history);
+        renderHistory();
+        showToast('Cotización duplicada');
+      });
+      row.querySelector('[data-del]').addEventListener('click', () => {
+        history.splice(i, 1);
+        saveJSON(HISTORY_KEY, history);
+        renderHistory();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  document.getElementById('saveQuoteBtn').addEventListener('click', () => {
+    const nameInput = document.getElementById('quoteName');
+    const name = nameInput.value.trim();
+    if(!name){ showToast('Ponle un nombre a la pieza'); return; }
+    calculate();
+    history.push({
+      name,
+      savedAt: Date.now(),
+      finalPriceLabel: fmt(lastResult.finalPrice),
+      state: captureState()
+    });
+    saveJSON(HISTORY_KEY, history);
+    nameInput.value = '';
+    renderHistory();
+    showToast('Cotización guardada');
+  });
+
+  function escapeHTML(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------- export / share ----------
+  function buildSummaryText(){
+    calculate();
+    const lines = [
+      'Cotización de impresión 3D',
+      '—————————————————',
+      'Material: ' + outMaterial.textContent,
+      'Electricidad: ' + outElectricity.textContent,
+      'Desgaste de máquina: ' + outWear.textContent,
+      'Tu tiempo: ' + outLabor.textContent
+    ];
+    if(!rowPurge.classList.contains('hidden')) lines.push('Purga multicolor: ' + outPurge.textContent);
+    if(!rowExtraTime.classList.contains('hidden')) lines.push('Tiempo extra multicolor: ' + outExtraTime.textContent);
+    if(!rowExtraItems.classList.contains('hidden')) lines.push('Consumibles extra: ' + outExtraItems.textContent);
+    if(!rowShipping.classList.contains('hidden')) lines.push('Envío/empaque: ' + outShipping.textContent);
+    lines.push('Margen por fallos: ' + outFail.textContent);
+    lines.push('—————————————————');
+    lines.push('COSTO TOTAL: ' + outCost.textContent);
+    lines.push(outFinalLabel.textContent + ': ' + outFinal.textContent);
+    return lines.join('\n');
+  }
+
+  document.getElementById('copyTextBtn').addEventListener('click', async () => {
+    const text = buildSummaryText();
+    try{
+      await navigator.clipboard.writeText(text);
+      showToast('Cotización copiada');
+    }catch(e){
+      showToast('No se pudo copiar automáticamente');
+    }
+  });
+
+  document.getElementById('shareBtn').addEventListener('click', async () => {
+    const text = buildSummaryText();
+    if(navigator.share){
+      try{ await navigator.share({ title: 'Cotización de impresión 3D', text }); }
+      catch(e){ /* usuario canceló */ }
+    } else {
+      try{
+        await navigator.clipboard.writeText(text);
+        showToast('Tu navegador no soporta compartir — texto copiado');
+      }catch(e){
+        showToast('No se pudo compartir ni copiar');
+      }
+    }
+  });
+
+  document.getElementById('pdfBtn').addEventListener('click', () => {
+    if(!window.jspdf){ showToast('No se pudo cargar el generador de PDF'); return; }
+    calculate();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Cotización de impresión 3D', 14, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(120);
+    doc.text(new Date().toLocaleDateString(), 14, 24);
+    doc.setTextColor(20);
+    doc.setFontSize(11);
+    let y = 36;
+    const rows = [
+      ['Material', outMaterial.textContent],
+      !rowSupport.classList.contains('hidden') ? ['Soportes', outSupport.textContent] : null,
+      ['Electricidad', outElectricity.textContent],
+      ['Desgaste de máquina', outWear.textContent],
+      ['Tu tiempo', outLabor.textContent],
+      !rowPurge.classList.contains('hidden') ? ['Purga multicolor', outPurge.textContent] : null,
+      !rowExtraTime.classList.contains('hidden') ? ['Tiempo extra multicolor', outExtraTime.textContent] : null,
+      !rowExtraItems.classList.contains('hidden') ? ['Consumibles extra', outExtraItems.textContent] : null,
+      !rowShipping.classList.contains('hidden') ? ['Envío / empaque', outShipping.textContent] : null,
+      ['Margen por fallos', outFail.textContent]
+    ].filter(Boolean);
+    rows.forEach(([label, value]) => {
+      doc.text(label, 14, y);
+      doc.text(value, 195, y, { align: 'right' });
+      y += 8;
+    });
+    y += 2;
+    doc.setDrawColor(200);
+    doc.line(14, y, 195, y);
+    y += 10;
+    doc.setFontSize(13);
+    doc.text('COSTO TOTAL', 14, y);
+    doc.text(outCost.textContent, 195, y, { align: 'right' });
+    y += 12;
+    doc.setFontSize(15);
+    doc.setTextColor(20, 130, 110);
+    doc.text(outFinalLabel.textContent, 14, y);
+    doc.text(outFinal.textContent, 195, y, { align: 'right' });
+    doc.save('cotizacion-3d.pdf');
+    showToast('PDF descargado');
+  });
+
+  document.getElementById('imageBtn').addEventListener('click', () => {
+    if(!window.html2canvas){ showToast('No se pudo cargar el generador de imagen'); return; }
+    calculate();
+    qrBox.classList.add('hidden');
+    const target = document.getElementById('resultCard');
+    html2canvas(target, { backgroundColor: null, scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'cotizacion-3d.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      showToast('Imagen descargada');
+    }).catch(() => showToast('No se pudo generar la imagen'));
+  });
+
+  function buildShareLink(){
+    const params = new URLSearchParams();
+    ids.forEach(id => {
+      const val = el[id].type === 'checkbox' ? (el[id].checked ? '1' : '0') : el[id].value;
+      params.set(id, val);
+    });
+    return location.origin + location.pathname + '?' + params.toString();
+  }
+
+  document.getElementById('linkBtn').addEventListener('click', async () => {
+    const link = buildShareLink();
+    try{
+      await navigator.clipboard.writeText(link);
+      showToast('Link copiado');
+    }catch(e){
+      showToast('No se pudo copiar el link');
+    }
+  });
+
+  document.getElementById('qrBtn').addEventListener('click', () => {
+    const isHidden = qrBox.classList.contains('hidden');
+    if(!isHidden){ qrBox.classList.add('hidden'); return; }
+    if(!window.QRCode){ showToast('No se pudo cargar el generador de QR'); return; }
+    qrBox.innerHTML = '';
+    qrBox.classList.remove('hidden');
+    new QRCode(qrBox, { text: buildShareLink(), width: 168, height: 168, colorDark: '#0d1b2a', colorLight: '#ffffff' });
+  });
+
+  // ---------- load shared link (if any) ----------
+  function loadFromQuery(){
+    const params = new URLSearchParams(location.search);
+    if([...params.keys()].length === 0) return;
+    ids.forEach(id => {
+      if(!params.has(id)) return;
+      const raw = params.get(id);
+      if(el[id].type === 'checkbox'){ el[id].checked = raw === '1'; }
+      else { el[id].value = raw; }
+    });
+    multiFields.classList.toggle('hidden', !el.multiToggle.checked);
+    purgeCostField.classList.toggle('hidden', !el.purgeCostToggle.checked);
+    targetPriceField.classList.toggle('hidden', !el.reverseToggle.checked);
+    el.profit.disabled = el.reverseToggle.checked;
+    profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
+    userEditedChanges = true;
+  }
+
+  // ---------- init ----------
+  renderExtraCosts();
+  renderProfiles();
+  renderHistory();
+  loadFromQuery();
   calculate();
 
   if("serviceWorker" in navigator){
@@ -661,6 +1441,8 @@
       navigator.serviceWorker.register("sw.js").catch(() => {});
     });
   }
+
+})();
 </script>
 
 </body>
