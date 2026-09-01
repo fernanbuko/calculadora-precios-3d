@@ -226,8 +226,16 @@
     display:flex;
     gap: 8px;
     align-items:center;
+    width: 100%;
   }
-  .currency-row .input-box:first-child input{ width: 46px; }
+  .currency-row select{ width: 64px; flex-shrink: 0; }
+  .currency-row .input-box{ flex: 1; min-width: 0; }
+  .currency-row .input-box input{ width: 100%; min-width: 0; }
+
+  .field.field-wide{
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
 
   /* Results */
   .result-card{
@@ -459,7 +467,7 @@
   <div class="card">
     <p class="card-title">01 · Material <span class="tag">FILAMENTO</span></p>
 
-    <div class="field">
+    <div class="field field-wide">
       <div>
         <label for="rollPrice">Precio del rollo</label>
         <small>Lo que pagaste por el rollo completo</small>
