@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Calculadora de precios · Impresión 3D</title>
+<meta name="description" content="Calcula en segundos cuánto cobrar por tus impresiones 3D: material, electricidad, desgaste de máquina, tu tiempo y margen de ganancia.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1b2a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Precios 3D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0d1b2a;
+    --bg-grid: rgba(148, 197, 255, 0.06);
+    --surface: #13253b;
+    --surface-2: #0f1f32;
+    --line: rgba(148, 197, 255, 0.18);
+    --line-strong: rgba(148, 197, 255, 0.35);
+    --text: #e7eefc;
+    --text-dim: #93a8c4;
+    --text-faint: #5d7290;
+    --orange: #ff8a3d;
+    --orange-dim: #ff8a3d33;
+    --teal: #5fe0c7;
+    --teal-dim: #5fe0c722;
+    --red: #ff6b6b;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body{
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+    min-height: 100vh;
+    padding: 20px 14px 60px;
+  }
+
+  .wrap{ max-width: 640px; margin: 0 auto; }
+
+  header{ margin-bottom: 22px; }
+
+  .eyebrow{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--orange);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .eyebrow::before{
+    content: "";
+    width: 7px; height: 7px;
+    background: var(--orange);
+    display: inline-block;
+    transform: rotate(45deg);
+  }
+
+  h1{
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    line-height: 1.25;
+  }
+
+  header p{
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+    max-width: 46ch;
+  }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 18px 16px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  .card::before, .card::after{
+    content: "";
+    position: absolute;
+    width: 8px; height: 8px;
+    border: 1px solid var(--line-strong);
+    top: -1px;
+  }
+  .card::before{ left: -1px; border-right: none; border-bottom: none; }
+  .card::after{ right: -1px; border-left: none; border-bottom: none; }
+
+  .card-title{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .card-title span.tag{
+    color: var(--text-faint);
+    font-size: 10px;
+  }
+
+  .field{
+    display: grid;
+    grid-template-columns: 1fr 96px;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .field:last-child{ border-bottom: none; }
+
+  .field label{
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.35;
+  }
+  .field small{
+    display: block;
+    color: var(--text-faint);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .input-box{
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  input[type="number"], input[type="text"]{
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    padding: 8px 8px;
+    border-radius: 3px;
+    text-align: right;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input[type="text"].currency{
+    text-align: center;
+    padding: 8px 4px;
+  }
+
+  input:focus{
+    border-color: var(--orange);
+  }
+
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button{
+    -webkit-appearance: none; margin: 0;
+  }
+
+  .currency-row{
+    display:flex;
+    gap: 8px;
+    align-items:center;
+  }
+  .currency-row .input-box:first-child input{ width: 46px; }
+
+  /* Results */
+  .result-card{
+    background: var(--surface-2);
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 18px 16px;
+    margin-top: 4px;
+  }
+
+  .breakdown-row{
+    display:flex;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    padding: 6px 0;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--line);
+  }
+  .breakdown-row span:last-child{ color: var(--text); }
+  .breakdown-row.warn span:last-child{ color: var(--red); }
+
+  .total-row{
+    display:flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-top: 12px;
+    margin-top: 6px;
+  }
+  .total-row .label{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .05em;
+    color: var(--text-dim);
+  }
+  .total-row .value{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    color: var(--text);
+  }
+
+  .final-price{
+    margin-top: 14px;
+    background: var(--teal-dim);
+    border: 1px solid var(--teal);
+    border-radius: 4px;
+    padding: 16px;
+    text-align: center;
+  }
+  .final-price .label{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .08em;
+    color: var(--teal);
+    margin-bottom: 4px;
+  }
+  .final-price .value{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 34px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .final-price .sub{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  footer{
+    text-align:center;
+    color: var(--text-faint);
+    font-size: 11px;
+    margin-top: 24px;
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.6;
+  }
+
+  .hidden{ display: none !important; }
+
+  .multi-fields{
+    margin-top: 4px;
+  }
+
+  .switch{
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 24px;
+  }
+  .switch input{
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .slider{
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--surface-2);
+    border: 1px solid var(--line-strong);
+    transition: .15s;
+    border-radius: 24px;
+  }
+  .slider::before{
+    position: absolute;
+    content: "";
+    height: 16px; width: 16px;
+    left: 3px; bottom: 3px;
+    background-color: var(--text-faint);
+    transition: .15s;
+    border-radius: 50%;
+  }
+  .switch input:checked + .slider{
+    border-color: var(--orange);
+    background-color: var(--orange-dim);
+  }
+  .switch input:checked + .slider::before{
+    transform: translateX(18px);
+    background-color: var(--orange);
+  }
+
+  @media (min-width: 480px){
+    h1{ font-size: 30px; }
+    .final-price .value{ font-size: 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">CALCULADORA DE COSTOS</div>
+    <h1>¿Cuánto cobrar por tu impresión?</h1>
+    <p>Mete tus números en tu propia moneda. El precio final se recalcula solo, en tiempo real.</p>
+  </header>
+
+  <!-- MATERIAL -->
+  <div class="card">
+    <p class="card-title">01 · Material <span class="tag">FILAMENTO</span></p>
+
+    <div class="field">
+      <div>
+        <label for="rollPrice">Precio del rollo</label>
+        <small>Lo que pagaste por el rollo completo</small>
+      </div>
+      <div class="currency-row">
+        <div class="input-box"><input type="text" id="currency" class="currency" value="$" maxlength="4"></div>
+        <div class="input-box"><input type="number" id="rollPrice" value="18" min="0" step="0.01"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="rollWeight">Peso del rollo</label>
+        <small>Normalmente 1000 g, a veces 500 o 750</small>
+      </div>
+      <div class="input-box"><input type="number" id="rollWeight" value="1000" min="1" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="pieceWeight">Peso de la pieza</label>
+        <small>Gramos usados — lo ves en el slicer (de 1 sola pieza)</small>
+      </div>
+      <div class="input-box"><input type="number" id="pieceWeight" value="35" min="0" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="quantity">Cantidad de piezas</label>
+        <small>Cuántas copias vas a imprimir/vender juntas</small>
+      </div>
+      <div class="input-box"><input type="number" id="quantity" value="1" min="1" step="1"></div>
+    </div>
+  </div>
+
+  <!-- MAQUINA -->
+  <div class="card">
+    <p class="card-title">02 · Máquina <span class="tag">ELECTRICIDAD + DESGASTE</span></p>
+
+    <div class="field">
+      <div>
+        <label for="hours">Horas de impresión</label>
+        <small>Tiempo total de impresión (todo el lote, si son varias)</small>
+      </div>
+      <div class="input-box"><input type="number" id="hours" value="2.5" min="0" step="0.1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="watts">Consumo de la impresora</label>
+        <small>En Watts (promedio mientras imprime)</small>
+      </div>
+      <div class="input-box"><input type="number" id="watts" value="150" min="0" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="kwhPrice">Precio del kWh</label>
+        <small>Revisa tu recibo de luz</small>
+      </div>
+      <div class="input-box"><input type="number" id="kwhPrice" value="0.15" min="0" step="0.01"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="printerPrice">Precio de tu impresora</label>
+        <small>Para calcular su desgaste por hora</small>
+      </div>
+      <div class="input-box"><input type="number" id="printerPrice" value="300" min="0" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="lifeHours">Vida útil estimada</label>
+        <small>Horas de uso antes de reemplazarla</small>
+      </div>
+      <div class="input-box"><input type="number" id="lifeHours" value="4000" min="1" step="100"></div>
+    </div>
+  </div>
+
+  <!-- TIEMPO -->
+  <div class="card">
+    <p class="card-title">03 · Tu tiempo <span class="tag">MANO DE OBRA</span></p>
+
+    <div class="field">
+      <div>
+        <label for="workHours">Horas de trabajo</label>
+        <small>Diseño, preparación, post-procesado</small>
+      </div>
+      <div class="input-box"><input type="number" id="workHours" value="0.5" min="0" step="0.1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="wage">Tu tarifa por hora</label>
+        <small>Cuánto vale tu hora de trabajo</small>
+      </div>
+      <div class="input-box"><input type="number" id="wage" value="5" min="0" step="0.5"></div>
+    </div>
+  </div>
+
+  <!-- MULTICOLOR -->
+  <div class="card">
+    <p class="card-title">04 · Multicolor <span class="tag">OPCIONAL</span></p>
+
+    <div class="field">
+      <div>
+        <label for="multiToggle">¿Es impresión multicolor?</label>
+        <small>Agrega el material y tiempo que se pierde al cambiar de color</small>
+      </div>
+      <div class="input-box">
+        <label class="switch">
+          <input type="checkbox" id="multiToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div id="multiFields" class="multi-fields hidden">
+      <div class="field">
+        <div>
+          <label for="numColors">Número de colores</label>
+          <small>Cuántos filamentos distintos usa la pieza</small>
+        </div>
+        <div class="input-box"><input type="number" id="numColors" value="2" min="2" max="12" step="1"></div>
+      </div>
+
+      <div class="field">
+        <div>
+          <label for="colorChanges">Cambios de color totales</label>
+          <small>Lo ves en el resumen de Creality Print al laminar</small>
+        </div>
+        <div class="input-box"><input type="number" id="colorChanges" value="1" min="0" step="1"></div>
+      </div>
+
+      <div class="field">
+        <div>
+          <label for="purgePerChange">Purga por cada cambio</label>
+          <small>Gramos que se desechan al limpiar el nozzle</small>
+        </div>
+        <div class="input-box"><input type="number" id="purgePerChange" value="3" min="0" step="0.5"></div>
+      </div>
+
+      <div class="field">
+        <div>
+          <label for="extraMinPerChange">Tiempo extra por cambio</label>
+          <small>Minutos que suma cada cambio de filamento</small>
+        </div>
+        <div class="input-box"><input type="number" id="extraMinPerChange" value="1.5" min="0" step="0.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AJUSTES -->
+  <div class="card">
+    <p class="card-title">05 · Ajustes <span class="tag">RIESGO Y GANANCIA</span></p>
+
+    <div class="field">
+      <div>
+        <label for="failRate">Margen por fallos</label>
+        <small>Cubre impresiones que fallan</small>
+      </div>
+      <div class="input-box"><input type="number" id="failRate" value="10" min="0" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="profit">Margen de ganancia</label>
+        <small>Tu utilidad sobre el costo total</small>
+      </div>
+      <div class="input-box"><input type="number" id="profit" value="40" min="0" step="1"></div>
+    </div>
+  </div>
+
+  <!-- RESULTADOS -->
+  <div class="result-card">
+    <p class="card-title" style="margin-bottom:10px;">DESGLOSE</p>
+
+    <div class="breakdown-row"><span>Material</span><span id="outMaterial">—</span></div>
+    <div class="breakdown-row"><span>Electricidad</span><span id="outElectricity">—</span></div>
+    <div class="breakdown-row"><span>Desgaste de máquina</span><span id="outWear">—</span></div>
+    <div class="breakdown-row"><span>Tu tiempo</span><span id="outLabor">—</span></div>
+    <div class="breakdown-row hidden" id="rowPurge"><span>Purga multicolor (material)</span><span id="outPurge">—</span></div>
+    <div class="breakdown-row hidden" id="rowExtraTime"><span>Tiempo extra multicolor</span><span id="outExtraTime">—</span></div>
+    <div class="breakdown-row"><span>Margen por fallos</span><span id="outFail">—</span></div>
+
+    <div class="total-row">
+      <span class="label">COSTO TOTAL</span>
+      <span class="value" id="outCost">—</span>
+    </div>
+
+    <div class="final-price">
+      <div class="label">PRECIO SUGERIDO DE VENTA</div>
+      <div class="value" id="outFinal">—</div>
+      <div class="sub" id="outFinalSub">incluye tu margen de ganancia</div>
+    </div>
+
+    <div class="breakdown-row hidden" id="rowPerPiece" style="margin-top:10px;">
+      <span>Precio por pieza (÷ cantidad)</span><span id="outPerPiece">—</span>
+    </div>
+  </div>
+
+  <footer>
+    COSTO = MATERIAL + ELECTRICIDAD + DESGASTE + TIEMPO<br>
+    PRECIO = COSTO × (1 + % FALLOS) × (1 + % GANANCIA)
+  </footer>
+
+</div>
+
+<script>
+  const ids = ['rollPrice','rollWeight','pieceWeight','quantity','hours','watts','kwhPrice',
+               'printerPrice','lifeHours','workHours','wage','failRate','profit','currency',
+               'multiToggle','numColors','colorChanges','purgePerChange','extraMinPerChange'];
+  const el = {};
+  ids.forEach(id => el[id] = document.getElementById(id));
+
+  const outMaterial = document.getElementById('outMaterial');
+  const outElectricity = document.getElementById('outElectricity');
+  const outWear = document.getElementById('outWear');
+  const outLabor = document.getElementById('outLabor');
+  const outFail = document.getElementById('outFail');
+  const outCost = document.getElementById('outCost');
+  const outFinal = document.getElementById('outFinal');
+  const outPurge = document.getElementById('outPurge');
+  const outExtraTime = document.getElementById('outExtraTime');
+  const rowPurge = document.getElementById('rowPurge');
+  const rowExtraTime = document.getElementById('rowExtraTime');
+  const rowPerPiece = document.getElementById('rowPerPiece');
+  const outPerPiece = document.getElementById('outPerPiece');
+  const multiFields = document.getElementById('multiFields');
+
+  let userEditedChanges = false;
+  el.colorChanges.addEventListener('input', () => { userEditedChanges = true; });
+  el.numColors.addEventListener('input', () => {
+    if(!userEditedChanges){
+      el.colorChanges.value = Math.max(0, num('numColors') - 1);
+    }
+  });
+
+  el.multiToggle.addEventListener('change', () => {
+    multiFields.classList.toggle('hidden', !el.multiToggle.checked);
+    calculate();
+  });
+
+  function num(id){
+    const v = parseFloat(el[id].value);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function fmt(n){
+    const c = el.currency.value || '';
+    return c + ' ' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function calculate(){
+    const rollPrice = num('rollPrice');
+    const rollWeight = num('rollWeight') || 1;
+    const pieceWeight = num('pieceWeight');
+    const quantity = Math.max(1, num('quantity'));
+    const hours = num('hours');
+    const watts = num('watts');
+    const kwhPrice = num('kwhPrice');
+    const printerPrice = num('printerPrice');
+    const lifeHours = num('lifeHours') || 1;
+    const workHours = num('workHours');
+    const wage = num('wage');
+    const failRate = num('failRate') / 100;
+    const profit = num('profit') / 100;
+
+    const costPerGram = rollPrice / rollWeight;
+    const materialCost = costPerGram * pieceWeight * quantity;
+
+    const electricityCost = (watts * hours / 1000) * kwhPrice;
+
+    const wearPerHour = printerPrice / lifeHours;
+    const wearCost = wearPerHour * hours;
+
+    const laborCost = workHours * wage;
+
+    // Multicolor extras
+    const isMulti = el.multiToggle.checked;
+    let purgeCost = 0;
+    let extraTimeCost = 0;
+
+    if(isMulti){
+      const changes = num('colorChanges');
+      const purgePerChange = num('purgePerChange');
+      const extraMin = num('extraMinPerChange');
+
+      const purgeGrams = changes * purgePerChange;
+      purgeCost = purgeGrams * costPerGram;
+
+      const extraHours = (changes * extraMin) / 60;
+      const extraElec = (watts * extraHours / 1000) * kwhPrice;
+      const extraWear = wearPerHour * extraHours;
+      extraTimeCost = extraElec + extraWear;
+
+      rowPurge.classList.remove('hidden');
+      rowExtraTime.classList.remove('hidden');
+      outPurge.textContent = fmt(purgeCost);
+      outExtraTime.textContent = fmt(extraTimeCost);
+    } else {
+      rowPurge.classList.add('hidden');
+      rowExtraTime.classList.add('hidden');
+    }
+
+    const subtotal = materialCost + electricityCost + wearCost + laborCost + purgeCost + extraTimeCost;
+    const failCost = subtotal * failRate;
+    const totalCost = subtotal + failCost;
+    const finalPrice = totalCost * (1 + profit);
+
+    outMaterial.textContent = fmt(materialCost);
+    outElectricity.textContent = fmt(electricityCost);
+    outWear.textContent = fmt(wearCost);
+    outLabor.textContent = fmt(laborCost);
+    outFail.textContent = fmt(failCost);
+    outCost.textContent = fmt(totalCost);
+    outFinal.textContent = fmt(finalPrice);
+
+    if(quantity > 1){
+      rowPerPiece.classList.remove('hidden');
+      outPerPiece.textContent = fmt(finalPrice / quantity);
+    } else {
+      rowPerPiece.classList.add('hidden');
+    }
+  }
+
+  ids.forEach(id => {
+    el[id].addEventListener('input', calculate);
+  });
+
+  calculate();
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>
