@@ -236,6 +236,7 @@
     grid-template-columns: 1fr;
     row-gap: 8px;
   }
+  .field.field-wide .input-box{ width: 100%; min-width: 0; }
 
   /* Results */
   .result-card{
@@ -481,6 +482,30 @@
         <small>Su dimensión más grande, en cm (aproximado)</small>
       </div>
       <div class="input-box"><input type="number" id="simpleSize" value="10" min="1" step="0.5"></div>
+    </div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="simplePrinterSpeed">Velocidad de tu impresora</label>
+        <small>Para afinar la estimación del tiempo de impresión</small>
+      </div>
+      <div class="input-box">
+        <select id="simplePrinterSpeed" style="width:100%;">
+          <option value="1">Estándar / no sé</option>
+          <option value="1.2">Básica (Ender 3, Prusa Mini...)</option>
+          <option value="0.85">Media-alta (Prusa MK3S+/MK4, Ender S1...)</option>
+          <option value="0.45">Alta velocidad (Bambu Lab, Creality K1/K2...)</option>
+          <option value="custom">Personalizada</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field hidden" id="simpleSpeedCustomField">
+      <div>
+        <label for="simpleSpeedCustom">Factor de velocidad</label>
+        <small>1 = estándar. Menos de 1 = más rápida (menos horas). Más de 1 = más lenta.</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleSpeedCustom" value="1" min="0.1" step="0.05"></div>
     </div>
 
     <div class="field">
@@ -1075,30 +1100,42 @@
     el.profit.disabled = false;
     profitField.style.opacity = '1';
     SIMPLE_DEFAULTS_LIST.forEach(([id, val]) => { document.getElementById(id).value = val; });
+    document.getElementById('simpleSpeedCustomField').classList.add('hidden');
     calculate();
     showToast('Valores reiniciados');
   });
 
   // ---------- modo simple ----------
   // El tamaño se convierte a peso/horas con la misma proporción que los
-  // valores por defecto: 10 cm ~ 35 g y 2.5 h (aprox. volumen al cubo).
+  // valores por defecto: 10 cm ~ 35 g y 2.5 h (aprox. volumen al cubo),
+  // ajustado además por qué tan rápida es la impresora elegida.
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
-    ['simpleSize', '10'], ['simpleColors', '1'],
+    ['simpleSize', '10'], ['simplePrinterSpeed', '1'], ['simpleSpeedCustom', '1'], ['simpleColors', '1'],
     ['simpleRollPrice', '18'], ['simpleKwhPrice', '0.15'], ['simpleWage', '5']
   ];
   const simpleModeToggle = document.getElementById('simpleModeToggle');
   const simpleCard = document.getElementById('simpleCard');
-  const simpleFieldIds = ['simpleSize', 'simpleColors', 'simpleRollPrice', 'simpleKwhPrice', 'simpleWage'];
+  const simpleSpeedCustomField = document.getElementById('simpleSpeedCustomField');
+  const simpleFieldIds = ['simpleSize', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleKwhPrice', 'simpleWage'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
+
+  simpleEl.simplePrinterSpeed.addEventListener('change', () => {
+    simpleSpeedCustomField.classList.toggle('hidden', simpleEl.simplePrinterSpeed.value !== 'custom');
+  });
 
   function applySimpleToAdvanced(){
     const cm = Math.max(0, parseFloat(simpleEl.simpleSize.value) || 0);
     const cm3 = Math.pow(cm, 3);
+
+    const speedFactor = simpleEl.simplePrinterSpeed.value === 'custom'
+      ? Math.max(0.1, parseFloat(simpleEl.simpleSpeedCustom.value) || 1)
+      : (parseFloat(simpleEl.simplePrinterSpeed.value) || 1);
+
     el.pieceWeight.value = (SIMPLE_WEIGHT_PER_CM3 * cm3).toFixed(1);
-    el.hours.value = (SIMPLE_HOURS_PER_CM3 * cm3).toFixed(2);
+    el.hours.value = (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
     el.sizeScale.value = '100';
 
     const colors = Math.max(1, parseInt(simpleEl.simpleColors.value, 10) || 1);
@@ -1121,6 +1158,7 @@
 
   simpleFieldIds.forEach(id => {
     simpleEl[id].addEventListener('input', applySimpleToAdvanced);
+    simpleEl[id].addEventListener('change', applySimpleToAdvanced);
   });
 
   simpleModeToggle.addEventListener('change', () => {
