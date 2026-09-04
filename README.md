@@ -22,7 +22,7 @@ Todo se recalcula en tiempo real mientras escribes, en la moneda que elijas.
 
 ## Modo simple
 
-Un interruptor arriba de todo activa el **modo simple**: oculta las tarjetas avanzadas y deja solo el tamaño de la pieza (cm), la velocidad de tu impresora, colores, costo del rollo, precio de la luz y tu tarifa por hora. El tamaño se convierte en peso y horas de impresión con la misma lógica de escala al cubo, ajustadas además por qué tan rápida es tu impresora (estándar, básica, media-alta, alta velocidad o un factor personalizado). El resto de los valores (desgaste, fallos, margen) usa cifras típicas. Se puede volver al modo avanzado en cualquier momento para ajustar todo con precisión.
+Un interruptor arriba de todo activa el **modo simple**: oculta las tarjetas avanzadas y deja solo el tamaño de la pieza (cm), la velocidad de tu impresora, colores, costo del rollo, precio de la luz y tu tarifa por hora. El tamaño se convierte en peso y horas de impresión con la misma lógica de escala al cubo, ajustadas además por qué tan rápida es tu impresora (estándar, básica, media-alta, alta velocidad, SparkX i7 Combo con CFS Lite —preseleccionada, con 4 colores por defecto— o un factor personalizado). El resto de los valores (desgaste, fallos, margen) usa cifras típicas. Se puede volver al modo avanzado en cualquier momento para ajustar todo con precisión.
 
 ## Funciones adicionales
 

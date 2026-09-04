@@ -495,9 +495,16 @@
           <option value="1.2">Básica (Ender 3, Prusa Mini...)</option>
           <option value="0.85">Media-alta (Prusa MK3S+/MK4, Ender S1...)</option>
           <option value="0.45">Alta velocidad (Bambu Lab, Creality K1/K2...)</option>
+          <option value="0.4" data-colors="4" selected>SparkX i7 Combo (CFS Lite, 4 colores)</option>
           <option value="custom">Personalizada</option>
         </select>
       </div>
+    </div>
+
+    <div class="field field-wide" id="sparkxNote">
+      <p style="font-size:11.5px;color:var(--text-faint);margin:0;line-height:1.5;">
+        ⚠ No tenemos datos verificados de velocidad para la SparkX i7 Combo — es un estimado. Si tus tiempos reales del slicer son distintos, elige "Personalizada" y ajusta el factor.
+      </p>
     </div>
 
     <div class="field hidden" id="simpleSpeedCustomField">
@@ -513,7 +520,7 @@
         <label for="simpleColors">Colores de la pieza</label>
         <small>Cuántos filamentos distintos usa</small>
       </div>
-      <div class="input-box"><input type="number" id="simpleColors" value="1" min="1" max="12" step="1"></div>
+      <div class="input-box"><input type="number" id="simpleColors" value="4" min="1" max="12" step="1"></div>
     </div>
 
     <div class="field">
@@ -1112,19 +1119,26 @@
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
-    ['simpleSize', '10'], ['simplePrinterSpeed', '1'], ['simpleSpeedCustom', '1'], ['simpleColors', '1'],
+    ['simpleSize', '10'], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', '4'],
     ['simpleRollPrice', '18'], ['simpleKwhPrice', '0.15'], ['simpleWage', '5']
   ];
   const simpleModeToggle = document.getElementById('simpleModeToggle');
   const simpleCard = document.getElementById('simpleCard');
   const simpleSpeedCustomField = document.getElementById('simpleSpeedCustomField');
+  const sparkxNote = document.getElementById('sparkxNote');
   const simpleFieldIds = ['simpleSize', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleKwhPrice', 'simpleWage'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
 
   simpleEl.simplePrinterSpeed.addEventListener('change', () => {
     simpleSpeedCustomField.classList.toggle('hidden', simpleEl.simplePrinterSpeed.value !== 'custom');
+    const opt = simpleEl.simplePrinterSpeed.selectedOptions[0];
+    sparkxNote.classList.toggle('hidden', !(opt && opt.value === '0.4'));
+    if(opt && opt.dataset.colors){
+      simpleEl.simpleColors.value = opt.dataset.colors;
+    }
   });
+  simpleEl.simplePrinterSpeed.dispatchEvent(new Event('change'));
 
   function applySimpleToAdvanced(){
     const cm = Math.max(0, parseFloat(simpleEl.simpleSize.value) || 0);
