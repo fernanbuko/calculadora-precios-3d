@@ -431,6 +431,9 @@
   }
   .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  .mode-banner{ background: var(--orange-dim); border-color: var(--orange); }
+  body.simple-mode .advanced-cards{ display: none; }
+
   @media (min-width: 480px){
     h1{ font-size: 30px; }
     .final-price .value{ font-size: 40px; }
@@ -452,6 +455,68 @@
     </div>
   </header>
 
+  <!-- MODO SIMPLE -->
+  <div class="card mode-banner">
+    <div class="field" style="border-bottom:none; padding: 0;">
+      <div>
+        <label for="simpleModeToggle">Modo simple</label>
+        <small>Solo tamaño, colores, costo del rollo, luz y mano de obra. El resto usa valores típicos.</small>
+      </div>
+      <div class="input-box">
+        <label class="switch">
+          <input type="checkbox" id="simpleModeToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="simpleCard">
+    <p class="card-title">Modo simple <span class="tag">LO ESENCIAL</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Ideal para una cotización rápida. Usamos valores estándar para lo demás (impresora genérica, sin margen de fallos extra, ganancia del 40%) — cambia a modo avanzado para ajustarlo todo.</p>
+
+    <div class="field">
+      <div>
+        <label for="simpleSize">Tamaño de la pieza</label>
+        <small>Su dimensión más grande, en cm (aproximado)</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleSize" value="10" min="1" step="0.5"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="simpleColors">Colores de la pieza</label>
+        <small>Cuántos filamentos distintos usa</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleColors" value="1" min="1" max="12" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="simpleRollPrice">Costo del rollo</label>
+        <small>Lo que pagaste por el rollo de filamento (1 kg)</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleRollPrice" value="18" min="0" step="0.01"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="simpleKwhPrice">Precio de la luz</label>
+        <small>Precio del kWh — revisa tu recibo</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleKwhPrice" value="0.15" min="0" step="0.01"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="simpleWage">Mano de obra</label>
+        <small>Tu tarifa por hora de trabajo</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleWage" value="5" min="0" step="0.5"></div>
+    </div>
+  </div>
+
+  <div class="advanced-cards">
   <!-- PERFILES -->
   <div class="card">
     <p class="card-title">00 · Perfiles <span class="tag">GUARDAR IMPRESORA Y FILAMENTO</span></p>
@@ -747,6 +812,7 @@
       <div class="input-box"><input type="number" id="marketPrice" value="0" min="0" step="0.5"></div>
     </div>
   </div>
+  </div><!-- /advanced-cards -->
 
   <!-- RESULTADOS -->
   <div class="result-card" id="resultCard">
@@ -997,8 +1063,65 @@
     targetPriceField.classList.add('hidden');
     el.profit.disabled = false;
     profitField.style.opacity = '1';
+    SIMPLE_DEFAULTS_LIST.forEach(([id, val]) => { document.getElementById(id).value = val; });
     calculate();
     showToast('Valores reiniciados');
+  });
+
+  // ---------- modo simple ----------
+  // El tamaño se convierte a peso/horas con la misma proporción que los
+  // valores por defecto: 10 cm ~ 35 g y 2.5 h (aprox. volumen al cubo).
+  const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
+  const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
+  const SIMPLE_DEFAULTS_LIST = [
+    ['simpleSize', '10'], ['simpleColors', '1'],
+    ['simpleRollPrice', '18'], ['simpleKwhPrice', '0.15'], ['simpleWage', '5']
+  ];
+  const simpleModeToggle = document.getElementById('simpleModeToggle');
+  const simpleCard = document.getElementById('simpleCard');
+  const simpleFieldIds = ['simpleSize', 'simpleColors', 'simpleRollPrice', 'simpleKwhPrice', 'simpleWage'];
+  const simpleEl = {};
+  simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
+
+  function applySimpleToAdvanced(){
+    const cm = Math.max(0, parseFloat(simpleEl.simpleSize.value) || 0);
+    const cm3 = Math.pow(cm, 3);
+    el.pieceWeight.value = (SIMPLE_WEIGHT_PER_CM3 * cm3).toFixed(1);
+    el.hours.value = (SIMPLE_HOURS_PER_CM3 * cm3).toFixed(2);
+    el.sizeScale.value = '100';
+
+    const colors = Math.max(1, parseInt(simpleEl.simpleColors.value, 10) || 1);
+    if(colors >= 2){
+      el.multiToggle.checked = true;
+      el.numColors.value = colors;
+      el.colorChanges.value = Math.max(0, colors - 1);
+      multiFields.classList.remove('hidden');
+    } else {
+      el.multiToggle.checked = false;
+      multiFields.classList.add('hidden');
+    }
+
+    el.rollPrice.value = simpleEl.simpleRollPrice.value;
+    el.kwhPrice.value = simpleEl.simpleKwhPrice.value;
+    el.wage.value = simpleEl.simpleWage.value;
+
+    calculate();
+  }
+
+  simpleFieldIds.forEach(id => {
+    simpleEl[id].addEventListener('input', applySimpleToAdvanced);
+  });
+
+  simpleModeToggle.addEventListener('change', () => {
+    const isSimple = simpleModeToggle.checked;
+    document.body.classList.toggle('simple-mode', isSimple);
+    simpleCard.classList.toggle('hidden', !isSimple);
+    if(isSimple){
+      applySimpleToAdvanced();
+      showToast('Modo simple activado');
+    } else {
+      showToast('Modo avanzado activado');
+    }
   });
 
   // ---------- main calculation ----------

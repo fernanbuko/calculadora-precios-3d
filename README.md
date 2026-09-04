@@ -20,6 +20,10 @@ PRECIO = COSTO × (1 + % FALLOS) × (1 + % GANANCIA)
 
 Todo se recalcula en tiempo real mientras escribes, en la moneda que elijas.
 
+## Modo simple
+
+Un interruptor arriba de todo activa el **modo simple**: oculta las tarjetas avanzadas y deja solo 5 campos —tamaño de la pieza (cm), colores, costo del rollo, precio de la luz y tu tarifa por hora— para cotizar rápido. El tamaño se convierte en peso y horas de impresión con la misma lógica de escala al cubo, y el resto de los valores (impresora, desgaste, fallos, margen) usa cifras típicas. Se puede volver al modo avanzado en cualquier momento para ajustar todo con precisión.
+
 ## Funciones adicionales
 
 - **Perfiles de impresora/filamento**: guarda combinaciones (precio/peso de rollo, watts, precio del kWh, precio y vida útil de la impresora) y cárgalas con un clic. Cada perfil muestra su costo por hora, útil para comparar impresoras.
