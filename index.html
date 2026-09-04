@@ -989,6 +989,7 @@
 
     <div class="btn-row">
       <button type="button" class="btn primary" id="addOrderBtn">+ Agregar pedido</button>
+      <button type="button" class="btn hidden" id="cancelEditOrderBtn">Cancelar edición</button>
     </div>
 
     <div class="list" id="ordersList" style="margin-top:14px;"></div>
@@ -1597,12 +1598,29 @@
   // ---------- pedidos ----------
   const ORDERS_KEY = 'calc3d_orders';
   let orders = loadJSON(ORDERS_KEY, []);
+  let editingOrderIndex = null;
   const orderClient = document.getElementById('orderClient');
   const orderDesc = document.getElementById('orderDesc');
   const orderPrice = document.getElementById('orderPrice');
   const orderDate = document.getElementById('orderDate');
   const ordersList = document.getElementById('ordersList');
   const ordersSummary = document.getElementById('ordersSummary');
+  const addOrderBtn = document.getElementById('addOrderBtn');
+  const cancelEditOrderBtn = document.getElementById('cancelEditOrderBtn');
+
+  function clearOrderForm(){
+    orderClient.value = '';
+    orderDesc.value = '';
+    orderPrice.value = '0';
+    orderDate.value = '';
+  }
+
+  function exitEditMode(){
+    editingOrderIndex = null;
+    addOrderBtn.textContent = '+ Agregar pedido';
+    cancelEditOrderBtn.classList.add('hidden');
+    clearOrderForm();
+  }
 
   function fmtOrderDate(dateStr){
     if(!dateStr) return '';
@@ -1642,12 +1660,16 @@
             '<div class="meta">' + escapeHTML(o.descripcion || '') + '</div>' +
             '<div class="meta">' + fmt(parseFloat(o.precio) || 0) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
           '</div>' +
-          '<button type="button" class="btn small danger" data-del="' + i + '" title="Eliminar">✕</button>' +
+          '<div class="actions">' +
+            '<button type="button" class="btn small" data-edit="' + i + '" title="Editar">✎</button>' +
+            '<button type="button" class="btn small danger" data-del="' + i + '" title="Eliminar">✕</button>' +
+          '</div>' +
         '</div>' +
         '<div class="badges">' +
           '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>' +
           '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
         '</div>';
+      if(i === editingOrderIndex) row.style.borderColor = 'var(--orange)';
       row.querySelector('[data-toggle-pagado]').addEventListener('click', () => {
         orders[i].pagado = !orders[i].pagado;
         saveJSON(ORDERS_KEY, orders);
@@ -1658,9 +1680,21 @@
         saveJSON(ORDERS_KEY, orders);
         renderOrders();
       });
+      row.querySelector('[data-edit]').addEventListener('click', () => {
+        editingOrderIndex = i;
+        orderClient.value = orders[i].cliente || '';
+        orderDesc.value = orders[i].descripcion || '';
+        orderPrice.value = orders[i].precio || 0;
+        orderDate.value = orders[i].fecha || '';
+        addOrderBtn.textContent = '✓ Guardar cambios';
+        cancelEditOrderBtn.classList.remove('hidden');
+        orderClient.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast('Editando pedido');
+      });
       row.querySelector('[data-del]').addEventListener('click', () => {
         if(!confirm('¿Eliminar este pedido?')) return;
         orders.splice(i, 1);
+        if(editingOrderIndex === i) exitEditMode();
         saveJSON(ORDERS_KEY, orders);
         renderOrders();
       });
@@ -1674,24 +1708,33 @@
     showToast('Precio copiado');
   });
 
-  document.getElementById('addOrderBtn').addEventListener('click', () => {
+  addOrderBtn.addEventListener('click', () => {
     const cliente = orderClient.value.trim();
     const descripcion = orderDesc.value.trim();
     if(!cliente && !descripcion){ showToast('Pon al menos el cliente o el pedido'); return; }
-    orders.push({
+    const data = {
       cliente, descripcion,
       precio: parseFloat(orderPrice.value) || 0,
-      fecha: orderDate.value || '',
-      pagado: false, entregado: false,
-      createdAt: Date.now()
-    });
-    saveJSON(ORDERS_KEY, orders);
-    orderClient.value = '';
-    orderDesc.value = '';
-    orderPrice.value = '0';
-    orderDate.value = '';
-    renderOrders();
-    showToast('Pedido agregado');
+      fecha: orderDate.value || ''
+    };
+    if(editingOrderIndex !== null){
+      Object.assign(orders[editingOrderIndex], data);
+      saveJSON(ORDERS_KEY, orders);
+      exitEditMode();
+      renderOrders();
+      showToast('Pedido actualizado');
+    } else {
+      orders.push(Object.assign({ pagado: false, entregado: false, createdAt: Date.now() }, data));
+      saveJSON(ORDERS_KEY, orders);
+      clearOrderForm();
+      renderOrders();
+      showToast('Pedido agregado');
+    }
+  });
+
+  cancelEditOrderBtn.addEventListener('click', () => {
+    exitEditMode();
+    showToast('Edición cancelada');
   });
 
   // ---------- export / share ----------
