@@ -818,6 +818,7 @@
   <div class="result-card" id="resultCard">
     <p class="card-title" style="margin-bottom:10px;">DESGLOSE</p>
 
+    <div class="breakdown-row"><span>Tiempo de impresión estimado</span><span id="outPrintTime">—</span></div>
     <div class="breakdown-row"><span>Material</span><span id="outMaterial">—</span></div>
     <div class="breakdown-row hidden" id="rowSupport"><span>Soportes (material)</span><span id="outSupport">—</span></div>
     <div class="breakdown-row"><span>Electricidad</span><span id="outElectricity">—</span></div>
@@ -900,6 +901,7 @@
   };
 
   const outMaterial = document.getElementById('outMaterial');
+  const outPrintTime = document.getElementById('outPrintTime');
   const rowScaled = document.getElementById('rowScaled');
   const outScaled = document.getElementById('outScaled');
   const outSupport = document.getElementById('outSupport');
@@ -941,6 +943,15 @@
   function fmt(n){
     const c = el.currency.value || '';
     return c + ' ' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function fmtHours(h){
+    const totalMinutes = Math.max(0, Math.round(h * 60));
+    const hh = Math.floor(totalMinutes / 60);
+    const mm = totalMinutes % 60;
+    if(hh === 0) return mm + ' min';
+    if(mm === 0) return hh + ' h';
+    return hh + ' h ' + mm + ' min';
   }
 
   function showToast(msg){
@@ -1246,6 +1257,7 @@
       outFinalSub.textContent = 'incluye tu margen de ganancia';
     }
 
+    outPrintTime.textContent = fmtHours(scaledHours);
     outMaterial.textContent = fmt(materialCost);
     outElectricity.textContent = fmt(electricityCost);
     outWear.textContent = fmt(wearCost);
