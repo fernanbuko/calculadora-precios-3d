@@ -28,6 +28,7 @@ Un interruptor arriba de todo activa el **modo simple**: oculta las tarjetas ava
 
 - **Perfiles de impresora/filamento**: guarda combinaciones (precio/peso de rollo, watts, precio del kWh, precio y vida útil de la impresora) y cárgalas con un clic. Cada perfil muestra su costo por hora, útil para comparar impresoras.
 - **Historial de cotizaciones**: guarda cada pieza cotizada (con todos sus valores) en este dispositivo, cárgala de nuevo o duplícala como punto de partida para una variante.
+- **Pedidos**: registra qué le debes entregar a cada cliente y cuánto cobrar (con el botón "Usar precio calculado" para copiar el precio de la calculadora), marca cada uno como pagado/entregado con un toque, y ve de un vistazo cuánto tienes por cobrar y cuántos pedidos faltan por entregar.
 - **Calculadora inversa**: en vez de fijar tu margen de ganancia, defines el precio que quieres cobrar y la app te dice qué margen real te deja.
 - **Comparación con el mercado**: mete un precio de referencia (de la competencia) y ve cuánto te desvías, en monto y porcentaje.
 - **Exportar y compartir**: copiar el desglose como texto, compartirlo (Web Share API en celulares), descargarlo como PDF o como imagen PNG del resultado, o generar un link/QR que reabre la calculadora con los mismos valores ya cargados.

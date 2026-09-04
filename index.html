@@ -183,7 +183,7 @@
     align-items: center;
   }
 
-  input[type="number"], input[type="text"]{
+  input[type="number"], input[type="text"], input[type="date"]{
     width: 100%;
     background: var(--surface-2);
     border: 1px solid var(--line);
@@ -195,6 +195,7 @@
     text-align: right;
     outline: none;
     transition: border-color .15s;
+    color-scheme: light dark;
   }
   input[type="text"].currency{
     text-align: center;
@@ -411,6 +412,50 @@
 
   .qr-box{ display:flex; justify-content:center; padding: 12px 0 4px; }
   .qr-box canvas, .qr-box img{ border-radius: 4px; background: #fff; padding: 8px; }
+
+  #orderClient, #orderDesc{ text-align: left; }
+
+  .orders-summary{
+    display:flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .orders-summary .stat{
+    flex: 1;
+    min-width: 130px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 10px 12px;
+  }
+  .orders-summary .stat .num{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    color: var(--orange);
+  }
+  .orders-summary .stat .lbl{
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+
+  .order-item{ flex-direction: column; align-items: stretch; gap: 8px; }
+  .order-item .order-top{ display:flex; justify-content: space-between; gap: 10px; }
+  .order-item .badges{ display:flex; gap: 6px; flex-wrap: wrap; }
+  .badge{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .03em;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--line-strong);
+    color: var(--text-dim);
+    cursor: pointer;
+    background: transparent;
+  }
+  .badge.on{ border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+  .badge.warn-off{ border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
 
   .toast{
     position: fixed;
@@ -899,6 +944,54 @@
       <button type="button" class="btn primary" id="saveQuoteBtn">Guardar cotización</button>
     </div>
     <div class="list" id="historyList"></div>
+  </div>
+
+  <!-- PEDIDOS -->
+  <div class="card">
+    <p class="card-title">Pedidos <span class="tag">QUÉ ENTREGAR Y COBRAR</span></p>
+    <div class="orders-summary" id="ordersSummary"></div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="orderClient">Cliente</label>
+        <small>Quién te lo pidió</small>
+      </div>
+      <div class="input-box"><input type="text" id="orderClient" placeholder="Nombre del cliente"></div>
+    </div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="orderDesc">Pedido</label>
+        <small>Qué le vas a entregar</small>
+      </div>
+      <div class="input-box"><input type="text" id="orderDesc" placeholder="Ej: Maceta 12cm x3, roja y blanca"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="orderPrice">Precio a cobrar</label>
+        <small>Usa el botón para copiar el precio calculado arriba</small>
+      </div>
+      <div class="input-box"><input type="number" id="orderPrice" value="0" min="0" step="0.5"></div>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:8px;">
+      <button type="button" class="btn small" id="useCalculatedPriceBtn">↑ Usar precio calculado</button>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="orderDate">Fecha de entrega</label>
+        <small>Opcional</small>
+      </div>
+      <div class="input-box"><input type="date" id="orderDate"></div>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="addOrderBtn">+ Agregar pedido</button>
+    </div>
+
+    <div class="list" id="ordersList" style="margin-top:14px;"></div>
   </div>
 
   <footer>
@@ -1501,6 +1594,106 @@
     return div.innerHTML;
   }
 
+  // ---------- pedidos ----------
+  const ORDERS_KEY = 'calc3d_orders';
+  let orders = loadJSON(ORDERS_KEY, []);
+  const orderClient = document.getElementById('orderClient');
+  const orderDesc = document.getElementById('orderDesc');
+  const orderPrice = document.getElementById('orderPrice');
+  const orderDate = document.getElementById('orderDate');
+  const ordersList = document.getElementById('ordersList');
+  const ordersSummary = document.getElementById('ordersSummary');
+
+  function fmtOrderDate(dateStr){
+    if(!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    if(isNaN(d.getTime())) return '';
+    return d.toLocaleDateString();
+  }
+
+  function renderOrdersSummary(){
+    const pending = orders.filter(o => !o.pagado);
+    const toDeliver = orders.filter(o => !o.entregado);
+    const totalDue = pending.reduce((sum, o) => sum + (parseFloat(o.precio) || 0), 0);
+    ordersSummary.innerHTML =
+      '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Por cobrar (' + pending.length + ' pedido' + (pending.length === 1 ? '' : 's') + ')</div></div>' +
+      '<div class="stat"><div class="num">' + toDeliver.length + '</div><div class="lbl">Por entregar</div></div>';
+  }
+
+  function renderOrders(){
+    renderOrdersSummary();
+    ordersList.innerHTML = '';
+    if(orders.length === 0){
+      ordersList.innerHTML = '<p class="empty-note">Aún no guardas ningún pedido.</p>';
+      return;
+    }
+    const sorted = orders
+      .map((o, i) => ({ o, i }))
+      .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
+
+    sorted.forEach(({ o, i }) => {
+      const row = document.createElement('div');
+      row.className = 'list-item order-item';
+      const dateLabel = fmtOrderDate(o.fecha);
+      row.innerHTML =
+        '<div class="order-top">' +
+          '<div class="info">' +
+            '<div class="name">' + escapeHTML(o.cliente || 'Sin nombre') + '</div>' +
+            '<div class="meta">' + escapeHTML(o.descripcion || '') + '</div>' +
+            '<div class="meta">' + fmt(parseFloat(o.precio) || 0) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
+          '</div>' +
+          '<button type="button" class="btn small danger" data-del="' + i + '" title="Eliminar">✕</button>' +
+        '</div>' +
+        '<div class="badges">' +
+          '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>' +
+          '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
+        '</div>';
+      row.querySelector('[data-toggle-pagado]').addEventListener('click', () => {
+        orders[i].pagado = !orders[i].pagado;
+        saveJSON(ORDERS_KEY, orders);
+        renderOrders();
+      });
+      row.querySelector('[data-toggle-entregado]').addEventListener('click', () => {
+        orders[i].entregado = !orders[i].entregado;
+        saveJSON(ORDERS_KEY, orders);
+        renderOrders();
+      });
+      row.querySelector('[data-del]').addEventListener('click', () => {
+        if(!confirm('¿Eliminar este pedido?')) return;
+        orders.splice(i, 1);
+        saveJSON(ORDERS_KEY, orders);
+        renderOrders();
+      });
+      ordersList.appendChild(row);
+    });
+  }
+
+  document.getElementById('useCalculatedPriceBtn').addEventListener('click', () => {
+    calculate();
+    orderPrice.value = (lastResult.finalPrice || 0).toFixed(2);
+    showToast('Precio copiado');
+  });
+
+  document.getElementById('addOrderBtn').addEventListener('click', () => {
+    const cliente = orderClient.value.trim();
+    const descripcion = orderDesc.value.trim();
+    if(!cliente && !descripcion){ showToast('Pon al menos el cliente o el pedido'); return; }
+    orders.push({
+      cliente, descripcion,
+      precio: parseFloat(orderPrice.value) || 0,
+      fecha: orderDate.value || '',
+      pagado: false, entregado: false,
+      createdAt: Date.now()
+    });
+    saveJSON(ORDERS_KEY, orders);
+    orderClient.value = '';
+    orderDesc.value = '';
+    orderPrice.value = '0';
+    orderDate.value = '';
+    renderOrders();
+    showToast('Pedido agregado');
+  });
+
   // ---------- export / share ----------
   function buildSummaryText(){
     calculate();
@@ -1658,6 +1851,7 @@
   renderExtraCosts();
   renderProfiles();
   renderHistory();
+  renderOrders();
   loadFromQuery();
   calculate();
 
