@@ -66,11 +66,52 @@
       linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
     background-size: 28px 28px;
     min-height: 100vh;
-    padding: 20px 14px 60px;
+    padding: 20px 14px calc(76px + env(safe-area-inset-bottom, 0px));
     transition: background-color .15s, color .15s;
   }
 
   .wrap{ max-width: 640px; margin: 0 auto; }
+
+  .tab-panel.hidden{ display: none; }
+
+  .tab-bar{
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    display: flex;
+    max-width: 640px;
+    margin: 0 auto;
+    background: var(--surface);
+    border-top: 1px solid var(--line-strong);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tab-bar-btn{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 9px 4px 7px;
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-family: 'IBM Plex Mono', monospace;
+    position: relative;
+    cursor: pointer;
+  }
+  .tab-bar-btn .tab-icon{ font-size: 19px; line-height: 1; }
+  .tab-bar-btn .tab-label{ font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+  .tab-bar-btn.active{ color: var(--orange); }
+  .tab-bar-btn.active::before{
+    content: "";
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 28px; height: 3px;
+    background: var(--orange);
+    border-radius: 3px;
+  }
 
   header{ margin-bottom: 22px; display:flex; justify-content: space-between; align-items:flex-start; gap: 12px; }
 
@@ -501,6 +542,8 @@
     </div>
   </header>
 
+  <div class="tab-panel" data-tab="calc" id="tabPanelCalc">
+
   <!-- MODO SIMPLE -->
   <div class="card mode-banner">
     <div class="field" style="border-bottom:none; padding: 0;">
@@ -594,17 +637,6 @@
   </div>
 
   <div class="advanced-cards">
-  <!-- PERFILES -->
-  <div class="card">
-    <p class="card-title">00 · Perfiles <span class="tag">GUARDAR IMPRESORA Y FILAMENTO</span></p>
-    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Guarda tu impresora + filamento actuales para no volver a escribirlos. La columna "costo/hora" te sirve para comparar impresoras entre sí.</p>
-    <div class="save-row">
-      <input type="text" id="profileName" placeholder="Nombre del perfil (ej: Ender 3 + PLA genérico)">
-      <button type="button" class="btn primary" id="saveProfileBtn">Guardar perfil</button>
-    </div>
-    <div class="list" id="profileList"></div>
-  </div>
-
   <!-- MATERIAL -->
   <div class="card">
     <p class="card-title">01 · Material <span class="tag">FILAMENTO</span></p>
@@ -936,6 +968,27 @@
     <div class="qr-box hidden" id="qrBox"></div>
   </div>
 
+  <footer>
+    COSTO = MATERIAL + ELECTRICIDAD + DESGASTE + TIEMPO + EXTRAS<br>
+    PRECIO = COSTO × (1 + % FALLOS) × (1 + % GANANCIA)
+  </footer>
+
+  </div><!-- /tab-panel calc -->
+
+  <div class="tab-panel hidden" data-tab="perfiles" id="tabPanelPerfiles">
+  <!-- PERFILES -->
+  <div class="card">
+    <p class="card-title">Perfiles <span class="tag">GUARDAR IMPRESORA Y FILAMENTO</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Guarda tu impresora + filamento actuales para no volver a escribirlos. La columna "costo/hora" te sirve para comparar impresoras entre sí.</p>
+    <div class="save-row">
+      <input type="text" id="profileName" placeholder="Nombre del perfil (ej: Ender 3 + PLA genérico)">
+      <button type="button" class="btn primary" id="saveProfileBtn">Guardar perfil</button>
+    </div>
+    <div class="list" id="profileList"></div>
+  </div>
+  </div><!-- /tab-panel perfiles -->
+
+  <div class="tab-panel hidden" data-tab="historial" id="tabPanelHistorial">
   <!-- HISTORIAL -->
   <div class="card">
     <p class="card-title">Historial de cotizaciones <span class="tag">GUARDADAS EN ESTE DISPOSITIVO</span></p>
@@ -945,7 +998,9 @@
     </div>
     <div class="list" id="historyList"></div>
   </div>
+  </div><!-- /tab-panel historial -->
 
+  <div class="tab-panel hidden" data-tab="pedidos" id="tabPanelPedidos">
   <!-- PEDIDOS -->
   <div class="card">
     <p class="card-title">Pedidos <span class="tag">QUÉ ENTREGAR Y COBRAR</span></p>
@@ -1000,13 +1055,24 @@
     <p class="card-title" style="margin-top:14px;">Todos los pedidos</p>
     <div class="list" id="ordersList"></div>
   </div>
-
-  <footer>
-    COSTO = MATERIAL + ELECTRICIDAD + DESGASTE + TIEMPO + EXTRAS<br>
-    PRECIO = COSTO × (1 + % FALLOS) × (1 + % GANANCIA)
-  </footer>
+  </div><!-- /tab-panel pedidos -->
 
 </div>
+
+<nav class="tab-bar" id="tabBar">
+  <button type="button" class="tab-bar-btn" data-tab="calc">
+    <span class="tab-icon">🧮</span><span class="tab-label">Calculadora</span>
+  </button>
+  <button type="button" class="tab-bar-btn" data-tab="perfiles">
+    <span class="tab-icon">🖨️</span><span class="tab-label">Perfiles</span>
+  </button>
+  <button type="button" class="tab-bar-btn" data-tab="historial">
+    <span class="tab-icon">📜</span><span class="tab-label">Historial</span>
+  </button>
+  <button type="button" class="tab-bar-btn" data-tab="pedidos">
+    <span class="tab-icon">📦</span><span class="tab-label">Pedidos</span>
+  </button>
+</nav>
 
 <div class="toast" id="toast"></div>
 
@@ -1939,6 +2005,29 @@
     userEditedChanges = true;
   }
 
+  // ---------- pestañas ----------
+  const TAB_KEY = 'calc3d_activeTab';
+  const tabBarBtns = document.querySelectorAll('.tab-bar-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  function setActiveTab(tab){
+    let found = false;
+    tabPanels.forEach(p => {
+      const isActive = p.dataset.tab === tab;
+      p.classList.toggle('hidden', !isActive);
+      if(isActive) found = true;
+    });
+    if(!found) tab = 'calc';
+    tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
+    tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    window.scrollTo(0, 0);
+    saveJSON(TAB_KEY, tab);
+  }
+
+  tabBarBtns.forEach(btn => {
+    btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+  });
+
   // ---------- init ----------
   renderExtraCosts();
   renderProfiles();
@@ -1946,6 +2035,7 @@
   renderOrders();
   loadFromQuery();
   calculate();
+  setActiveTab(loadJSON(TAB_KEY, 'calc'));
 
   if("serviceWorker" in navigator){
     window.addEventListener("load", () => {

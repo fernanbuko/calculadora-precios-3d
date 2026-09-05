@@ -2,6 +2,10 @@
 
 App web (PWA) para calcular en segundos cuánto cobrar por una impresión 3D.
 
+## Navegación por pestañas
+
+La app está organizada en 4 pestañas con una barra fija abajo (como una app móvil): **Calculadora**, **Perfiles**, **Historial** y **Pedidos**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga, y la última pestaña abierta se recuerda entre visitas.
+
 ## Qué incluye el cálculo
 
 - **Material**: costo por gramo según el precio y peso del rollo, multiplicado por el peso de la pieza y la cantidad. Incluye soportes descartables.
