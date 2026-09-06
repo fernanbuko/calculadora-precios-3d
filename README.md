@@ -8,7 +8,9 @@ Interfaz moderna con tarjetas blancas de esquinas redondeadas, sombras suaves y 
 
 ## Navegación por pestañas
 
-La app está organizada en 4 pestañas con una barra fija abajo (como una app móvil): **Calculadora**, **Perfiles**, **Historial** y **Pedidos**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga, y la última pestaña abierta se recuerda entre visitas.
+La app está organizada en 4 pestañas: **Calculadora**, **Perfiles**, **Historial** y **Pedidos**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga, y la última pestaña abierta se recuerda entre visitas.
+
+En celular y tablet la navegación es una barra fija abajo (como una app móvil). En pantallas de escritorio (900px de ancho o más) se convierte automáticamente en una barra lateral fija a la izquierda, y el contenido usa más ancho — sin necesidad de dos versiones separadas, es la misma página que se adapta con CSS.
 
 ## Qué incluye el cálculo
 

@@ -533,6 +533,51 @@
     h1{ font-size: 31px; }
     .final-price .value{ font-size: 42px; }
   }
+
+  /* ---------- Escritorio: barra lateral en vez de barra inferior ---------- */
+  @media (min-width: 900px){
+    body{
+      padding: 36px 36px 36px 260px;
+    }
+    .wrap{
+      max-width: 780px;
+      margin: 0;
+    }
+    .tab-bar{
+      left: 0; right: auto; top: 0; bottom: 0;
+      width: 220px;
+      max-width: none;
+      margin: 0;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 4px;
+      padding: 28px 12px;
+      border-top: none;
+      border-right: 1px solid var(--line);
+      box-shadow: 10px 0 32px -22px rgba(0,0,0,.2);
+    }
+    .tab-bar::before{
+      content: "🖨️  Precios 3D";
+      display: block;
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      color: var(--text);
+      padding: 4px 12px 22px;
+    }
+    .tab-bar-btn{
+      flex-direction: row;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 12px;
+      margin: 0;
+      border-radius: 12px;
+    }
+    .tab-bar-btn .tab-icon{ font-size: 18px; }
+    .tab-bar-btn .tab-label{ font-size: 13.5px; }
+  }
 </style>
 </head>
 <body>
