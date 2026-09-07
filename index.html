@@ -487,6 +487,13 @@
     color: var(--text-faint);
     margin-top: 3px;
   }
+  .orders-summary .stat.highlight{
+    background: var(--teal-dim);
+    border-color: var(--teal);
+    min-width: 100%;
+  }
+  .orders-summary .stat.highlight .num{ color: var(--teal); font-size: 24px; }
+  .orders-summary .stat.highlight .lbl{ color: var(--text-dim); }
 
   .order-item{ flex-direction: column; align-items: stretch; gap: 10px; }
   .order-item .order-top{ display:flex; justify-content: space-between; gap: 10px; }
@@ -1756,11 +1763,14 @@
   }
 
   function renderOrdersSummary(){
+    const paid = orders.filter(o => o.pagado);
     const pending = orders.filter(o => !o.pagado);
     const toMake = orders.filter(o => !o.hecho);
     const toDeliver = orders.filter(o => !o.entregado);
+    const totalEarned = paid.reduce((sum, o) => sum + (parseFloat(o.precio) || 0), 0);
     const totalDue = pending.reduce((sum, o) => sum + (parseFloat(o.precio) || 0), 0);
     ordersSummary.innerHTML =
+      '<div class="stat highlight"><div class="num">' + fmt(totalEarned) + '</div><div class="lbl">Generado (' + paid.length + ' pedido' + (paid.length === 1 ? '' : 's') + ' pagado' + (paid.length === 1 ? '' : 's') + ')</div></div>' +
       '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Por cobrar (' + pending.length + ' pedido' + (pending.length === 1 ? '' : 's') + ')</div></div>' +
       '<div class="stat"><div class="num">' + toMake.length + '</div><div class="lbl">Por hacer</div></div>' +
       '<div class="stat"><div class="num">' + toDeliver.length + '</div><div class="lbl">Por entregar</div></div>';
