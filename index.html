@@ -632,10 +632,18 @@
       <div class="input-box"><input type="number" id="simpleSize" value="10" min="1" step="0.5"></div>
     </div>
 
+    <div class="field">
+      <div>
+        <label for="simpleHours">Horas de impresión (opcional)</label>
+        <small>Si la sabes, ponla aquí. Si la dejas vacía, la calculamos con el tamaño y la velocidad de tu impresora</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleHours" value="" min="0" step="0.1" placeholder="Auto"></div>
+    </div>
+
     <div class="field field-wide">
       <div>
         <label for="simplePrinterSpeed">Velocidad de tu impresora</label>
-        <small>Para afinar la estimación del tiempo de impresión</small>
+        <small>Se usa solo si dejas vacías las horas de impresión de arriba</small>
       </div>
       <div class="input-box">
         <select id="simplePrinterSpeed" style="width:100%;">
@@ -1345,14 +1353,14 @@
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
-    ['simpleSize', '10'], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', '4'],
+    ['simpleSize', '10'], ['simpleHours', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', '4'],
     ['simpleRollPrice', '18'], ['simpleKwhPrice', '0.15'], ['simpleWage', '5']
   ];
   const simpleModeToggle = document.getElementById('simpleModeToggle');
   const simpleCard = document.getElementById('simpleCard');
   const simpleSpeedCustomField = document.getElementById('simpleSpeedCustomField');
   const sparkxNote = document.getElementById('sparkxNote');
-  const simpleFieldIds = ['simpleSize', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleKwhPrice', 'simpleWage'];
+  const simpleFieldIds = ['simpleSize', 'simpleHours', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleKwhPrice', 'simpleWage'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
 
@@ -1374,8 +1382,10 @@
       ? Math.max(0.1, parseFloat(simpleEl.simpleSpeedCustom.value) || 1)
       : (parseFloat(simpleEl.simplePrinterSpeed.value) || 1);
 
+    const manualHours = simpleEl.simpleHours.value.trim();
+
     el.pieceWeight.value = (SIMPLE_WEIGHT_PER_CM3 * cm3).toFixed(1);
-    el.hours.value = (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
+    el.hours.value = manualHours !== '' ? manualHours : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
     el.sizeScale.value = '100';
 
     const colors = Math.max(1, parseInt(simpleEl.simpleColors.value, 10) || 1);
