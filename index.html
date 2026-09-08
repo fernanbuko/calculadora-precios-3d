@@ -553,7 +553,7 @@
   .qr-box{ display:flex; justify-content:center; padding: 14px 0 4px; }
   .qr-box canvas, .qr-box img{ border-radius: 12px; background: #fff; padding: 10px; }
 
-  #orderClient{ text-align: left; }
+  #orderClient, #orderSearchInput{ text-align: left; }
 
   .orders-summary{
     display:flex;
@@ -1355,6 +1355,9 @@
 
     <div id="ordersListHeader">
       <p class="card-title" style="margin-top:14px;">Todos los pedidos</p>
+      <div class="input-box field-wide" style="margin-bottom:10px;">
+        <input type="text" id="orderSearchInput" placeholder="Buscar cliente...">
+      </div>
       <div class="btn-row" id="ordersFilterRow">
         <button type="button" class="btn filter-btn active" data-filter="all">Todos</button>
         <button type="button" class="btn filter-btn" data-filter="hacer">🖨️ Por hacer</button>
@@ -2136,6 +2139,12 @@
   const orderDate = document.getElementById('orderDate');
   const ordersList = document.getElementById('ordersList');
   const ordersListHeader = document.getElementById('ordersListHeader');
+  const orderSearchInput = document.getElementById('orderSearchInput');
+  let currentOrderSearch = '';
+  orderSearchInput.addEventListener('input', () => {
+    currentOrderSearch = orderSearchInput.value.trim().toLowerCase();
+    renderOrders();
+  });
   const clientProfileHeader = document.getElementById('clientProfileHeader');
   const clientProfileTitle = document.getElementById('clientProfileTitle');
   const backToOrdersBtn = document.getElementById('backToOrdersBtn');
@@ -2582,11 +2591,11 @@
     const filterFn = ORDERS_FILTERS[currentOrdersFilter] || ORDERS_FILTERS.all;
     const sorted = orders
       .map((o, i) => ({ o, i }))
-      .filter(({ o }) => filterFn(o))
+      .filter(({ o }) => filterFn(o) && (!currentOrderSearch || (o.cliente || 'Sin nombre').toLowerCase().includes(currentOrderSearch)))
       .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
 
     if(sorted.length === 0){
-      ordersList.innerHTML = '<p class="empty-note">' + ORDERS_FILTER_EMPTY_NOTE[currentOrdersFilter] + '</p>';
+      ordersList.innerHTML = '<p class="empty-note">' + (currentOrderSearch ? 'Ningún cliente coincide con "' + escapeHTML(orderSearchInput.value.trim()) + '"' : ORDERS_FILTER_EMPTY_NOTE[currentOrdersFilter]) + '</p>';
       return;
     }
 
