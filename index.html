@@ -1971,22 +1971,31 @@
           '</div>' +
         '</div>' +
         '<div class="badges">' +
-          '<button type="button" class="badge ' + (o.hecho ? 'on' : 'warn-off') + '" data-toggle-hecho="' + i + '">' + (o.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>' +
-          '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
-          '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>' +
+          (currentOrdersFilter === 'all' || currentOrdersFilter === 'hacer'
+            ? '<button type="button" class="badge ' + (o.hecho ? 'on' : 'warn-off') + '" data-toggle-hecho="' + i + '">' + (o.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>'
+            : '') +
+          (currentOrdersFilter === 'all' || currentOrdersFilter === 'entregar'
+            ? '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>'
+            : '') +
+          (currentOrdersFilter === 'all' || currentOrdersFilter === 'cobrar'
+            ? '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>'
+            : '') +
         '</div>';
       if(i === editingOrderIndex) row.style.borderColor = 'var(--orange)';
-      row.querySelector('[data-toggle-hecho]').addEventListener('click', () => {
+      const hechoBadge = row.querySelector('[data-toggle-hecho]');
+      if(hechoBadge) hechoBadge.addEventListener('click', () => {
         orders[i].hecho = !orders[i].hecho;
         saveJSON(ORDERS_KEY, orders);
         renderOrders();
       });
-      row.querySelector('[data-toggle-pagado]').addEventListener('click', () => {
+      const pagadoBadge = row.querySelector('[data-toggle-pagado]');
+      if(pagadoBadge) pagadoBadge.addEventListener('click', () => {
         orders[i].pagado = !orders[i].pagado;
         saveJSON(ORDERS_KEY, orders);
         renderOrders();
       });
-      row.querySelector('[data-toggle-entregado]').addEventListener('click', () => {
+      const entregadoBadge = row.querySelector('[data-toggle-entregado]');
+      if(entregadoBadge) entregadoBadge.addEventListener('click', () => {
         orders[i].entregado = !orders[i].entregado;
         saveJSON(ORDERS_KEY, orders);
         renderOrders();
