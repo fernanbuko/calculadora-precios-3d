@@ -458,6 +458,14 @@
   }
   .client-group .list{ margin-top: 0; gap: 6px; }
 
+  .item-status{
+    font-size: 11px;
+    margin-left: 3px;
+    filter: grayscale(1);
+    opacity: .3;
+  }
+  .item-status.done{ filter: none; opacity: 1; }
+
   .client-profile-header{ margin-top: 14px; }
   .client-profile-summary{
     display: flex;
@@ -2214,8 +2222,12 @@
     row.className = 'list-item order-item';
     const dateLabel = fmtOrderDate(o.fecha);
     const hasItems = Array.isArray(o.items) && o.items.length > 0;
+    const itemStatusIcons =
+      '<span class="item-status ' + (o.hecho ? 'done' : '') + '" title="Hecho">🖨️</span>' +
+      '<span class="item-status ' + (o.entregado ? 'done' : '') + '" title="Entregado">📦</span>' +
+      '<span class="item-status ' + (o.pagado ? 'done' : '') + '" title="Cobrado">💰</span>';
     const itemsLines = hasItems
-      ? o.items.map(it => (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0)).join('<br>')
+      ? o.items.map(it => (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + ' ' + itemStatusIcons).join('<br>')
       : '';
     const showAll = forceAllBadges || currentOrdersFilter === 'all';
     row.innerHTML =
