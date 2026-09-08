@@ -438,8 +438,12 @@
     justify-content: space-between;
     align-items: baseline;
     gap: 8px;
-    padding: 10px 2px 8px;
+    padding: 10px 10px 8px;
+    margin: 0 -10px;
+    border-radius: 12px;
+    cursor: pointer;
   }
+  .client-group-header:hover{ background: var(--surface-2); }
   .client-group-header .name{
     font-family: 'Inter', sans-serif;
     font-weight: 700;
@@ -453,6 +457,29 @@
     white-space: nowrap;
   }
   .client-group .list{ margin-top: 0; gap: 6px; }
+
+  .client-profile-header{ margin-top: 14px; }
+  .client-profile-summary{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0 4px;
+  }
+  .client-profile-summary .stat{
+    flex: 1;
+    min-width: 110px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .client-profile-summary .stat .num{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--orange);
+  }
+  .client-profile-summary .stat .lbl{ font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
 
   /* Lists: profiles / history / extra costs */
   .list{ display:flex; flex-direction: column; gap: 8px; margin-top: 12px; }
@@ -1237,12 +1264,18 @@
       <button type="button" class="btn hidden" id="cancelEditOrderBtn">Cancelar edición</button>
     </div>
 
-    <p class="card-title" style="margin-top:14px;">Todos los pedidos</p>
-    <div class="btn-row" id="ordersFilterRow">
-      <button type="button" class="btn filter-btn active" data-filter="all">Todos</button>
-      <button type="button" class="btn filter-btn" data-filter="hacer">🖨️ Por hacer</button>
-      <button type="button" class="btn filter-btn" data-filter="cobrar">💰 Por cobrar</button>
-      <button type="button" class="btn filter-btn" data-filter="entregar">📦 Por entregar</button>
+    <div id="ordersListHeader">
+      <p class="card-title" style="margin-top:14px;">Todos los pedidos</p>
+      <div class="btn-row" id="ordersFilterRow">
+        <button type="button" class="btn filter-btn active" data-filter="all">Todos</button>
+        <button type="button" class="btn filter-btn" data-filter="hacer">🖨️ Por hacer</button>
+        <button type="button" class="btn filter-btn" data-filter="cobrar">💰 Por cobrar</button>
+        <button type="button" class="btn filter-btn" data-filter="entregar">📦 Por entregar</button>
+      </div>
+    </div>
+    <div class="client-profile-header hidden" id="clientProfileHeader">
+      <button type="button" class="btn small" id="backToOrdersBtn">← Volver a todos los pedidos</button>
+      <p class="card-title" style="margin:10px 0 0;" id="clientProfileTitle"></p>
     </div>
     <div class="list" id="ordersList"></div>
   </div>
@@ -1925,6 +1958,10 @@
   const orderClient = document.getElementById('orderClient');
   const orderDate = document.getElementById('orderDate');
   const ordersList = document.getElementById('ordersList');
+  const ordersListHeader = document.getElementById('ordersListHeader');
+  const clientProfileHeader = document.getElementById('clientProfileHeader');
+  const clientProfileTitle = document.getElementById('clientProfileTitle');
+  const backToOrdersBtn = document.getElementById('backToOrdersBtn');
   const ordersSummary = document.getElementById('ordersSummary');
   const pendingToMakeList = document.getElementById('pendingToMakeList');
   const pendingSwipeArea = document.getElementById('pendingSwipeArea');
@@ -2172,7 +2209,7 @@
   };
   let currentOrdersFilter = 'all';
 
-  function buildOrderRow(o, i){
+  function buildOrderRow(o, i, forceAllBadges){
     const row = document.createElement('div');
     row.className = 'list-item order-item';
     const dateLabel = fmtOrderDate(o.fecha);
@@ -2180,6 +2217,7 @@
     const itemsLines = hasItems
       ? o.items.map(it => (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0)).join('<br>')
       : '';
+    const showAll = forceAllBadges || currentOrdersFilter === 'all';
     row.innerHTML =
       '<div class="order-top">' +
         '<div class="info">' +
@@ -2194,13 +2232,13 @@
         '</div>' +
       '</div>' +
       '<div class="badges">' +
-        (currentOrdersFilter === 'all' || currentOrdersFilter === 'hacer'
+        (showAll || currentOrdersFilter === 'hacer'
           ? '<button type="button" class="badge ' + (o.hecho ? 'on' : 'warn-off') + '" data-toggle-hecho="' + i + '">' + (o.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>'
           : '') +
-        (currentOrdersFilter === 'all' || currentOrdersFilter === 'entregar'
+        (showAll || currentOrdersFilter === 'entregar'
           ? '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>'
           : '') +
-        (currentOrdersFilter === 'all' || currentOrdersFilter === 'cobrar'
+        (showAll || currentOrdersFilter === 'cobrar'
           ? '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>'
           : '') +
       '</div>';
@@ -2255,10 +2293,66 @@
     return row;
   }
 
+  let openClientProfile = null;
+
+  function openClient(clientName){
+    openClientProfile = clientName;
+    renderOrders();
+    ordersListHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  backToOrdersBtn.addEventListener('click', () => {
+    openClientProfile = null;
+    renderOrders();
+  });
+
+  function renderClientProfile(clientName){
+    const items = orders
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => ((o.cliente || '').trim() || 'Sin nombre') === clientName)
+      .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
+
+    if(items.length === 0){
+      openClientProfile = null;
+      renderOrders();
+      return;
+    }
+
+    const totalGenerado = items.filter(({ o }) => o.pagado).reduce((s, { o }) => s + (parseFloat(o.precio) || 0), 0);
+    const totalPorCobrar = items.filter(({ o }) => !o.pagado).reduce((s, { o }) => s + (parseFloat(o.precio) || 0), 0);
+    const porEntregar = items.filter(({ o }) => !o.entregado).length;
+
+    ordersListHeader.classList.add('hidden');
+    clientProfileHeader.classList.remove('hidden');
+    clientProfileTitle.innerHTML = '👤 ' + escapeHTML(clientName);
+
+    ordersList.innerHTML = '';
+    const summary = document.createElement('div');
+    summary.className = 'client-profile-summary';
+    summary.innerHTML =
+      '<div class="stat"><div class="num">' + fmt(totalGenerado) + '</div><div class="lbl">Cobrado</div></div>' +
+      '<div class="stat"><div class="num">' + fmt(totalPorCobrar) + '</div><div class="lbl">Por cobrar</div></div>' +
+      '<div class="stat"><div class="num">' + porEntregar + '</div><div class="lbl">Por entregar</div></div>';
+    ordersList.appendChild(summary);
+
+    const list = document.createElement('div');
+    list.className = 'list';
+    items.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i, true)));
+    ordersList.appendChild(list);
+  }
+
   function renderOrders(){
     renderOrdersSummary();
     renderPendingToMake();
     renderClientSelect();
+
+    if(openClientProfile !== null){
+      renderClientProfile(openClientProfile);
+      return;
+    }
+    ordersListHeader.classList.remove('hidden');
+    clientProfileHeader.classList.add('hidden');
+
     ordersList.innerHTML = '';
     const filterFn = ORDERS_FILTERS[currentOrdersFilter] || ORDERS_FILTERS.all;
     const sorted = orders
@@ -2291,6 +2385,7 @@
           '<span class="meta">' + items.length + ' pedido' + (items.length === 1 ? '' : 's') + ' · ' + fmt(total) + '</span>' +
         '</div>' +
         '<div class="list"></div>';
+      group.querySelector('.client-group-header').addEventListener('click', () => openClient(clientName));
       const list = group.querySelector('.list');
       items.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i)));
       ordersList.appendChild(group);
