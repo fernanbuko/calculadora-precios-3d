@@ -44,7 +44,28 @@ Un interruptor arriba de todo activa el **modo simple**: oculta las tarjetas ava
 - **Exportar y compartir**: copiar el desglose como texto, compartirlo (Web Share API en celulares), descargarlo como PDF o como imagen PNG del resultado, o generar un link/QR que reabre la calculadora con los mismos valores ya cargados.
 - **Modo claro/oscuro** y **reinicio a valores de fábrica** con un clic.
 
-Todo se guarda solo en el propio dispositivo (`localStorage`) — no hay servidor ni cuenta.
+Todo se guarda en el propio dispositivo (`localStorage`) por defecto. Si inicias sesión con Google (banner arriba de todo, visible en cualquier pestaña), tus perfiles, historial y pedidos también se sincronizan a tu cuenta vía Firestore, para verlos desde cualquier dispositivo.
+
+## Configurar el inicio de sesión con Google
+
+Por defecto el botón de Google muestra un aviso de que falta configurarlo — hace falta un proyecto de Firebase propio (gratis) para activarlo:
+
+1. Crea un proyecto en [console.firebase.google.com](https://console.firebase.google.com) (o usa uno que ya tengas) y agrégale una **app web** para obtener su configuración.
+2. En **Authentication → Sign-in method**, habilita el proveedor **Google**.
+3. En **Firestore Database**, crea la base de datos (modo producción) y en la pestaña **Reglas** pega:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /calc3d_usuarios/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+     }
+   }
+   ```
+4. En `index.html`, busca el bloque `const firebaseConfig = { ... }` (cerca del inicio del `<script>` principal) y reemplaza los valores `"TU_..."` por los de tu proyecto (Configuración del proyecto → General → "Tus apps").
+
+Estos datos de configuración son públicos (no son contraseñas) — la seguridad real la dan las reglas de Firestore del paso 3, que solo dejan a cada usuario leer y escribir sus propios datos.
 
 ## Uso
 

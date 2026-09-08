@@ -536,6 +536,26 @@
   .mode-banner{ background: var(--orange-dim); border-color: var(--orange); }
   body.simple-mode .advanced-cards{ display: none; }
 
+  .account-banner{ padding: 14px 16px; }
+  .account-field{ border-bottom: none; padding: 0; grid-template-columns: 1fr auto; gap: 12px; }
+  .account-info{ display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .account-info label{ display: block; }
+  .account-avatar{ width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+  .account-actions{ flex-shrink: 0; }
+  .google-btn{
+    background: #fff;
+    color: #3c4043;
+    border: 1px solid #dadce0;
+    font-weight: 600;
+  }
+  .google-btn:hover{ border-color: #dadce0; color: #3c4043; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+
+  @media (max-width: 480px){
+    .account-field{ grid-template-columns: 1fr; row-gap: 12px; }
+    .account-actions{ width: 100%; }
+    .account-actions .btn{ width: 100%; justify-content: center; }
+  }
+
   @media (min-width: 480px){
     h1{ font-size: 31px; }
     .final-price .value{ font-size: 42px; }
@@ -601,6 +621,26 @@
       <button type="button" class="icon-btn" id="resetBtn" title="Reiniciar valores">↺</button>
     </div>
   </header>
+
+  <!-- CUENTA -->
+  <div class="card account-banner">
+    <div class="field account-field">
+      <div class="account-info">
+        <img id="accountAvatar" class="account-avatar hidden" alt="">
+        <div>
+          <label id="accountLabel">Invitado (sin sincronizar)</label>
+          <small id="accountSub">Inicia sesión con Google para guardar tus pedidos, perfiles e historial en la nube.</small>
+        </div>
+      </div>
+      <div class="input-box account-actions">
+        <button type="button" class="btn google-btn" id="googleSignInBtn">
+          <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+          Iniciar sesión con Google
+        </button>
+        <button type="button" class="btn hidden" id="signOutBtn">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
 
   <div class="tab-panel" data-tab="calc" id="tabPanelCalc">
 
@@ -1147,8 +1187,57 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script>
 (function(){
+
+  /* ---------------------------------------------------------
+     Firebase: configuración, inicio de sesión con Google y
+     guardado en la nube (Firestore).
+     ---------------------------------------------------------
+     IMPORTANTE: reemplaza estos valores con los de TU proyecto de
+     Firebase (consola de Firebase → ⚙️ Configuración del proyecto →
+     General → "Tus apps" → app web). Estos datos son públicos (no
+     son contraseñas), es normal que vayan escritos aquí, en el
+     código del navegador.
+
+     Pasos en la consola de Firebase (console.firebase.google.com):
+     1. Crea un proyecto nuevo (o usa uno existente) y agrégale una
+        app web para obtener el objeto de configuración de abajo.
+     2. Authentication → Sign-in method → habilita "Google".
+     3. Firestore Database → crea la base (modo producción) y pon
+        estas reglas en la pestaña "Reglas":
+          rules_version = '2';
+          service cloud.firestore {
+            match /databases/{database}/documents {
+              match /calc3d_usuarios/{userId} {
+                allow read, write: if request.auth != null && request.auth.uid == userId;
+              }
+            }
+          }
+  ----------------------------------------------------------*/
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_PROYECTO.firebaseapp.com",
+    projectId: "TU_PROYECTO",
+    storageBucket: "TU_PROYECTO.firebasestorage.app",
+    messagingSenderId: "TU_SENDER_ID",
+    appId: "TU_APP_ID"
+  };
+  const firebaseReady = typeof firebase !== 'undefined' && firebaseConfig.apiKey && firebaseConfig.apiKey !== "TU_API_KEY";
+  let currentUser = null;
+  let firestoreDb = null;
+  let cloudDataLoaded = false;
+  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders' };
+
+  if(firebaseReady){
+    try{
+      firebase.initializeApp(firebaseConfig);
+      firestoreDb = firebase.firestore();
+    }catch(e){ console.error('Firebase init error:', e); }
+  }
 
   const ids = ['rollPrice','rollWeight','pieceWeight','sizeScale','quantity','supportWeight','hours','watts','kwhPrice',
                'printerPrice','lifeHours','workHours','wage','failRate','profit','currency',
@@ -1235,6 +1324,15 @@
   }
   function saveJSON(key, value){
     try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+    const cloudField = CLOUD_SYNC_KEYS[key];
+    if(cloudField) syncFieldToCloud(cloudField, value);
+  }
+
+  function syncFieldToCloud(field, value){
+    if(!currentUser || !firestoreDb || !cloudDataLoaded) return;
+    firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid)
+      .set({ [field]: value }, { merge: true })
+      .catch(() => { showToast('No se pudo guardar en la nube — se guardó en este dispositivo'); });
   }
 
   // ---------- extra costs (consumibles) ----------
@@ -2099,6 +2197,75 @@
 
   tabBarBtns.forEach(btn => {
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+  });
+
+  // ---------- cuenta de Google / Firestore ----------
+  const accountLabel = document.getElementById('accountLabel');
+  const accountSub = document.getElementById('accountSub');
+  const accountAvatar = document.getElementById('accountAvatar');
+  const googleSignInBtn = document.getElementById('googleSignInBtn');
+  const signOutBtn = document.getElementById('signOutBtn');
+
+  function updateAccountUI(){
+    const signedIn = !!currentUser;
+    accountLabel.textContent = signedIn ? (currentUser.displayName || currentUser.email || 'Cuenta de Google') : 'Invitado (sin sincronizar)';
+    accountSub.textContent = signedIn
+      ? 'Tus pedidos, perfiles e historial se guardan en tu cuenta y los ves en cualquier dispositivo.'
+      : 'Inicia sesión con Google para guardar tus pedidos, perfiles e historial en la nube.';
+    googleSignInBtn.classList.toggle('hidden', signedIn);
+    signOutBtn.classList.toggle('hidden', !signedIn);
+    if(signedIn && currentUser.photoURL){
+      accountAvatar.src = currentUser.photoURL;
+      accountAvatar.classList.remove('hidden');
+    } else {
+      accountAvatar.classList.add('hidden');
+    }
+  }
+
+  async function loadCloudData(){
+    cloudDataLoaded = false;
+    try{
+      const ref = firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid);
+      const snap = await ref.get();
+      if(snap.exists){
+        const data = snap.data() || {};
+        if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
+        if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
+        if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
+      } else {
+        // Primera vez con esta cuenta: sube lo que ya tenías guardado en este dispositivo.
+        await ref.set({ profiles, history, orders }, { merge: true });
+      }
+      cloudDataLoaded = true;
+      showToast('Sesión iniciada — datos sincronizados');
+    }catch(e){
+      cloudDataLoaded = true;
+      showToast('No se pudo sincronizar con la nube');
+    }
+  }
+
+  if(firebaseReady){
+    firebase.auth().onAuthStateChanged(user => {
+      currentUser = user;
+      updateAccountUI();
+      if(user) loadCloudData();
+    });
+  }
+
+  googleSignInBtn.addEventListener('click', () => {
+    if(!firebaseReady){
+      showToast('Falta configurar Firebase en el código de la app');
+      return;
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    firebase.auth().signInWithPopup(provider).catch(err => {
+      showToast('No se pudo iniciar sesión: ' + (err.message || 'intenta de nuevo'));
+    });
+  });
+
+  signOutBtn.addEventListener('click', () => {
+    if(firebaseReady) firebase.auth().signOut();
   });
 
   // ---------- init ----------
