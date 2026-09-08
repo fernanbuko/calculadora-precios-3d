@@ -622,6 +622,7 @@
   }
   .badge.on{ border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
   .badge.warn-off{ border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+  .badge.partial{ border-color: var(--red); color: var(--red); background: transparent; border-style: dashed; }
 
   .toast{
     position: fixed;
@@ -2105,8 +2106,10 @@
     orders.forEach(o => {
       (o.items || []).forEach(it => {
         const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
-        if(it.pagado){ totalEarned += val; paidCount++; }
-        else { totalDue += val; dueCount++; }
+        const paid = Math.min(parseFloat(it.montoPagado) || 0, val);
+        totalEarned += paid;
+        totalDue += (val - paid);
+        if(val > 0 && paid >= val) paidCount++; else dueCount++;
         if(!it.hecho) toMakeCount++;
         if(!it.entregado) toDeliverCount++;
       });
@@ -2265,17 +2268,47 @@
       items.forEach((it, ii) => {
         const line = document.createElement('div');
         line.className = 'order-item-line';
+        const itemTotal = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
+        const paidSoFar = Math.min(parseFloat(it.montoPagado) || 0, itemTotal);
+        let pagoBadge;
+        if(itemTotal > 0 && paidSoFar >= itemTotal){
+          pagoBadge = '<button type="button" class="badge on" data-item-field="pagado">✓ Pagado</button>';
+        } else if(paidSoFar > 0){
+          pagoBadge = '<button type="button" class="badge partial" data-item-field="pagado">◐ Debe ' + fmt(itemTotal - paidSoFar) + '</button>';
+        } else {
+          pagoBadge = '<button type="button" class="badge warn-off" data-item-field="pagado">💰 Por cobrar</button>';
+        }
         line.innerHTML =
           '<div class="item-line-text">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + '</div>' +
           '<div class="badges">' +
             '<button type="button" class="badge ' + (it.hecho ? 'on' : 'warn-off') + '" data-item-field="hecho">' + (it.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>' +
             '<button type="button" class="badge ' + (it.entregado ? 'on' : 'warn-off') + '" data-item-field="entregado">' + (it.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
-            '<button type="button" class="badge ' + (it.pagado ? 'on' : 'warn-off') + '" data-item-field="pagado">' + (it.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>' +
+            pagoBadge +
           '</div>';
         line.querySelectorAll('[data-item-field]').forEach(btn => {
           btn.addEventListener('click', () => {
             const field = btn.dataset.itemField;
-            orders[i].items[ii][field] = !orders[i].items[ii][field];
+            const item = orders[i].items[ii];
+            if(field === 'pagado'){
+              const total = (parseFloat(item.cantidad) || 1) * (parseFloat(item.precio) || 0);
+              const paid = Math.min(parseFloat(item.montoPagado) || 0, total);
+              if(total > 0 && paid >= total){
+                // Ya estaba pagado del todo — un toque más lo deshace.
+                item.montoPagado = 0;
+                item.pagado = false;
+              } else {
+                const remaining = total - paid;
+                const input = window.prompt('¿Cuánto te pagaron ahora? (falta ' + fmt(remaining) + ')', remaining.toFixed(2));
+                if(input === null) return;
+                const amount = parseFloat(String(input).replace(',', '.'));
+                if(!(amount > 0)) return;
+                const newPaid = Math.min(paid + amount, total);
+                item.montoPagado = newPaid;
+                item.pagado = total > 0 && newPaid >= total;
+              }
+            } else {
+              item[field] = !item[field];
+            }
             saveJSON(ORDERS_KEY, orders);
             renderOrders();
           });
@@ -2351,7 +2384,9 @@
     clientOrders.forEach(({ o }) => {
       (o.items || []).forEach(it => {
         const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
-        if(it.pagado) totalGenerado += val; else totalPorCobrar += val;
+        const paid = Math.min(parseFloat(it.montoPagado) || 0, val);
+        totalGenerado += paid;
+        totalPorCobrar += (val - paid);
         if(!it.entregado) porEntregar++;
       });
     });
@@ -2449,7 +2484,7 @@
       .filter(it => (it.nombre || '').trim())
       .map(it => ({
         nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0,
-        hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado
+        hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado, montoPagado: parseFloat(it.montoPagado) || 0
       }));
     if(!cliente && items.length === 0){ showToast('Pon al menos el cliente o un artículo'); return; }
     const data = {
