@@ -432,24 +432,27 @@
   .filter-btn{ font-size: 11.5px; padding: 7px 12px; border-radius: 20px; }
   .filter-btn.active{ background: var(--orange); border-color: var(--orange); color: #fff; }
 
-  .chip-row{
+  .client-group{ margin-bottom: 4px; }
+  .client-group-header{
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: -6px 0 12px;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 2px 8px;
   }
-  .chip{
+  .client-group-header .name{
     font-family: 'Inter', sans-serif;
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 6px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--line-strong);
-    background: var(--surface-2);
-    color: var(--text-dim);
-    cursor: pointer;
+    font-weight: 700;
+    font-size: 13.5px;
+    color: var(--text);
   }
-  .chip:hover{ border-color: var(--orange); color: var(--orange); }
+  .client-group-header .meta{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .client-group .list{ margin-top: 0; gap: 6px; }
 
   /* Lists: profiles / history / extra costs */
   .list{ display:flex; flex-direction: column; gap: 8px; margin-top: 12px; }
@@ -1142,14 +1145,23 @@
 
     <div class="field field-wide">
       <div>
-        <label for="orderClient">Cliente</label>
-        <small>Quién te lo pidió</small>
+        <label for="orderClientSelect">Cliente</label>
+        <small>Elige uno que ya tengas, o crea uno nuevo</small>
       </div>
-      <div class="input-box"><input type="text" id="orderClient" placeholder="Nombre del cliente" list="clientsDatalist"></div>
+      <div class="input-box">
+        <select id="orderClientSelect" style="width:100%;">
+          <option value="__new__">➕ Nuevo cliente</option>
+        </select>
+      </div>
     </div>
-    <datalist id="clientsDatalist"></datalist>
 
-    <div class="chip-row hidden" id="recentClientsRow"></div>
+    <div class="field field-wide" id="newClientField">
+      <div>
+        <label for="orderClient">Nombre del cliente nuevo</label>
+        <small>Se guarda como perfil — sus próximos pedidos se agrupan aquí</small>
+      </div>
+      <div class="input-box"><input type="text" id="orderClient" placeholder="Nombre del cliente"></div>
+    </div>
 
     <div class="field field-wide">
       <div>
@@ -1878,45 +1890,50 @@
   const pendingToMakeList = document.getElementById('pendingToMakeList');
   const addOrderBtn = document.getElementById('addOrderBtn');
   const cancelEditOrderBtn = document.getElementById('cancelEditOrderBtn');
-  const clientsDatalist = document.getElementById('clientsDatalist');
-  const recentClientsRow = document.getElementById('recentClientsRow');
+  const orderClientSelect = document.getElementById('orderClientSelect');
+  const newClientField = document.getElementById('newClientField');
 
-  function clearOrderForm(){
-    orderClient.value = '';
-    orderDesc.value = '';
-    orderPrice.value = '0';
-    orderDate.value = '';
-  }
-
-  function renderRecentClients(){
-    // Nombres únicos, del más reciente al más antiguo (por fecha de creación).
+  function getUniqueClientNames(){
+    // Nombres únicos, alfabético, sin importar mayúsculas.
     const seen = new Set();
     const names = [];
-    orders.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach(o => {
+    orders.forEach(o => {
       const name = (o.cliente || '').trim();
       if(name && !seen.has(name.toLowerCase())){
         seen.add(name.toLowerCase());
         names.push(name);
       }
     });
+    names.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    return names;
+  }
 
-    clientsDatalist.innerHTML = names.map(n => '<option value="' + escapeHTML(n) + '">').join('');
+  function toggleNewClientField(){
+    newClientField.classList.toggle('hidden', orderClientSelect.value !== '__new__');
+  }
 
-    if(names.length === 0){
-      recentClientsRow.classList.add('hidden');
-      recentClientsRow.innerHTML = '';
-      return;
-    }
-    recentClientsRow.classList.remove('hidden');
-    recentClientsRow.innerHTML = names.slice(0, 8).map(n =>
-      '<button type="button" class="chip" data-client="' + escapeHTML(n) + '">' + escapeHTML(n) + '</button>'
-    ).join('');
-    recentClientsRow.querySelectorAll('.chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        orderClient.value = chip.dataset.client;
-        orderDesc.focus();
-      });
-    });
+  function renderClientSelect(){
+    const names = getUniqueClientNames();
+    const prevValue = orderClientSelect.value;
+    orderClientSelect.innerHTML = '<option value="__new__">➕ Nuevo cliente</option>' +
+      names.map(n => '<option value="' + escapeHTML(n) + '">' + escapeHTML(n) + '</option>').join('');
+    orderClientSelect.value = names.includes(prevValue) ? prevValue : '__new__';
+    toggleNewClientField();
+  }
+
+  orderClientSelect.addEventListener('change', toggleNewClientField);
+
+  function currentClientName(){
+    return orderClientSelect.value === '__new__' ? orderClient.value.trim() : orderClientSelect.value;
+  }
+
+  function clearOrderForm(){
+    orderClientSelect.value = '__new__';
+    toggleNewClientField();
+    orderClient.value = '';
+    orderDesc.value = '';
+    orderPrice.value = '0';
+    orderDate.value = '';
   }
 
   function exitEditMode(){
@@ -1994,10 +2011,80 @@
   };
   let currentOrdersFilter = 'all';
 
+  function buildOrderRow(o, i){
+    const row = document.createElement('div');
+    row.className = 'list-item order-item';
+    const dateLabel = fmtOrderDate(o.fecha);
+    row.innerHTML =
+      '<div class="order-top">' +
+        '<div class="info">' +
+          '<div class="name">' + escapeHTML(o.descripcion || 'Sin descripción') + '</div>' +
+          '<div class="meta">' + fmt(parseFloat(o.precio) || 0) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button type="button" class="btn small" data-edit="' + i + '" title="Editar">✎</button>' +
+          '<button type="button" class="btn small danger" data-del="' + i + '" title="Eliminar">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="badges">' +
+        (currentOrdersFilter === 'all' || currentOrdersFilter === 'hacer'
+          ? '<button type="button" class="badge ' + (o.hecho ? 'on' : 'warn-off') + '" data-toggle-hecho="' + i + '">' + (o.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>'
+          : '') +
+        (currentOrdersFilter === 'all' || currentOrdersFilter === 'entregar'
+          ? '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>'
+          : '') +
+        (currentOrdersFilter === 'all' || currentOrdersFilter === 'cobrar'
+          ? '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>'
+          : '') +
+      '</div>';
+    if(i === editingOrderIndex) row.style.borderColor = 'var(--orange)';
+    const hechoBadge = row.querySelector('[data-toggle-hecho]');
+    if(hechoBadge) hechoBadge.addEventListener('click', () => {
+      orders[i].hecho = !orders[i].hecho;
+      saveJSON(ORDERS_KEY, orders);
+      renderOrders();
+    });
+    const pagadoBadge = row.querySelector('[data-toggle-pagado]');
+    if(pagadoBadge) pagadoBadge.addEventListener('click', () => {
+      orders[i].pagado = !orders[i].pagado;
+      saveJSON(ORDERS_KEY, orders);
+      renderOrders();
+    });
+    const entregadoBadge = row.querySelector('[data-toggle-entregado]');
+    if(entregadoBadge) entregadoBadge.addEventListener('click', () => {
+      orders[i].entregado = !orders[i].entregado;
+      saveJSON(ORDERS_KEY, orders);
+      renderOrders();
+    });
+    row.querySelector('[data-edit]').addEventListener('click', () => {
+      editingOrderIndex = i;
+      const clientName = orders[i].cliente || '';
+      const names = getUniqueClientNames();
+      orderClientSelect.value = names.includes(clientName) ? clientName : '__new__';
+      orderClient.value = clientName;
+      toggleNewClientField();
+      orderDesc.value = orders[i].descripcion || '';
+      orderPrice.value = orders[i].precio || 0;
+      orderDate.value = orders[i].fecha || '';
+      addOrderBtn.textContent = '✓ Guardar cambios';
+      cancelEditOrderBtn.classList.remove('hidden');
+      orderClientSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showToast('Editando pedido');
+    });
+    row.querySelector('[data-del]').addEventListener('click', () => {
+      if(!confirm('¿Eliminar este pedido?')) return;
+      orders.splice(i, 1);
+      if(editingOrderIndex === i) exitEditMode();
+      saveJSON(ORDERS_KEY, orders);
+      renderOrders();
+    });
+    return row;
+  }
+
   function renderOrders(){
     renderOrdersSummary();
     renderPendingToMake();
-    renderRecentClients();
+    renderClientSelect();
     ordersList.innerHTML = '';
     const filterFn = ORDERS_FILTERS[currentOrdersFilter] || ORDERS_FILTERS.all;
     const sorted = orders
@@ -2010,71 +2097,29 @@
       return;
     }
 
-    sorted.forEach(({ o, i }) => {
-      const row = document.createElement('div');
-      row.className = 'list-item order-item';
-      const dateLabel = fmtOrderDate(o.fecha);
-      row.innerHTML =
-        '<div class="order-top">' +
-          '<div class="info">' +
-            '<div class="name">' + escapeHTML(o.cliente || 'Sin nombre') + '</div>' +
-            '<div class="meta">' + escapeHTML(o.descripcion || '') + '</div>' +
-            '<div class="meta">' + fmt(parseFloat(o.precio) || 0) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
-          '</div>' +
-          '<div class="actions">' +
-            '<button type="button" class="btn small" data-edit="' + i + '" title="Editar">✎</button>' +
-            '<button type="button" class="btn small danger" data-del="' + i + '" title="Eliminar">✕</button>' +
-          '</div>' +
+    // Perfil por cliente: cada cliente agrupa todos sus pedidos.
+    const groups = new Map();
+    sorted.forEach(item => {
+      const key = (item.o.cliente || '').trim() || 'Sin nombre';
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    });
+    const clientNames = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+    clientNames.forEach(clientName => {
+      const items = groups.get(clientName);
+      const total = items.reduce((sum, { o }) => sum + (parseFloat(o.precio) || 0), 0);
+      const group = document.createElement('div');
+      group.className = 'client-group';
+      group.innerHTML =
+        '<div class="client-group-header">' +
+          '<span class="name">👤 ' + escapeHTML(clientName) + '</span>' +
+          '<span class="meta">' + items.length + ' pedido' + (items.length === 1 ? '' : 's') + ' · ' + fmt(total) + '</span>' +
         '</div>' +
-        '<div class="badges">' +
-          (currentOrdersFilter === 'all' || currentOrdersFilter === 'hacer'
-            ? '<button type="button" class="badge ' + (o.hecho ? 'on' : 'warn-off') + '" data-toggle-hecho="' + i + '">' + (o.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>'
-            : '') +
-          (currentOrdersFilter === 'all' || currentOrdersFilter === 'entregar'
-            ? '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>'
-            : '') +
-          (currentOrdersFilter === 'all' || currentOrdersFilter === 'cobrar'
-            ? '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>'
-            : '') +
-        '</div>';
-      if(i === editingOrderIndex) row.style.borderColor = 'var(--orange)';
-      const hechoBadge = row.querySelector('[data-toggle-hecho]');
-      if(hechoBadge) hechoBadge.addEventListener('click', () => {
-        orders[i].hecho = !orders[i].hecho;
-        saveJSON(ORDERS_KEY, orders);
-        renderOrders();
-      });
-      const pagadoBadge = row.querySelector('[data-toggle-pagado]');
-      if(pagadoBadge) pagadoBadge.addEventListener('click', () => {
-        orders[i].pagado = !orders[i].pagado;
-        saveJSON(ORDERS_KEY, orders);
-        renderOrders();
-      });
-      const entregadoBadge = row.querySelector('[data-toggle-entregado]');
-      if(entregadoBadge) entregadoBadge.addEventListener('click', () => {
-        orders[i].entregado = !orders[i].entregado;
-        saveJSON(ORDERS_KEY, orders);
-        renderOrders();
-      });
-      row.querySelector('[data-edit]').addEventListener('click', () => {
-        editingOrderIndex = i;
-        orderClient.value = orders[i].cliente || '';
-        orderDesc.value = orders[i].descripcion || '';
-        orderPrice.value = orders[i].precio || 0;
-        orderDate.value = orders[i].fecha || '';
-        addOrderBtn.textContent = '✓ Guardar cambios';
-        cancelEditOrderBtn.classList.remove('hidden');
-        orderClient.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        showToast('Editando pedido');
-      });
-      row.querySelector('[data-del]').addEventListener('click', () => {
-        if(!confirm('¿Eliminar este pedido?')) return;
-        orders.splice(i, 1);
-        if(editingOrderIndex === i) exitEditMode();
-        saveJSON(ORDERS_KEY, orders);
-        renderOrders();
-      });
-      ordersList.appendChild(row);
+        '<div class="list"></div>';
+      const list = group.querySelector('.list');
+      items.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i)));
+      ordersList.appendChild(group);
     });
   }
 
@@ -2095,7 +2140,7 @@
   });
 
   addOrderBtn.addEventListener('click', () => {
-    const cliente = orderClient.value.trim();
+    const cliente = currentClientName();
     const descripcion = orderDesc.value.trim();
     if(!cliente && !descripcion){ showToast('Pon al menos el cliente o el pedido'); return; }
     const data = {
@@ -2112,8 +2157,14 @@
     } else {
       orders.push(Object.assign({ hecho: false, pagado: false, entregado: false, createdAt: Date.now() }, data));
       saveJSON(ORDERS_KEY, orders);
-      clearOrderForm();
+      // Deja el mismo cliente elegido — así, si le vas a agregar otro
+      // pedido seguido, no hay que volver a buscarlo/escribirlo.
+      orderDesc.value = '';
+      orderPrice.value = '0';
+      orderDate.value = '';
       renderOrders();
+      orderClientSelect.value = cliente;
+      toggleNewClientField();
       showToast('Pedido agregado');
     }
   });
