@@ -4,7 +4,7 @@ App web (PWA) para calcular en segundos cuánto cobrar por una impresión 3D.
 
 ## Diseño
 
-Interfaz moderna con tarjetas blancas de esquinas redondeadas, sombras suaves y tipografía Inter (más IBM Plex Mono para los números), en modo claro por defecto con opción de modo oscuro. Antes tenía un tema oscuro tipo "plano técnico" — ahora sigue el mismo lenguaje visual usado en las otras apps (Airescare, appvet).
+Interfaz moderna con tarjetas blancas de esquinas redondeadas, sombras suaves y tipografía Inter (más IBM Plex Mono para los números), en modo claro por defecto con opción de modo oscuro. Antes tenía un tema oscuro tipo "plano técnico" — ahora sigue el mismo lenguaje visual usado en las otras apps (Airescare, appvet). Incluso los avisos de confirmación (eliminar un pedido, reiniciar valores, registrar un pago) usan una ventana propia con ese mismo estilo, en vez de los diálogos genéricos del navegador.
 
 ## Navegación por pestañas
 
