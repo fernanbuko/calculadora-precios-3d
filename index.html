@@ -2200,15 +2200,26 @@
       pendingToMakeList.innerHTML = '<p class="empty-note">' + PENDING_TAB_EMPTY[currentPendingTab] + '</p>';
       return;
     }
+
+    // Agrupa por cliente para no repetir el nombre si tiene varios artículos pendientes.
+    const groups = new Map();
     pending.forEach(({ o, it }) => {
-      const row = document.createElement('div');
-      row.className = 'list-item';
-      const dateLabel = fmtOrderDate(o.fecha);
       const clientName = o.cliente || 'Sin nombre';
+      if(!groups.has(clientName)) groups.set(clientName, []);
+      groups.get(clientName).push({ o, it });
+    });
+
+    groups.forEach((entries, clientName) => {
+      const row = document.createElement('div');
+      row.className = 'list-item pending-client-item';
+      const lines = entries.map(({ o, it }) => {
+        const dateLabel = fmtOrderDate(o.fecha);
+        return '<div class="meta">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>';
+      }).join('');
       row.innerHTML =
         '<div class="info">' +
           '<div class="name" data-client-link>' + escapeHTML(clientName) + '</div>' +
-          '<div class="meta">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
+          lines +
         '</div>';
       row.querySelector('[data-client-link]').addEventListener('click', () => openClient(clientName));
       pendingToMakeList.appendChild(row);
