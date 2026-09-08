@@ -1191,6 +1191,7 @@
     <p class="card-title" style="margin-bottom:10px;">DESGLOSE</p>
 
     <div class="breakdown-row"><span>Tiempo de impresión estimado</span><span id="outPrintTime">—</span></div>
+    <div class="breakdown-row"><span>Peso estimado</span><span id="outWeight">—</span></div>
     <div class="breakdown-row"><span>Material</span><span id="outMaterial">—</span></div>
     <div class="breakdown-row hidden" id="rowSupport"><span>Soportes (material)</span><span id="outSupport">—</span></div>
     <div class="breakdown-row"><span>Electricidad</span><span id="outElectricity">—</span></div>
@@ -1449,6 +1450,7 @@
 
   const outMaterial = document.getElementById('outMaterial');
   const outPrintTime = document.getElementById('outPrintTime');
+  const outWeight = document.getElementById('outWeight');
   const rowScaled = document.getElementById('rowScaled');
   const outScaled = document.getElementById('outScaled');
   const outSupport = document.getElementById('outSupport');
@@ -1886,6 +1888,8 @@
     }
 
     outPrintTime.textContent = fmtHours(scaledHours);
+    outWeight.textContent = scaledWeight.toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g' +
+      (quantity > 1 ? ' c/u · ' + (scaledWeight * quantity).toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g total' : '');
     outMaterial.textContent = fmt(materialCost);
     outElectricity.textContent = fmt(electricityCost);
     outWear.textContent = fmt(wearCost);
