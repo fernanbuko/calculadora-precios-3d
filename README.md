@@ -15,7 +15,7 @@ En celular y tablet la navegación es una barra fija abajo (como una app móvil)
 ## Qué incluye el cálculo
 
 - **Material**: costo por gramo según el precio y peso del rollo, multiplicado por el peso de la pieza y la cantidad. Incluye soportes descartables.
-- **Escala de tamaño**: mides peso y horas una vez (al 100%) y luego cotizas la misma pieza más grande o más chica cambiando el porcentaje de escala — el peso y el tiempo se recalculan automáticamente (escalan al cubo del factor lineal), sin volver a laminar en el slicer.
+- **Escala de tamaño (en milímetros)**: mides peso y horas una vez, a una medida de referencia (en mm), y luego cotizas la misma pieza a otra medida cambiando solo el campo "Nueva medida a cotizar" — el peso y el tiempo se recalculan automáticamente (escalan al cubo del factor lineal entre ambas medidas), sin volver a laminar en el slicer.
 - **Electricidad**: consumo de la impresora (W) durante las horas de impresión, al precio del kWh.
 - **Desgaste de máquina**: precio de la impresora ÷ vida útil estimada (horas), por las horas usadas.
 - **Tu tiempo**: horas de diseño/preparación/post-procesado × tu tarifa por hora.

@@ -944,21 +944,29 @@
     <div class="field">
       <div>
         <label for="pieceWeight">Peso de la pieza</label>
-        <small>Gramos usados — lo ves en el slicer (de 1 sola pieza, al 100% de escala)</small>
+        <small>Gramos usados — lo ves en el slicer (de 1 sola pieza, a la medida de referencia)</small>
       </div>
       <div class="input-box"><input type="number" id="pieceWeight" value="35" min="0" step="1"></div>
     </div>
 
     <div class="field">
       <div>
-        <label for="sizeScale">Escala de tamaño</label>
-        <small>100% = el tamaño con el que mediste peso y horas. Cambia esto para cotizar una versión más grande o chica sin volver a laminar</small>
+        <label for="refSizeMm">Medida de referencia</label>
+        <small>En milímetros — la dimensión más grande de la pieza con la que mediste el peso y las horas</small>
       </div>
-      <div class="input-box"><input type="number" id="sizeScale" value="100" min="1" step="5"></div>
+      <div class="input-box"><input type="number" id="refSizeMm" value="100" min="1" step="1"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="newSizeMm">Nueva medida a cotizar</label>
+        <small>En milímetros — cámbiala para cotizar la misma pieza más grande o más chica, sin volver a laminar</small>
+      </div>
+      <div class="input-box"><input type="number" id="newSizeMm" value="100" min="1" step="1"></div>
     </div>
 
     <div class="breakdown-row hidden" id="rowScaled">
-      <span>A esta escala</span><span id="outScaled">—</span>
+      <span>A esta medida</span><span id="outScaled">—</span>
     </div>
 
     <div class="field">
@@ -985,7 +993,7 @@
     <div class="field">
       <div>
         <label for="hours">Horas de impresión</label>
-        <small>Tiempo total al 100% de escala (todo el lote, si son varias)</small>
+        <small>Tiempo total a la medida de referencia (todo el lote, si son varias)</small>
       </div>
       <div class="input-box"><input type="number" id="hours" value="2.5" min="0" step="0.1"></div>
     </div>
@@ -1432,7 +1440,7 @@
     }catch(e){ console.error('Firebase init error:', e); }
   }
 
-  const ids = ['rollPrice','rollWeight','pieceWeight','sizeScale','quantity','supportWeight','hours','watts','kwhPrice',
+  const ids = ['rollPrice','rollWeight','pieceWeight','refSizeMm','newSizeMm','quantity','supportWeight','hours','watts','kwhPrice',
                'printerPrice','lifeHours','workHours','wage','failRate','profit','currency',
                'multiToggle','numColors','colorChanges','purgePerChange','extraMinPerChange',
                'purgeCostToggle','purgeCostPerGram','shippingCost','reverseToggle','targetPrice','marketPrice'];
@@ -1440,7 +1448,7 @@
   ids.forEach(id => el[id] = document.getElementById(id));
 
   const DEFAULTS = {
-    currency: '$', rollPrice: '25', rollWeight: '1000', pieceWeight: '35', sizeScale: '100', quantity: '1', supportWeight: '0',
+    currency: '$', rollPrice: '25', rollWeight: '1000', pieceWeight: '35', refSizeMm: '100', newSizeMm: '100', quantity: '1', supportWeight: '0',
     hours: '2.5', watts: '150', kwhPrice: '0.50', printerPrice: '300', lifeHours: '4000',
     workHours: '0.5', wage: '5', failRate: '10', profit: '40',
     multiToggle: false, numColors: '2', colorChanges: '1', purgePerChange: '3', extraMinPerChange: '1.5',
@@ -1728,7 +1736,8 @@
 
     el.pieceWeight.value = (SIMPLE_WEIGHT_PER_CM3 * cm3).toFixed(1);
     el.hours.value = manualHours !== '' ? manualHours : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
-    el.sizeScale.value = '100';
+    el.refSizeMm.value = '100';
+    el.newSizeMm.value = '100';
 
     const colors = Math.max(1, parseInt(simpleEl.simpleColors.value, 10) || 1);
     if(colors >= 2){
@@ -1772,7 +1781,8 @@
     const rollPrice = num('rollPrice');
     const rollWeight = num('rollWeight') || 1;
     const pieceWeight = num('pieceWeight');
-    const sizeScale = num('sizeScale') || 100;
+    const refSizeMm = num('refSizeMm') || 100;
+    const newSizeMm = num('newSizeMm') || refSizeMm;
     const quantity = Math.max(1, num('quantity'));
     const supportWeight = num('supportWeight');
     const hours = num('hours');
@@ -1789,17 +1799,17 @@
     const isReverse = el.reverseToggle.checked;
     const targetPrice = num('targetPrice');
 
-    // El peso y las horas que mediste corresponden al 100% de escala.
-    // Un cambio uniforme de tamaño escala el volumen (y por tanto el
-    // peso y el tiempo, aproximadamente) al cubo del factor lineal.
-    const scaleFactor = Math.pow(sizeScale / 100, 3);
+    // El peso y las horas que mediste corresponden a la medida de
+    // referencia. Un cambio uniforme de tamaño escala el volumen (y por
+    // tanto el peso y el tiempo, aproximadamente) al cubo del factor lineal.
+    const scaleFactor = Math.pow(newSizeMm / refSizeMm, 3);
     const scaledWeight = pieceWeight * scaleFactor;
     const scaledHours = hours * scaleFactor;
 
-    if(sizeScale !== 100){
+    if(newSizeMm !== refSizeMm){
       rowScaled.classList.remove('hidden');
       outScaled.textContent = scaledWeight.toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g · ' +
-        scaledHours.toLocaleString('en-US', {maximumFractionDigits: 2}) + ' h (' + sizeScale + '%)';
+        scaledHours.toLocaleString('en-US', {maximumFractionDigits: 2}) + ' h (' + newSizeMm + ' mm)';
     } else {
       rowScaled.classList.add('hidden');
     }
