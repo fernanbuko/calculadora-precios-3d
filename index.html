@@ -432,6 +432,25 @@
   .filter-btn{ font-size: 11.5px; padding: 7px 12px; border-radius: 20px; }
   .filter-btn.active{ background: var(--orange); border-color: var(--orange); color: #fff; }
 
+  .chip-row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: -6px 0 12px;
+  }
+  .chip{
+    font-family: 'Inter', sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .chip:hover{ border-color: var(--orange); color: var(--orange); }
+
   /* Lists: profiles / history / extra costs */
   .list{ display:flex; flex-direction: column; gap: 8px; margin-top: 12px; }
   .list-item{
@@ -1126,8 +1145,11 @@
         <label for="orderClient">Cliente</label>
         <small>Quién te lo pidió</small>
       </div>
-      <div class="input-box"><input type="text" id="orderClient" placeholder="Nombre del cliente"></div>
+      <div class="input-box"><input type="text" id="orderClient" placeholder="Nombre del cliente" list="clientsDatalist"></div>
     </div>
+    <datalist id="clientsDatalist"></datalist>
+
+    <div class="chip-row hidden" id="recentClientsRow"></div>
 
     <div class="field field-wide">
       <div>
@@ -1856,12 +1878,45 @@
   const pendingToMakeList = document.getElementById('pendingToMakeList');
   const addOrderBtn = document.getElementById('addOrderBtn');
   const cancelEditOrderBtn = document.getElementById('cancelEditOrderBtn');
+  const clientsDatalist = document.getElementById('clientsDatalist');
+  const recentClientsRow = document.getElementById('recentClientsRow');
 
   function clearOrderForm(){
     orderClient.value = '';
     orderDesc.value = '';
     orderPrice.value = '0';
     orderDate.value = '';
+  }
+
+  function renderRecentClients(){
+    // Nombres únicos, del más reciente al más antiguo (por fecha de creación).
+    const seen = new Set();
+    const names = [];
+    orders.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach(o => {
+      const name = (o.cliente || '').trim();
+      if(name && !seen.has(name.toLowerCase())){
+        seen.add(name.toLowerCase());
+        names.push(name);
+      }
+    });
+
+    clientsDatalist.innerHTML = names.map(n => '<option value="' + escapeHTML(n) + '">').join('');
+
+    if(names.length === 0){
+      recentClientsRow.classList.add('hidden');
+      recentClientsRow.innerHTML = '';
+      return;
+    }
+    recentClientsRow.classList.remove('hidden');
+    recentClientsRow.innerHTML = names.slice(0, 8).map(n =>
+      '<button type="button" class="chip" data-client="' + escapeHTML(n) + '">' + escapeHTML(n) + '</button>'
+    ).join('');
+    recentClientsRow.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        orderClient.value = chip.dataset.client;
+        orderDesc.focus();
+      });
+    });
   }
 
   function exitEditMode(){
@@ -1942,6 +1997,7 @@
   function renderOrders(){
     renderOrdersSummary();
     renderPendingToMake();
+    renderRecentClients();
     ordersList.innerHTML = '';
     const filterFn = ORDERS_FILTERS[currentOrdersFilter] || ORDERS_FILTERS.all;
     const sorted = orders
