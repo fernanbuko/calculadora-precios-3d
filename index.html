@@ -1214,8 +1214,8 @@
   <div class="result-card" id="resultCard">
     <p class="card-title" style="margin-bottom:10px;">DESGLOSE</p>
 
-    <div class="breakdown-row"><span>Tiempo de impresión estimado</span><span id="outPrintTime">—</span></div>
-    <div class="breakdown-row"><span>Peso estimado</span><span id="outWeight">—</span></div>
+    <div class="breakdown-row"><span id="lblPrintTime">Tiempo de impresión</span><span id="outPrintTime">—</span></div>
+    <div class="breakdown-row"><span id="lblWeight">Peso</span><span id="outWeight">—</span></div>
     <div class="breakdown-row"><span>Material</span><span id="outMaterial">—</span></div>
     <div class="breakdown-row hidden" id="rowSupport"><span>Soportes (material)</span><span id="outSupport">—</span></div>
     <div class="breakdown-row"><span>Electricidad</span><span id="outElectricity">—</span></div>
@@ -1475,6 +1475,8 @@
   const outMaterial = document.getElementById('outMaterial');
   const outPrintTime = document.getElementById('outPrintTime');
   const outWeight = document.getElementById('outWeight');
+  const lblPrintTime = document.getElementById('lblPrintTime');
+  const lblWeight = document.getElementById('lblWeight');
   const rowScaled = document.getElementById('rowScaled');
   const outScaled = document.getElementById('outScaled');
   const outSupport = document.getElementById('outSupport');
@@ -1716,6 +1718,8 @@
   // El tamaño se convierte a peso/horas con la misma proporción que los
   // valores por defecto: 10 cm ~ 35 g y 2.5 h (aprox. volumen al cubo),
   // ajustado además por qué tan rápida es la impresora elegida.
+  let simpleWeightIsAuto = false;
+  let simpleHoursIsAuto = false;
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
@@ -1750,6 +1754,8 @@
 
     const manualWeight = simpleEl.simpleWeight.value.trim();
     const manualHours = simpleEl.simpleHours.value.trim();
+    simpleWeightIsAuto = manualWeight === '';
+    simpleHoursIsAuto = manualHours === '';
 
     el.pieceWeight.value = manualWeight !== '' ? manualWeight : (SIMPLE_WEIGHT_PER_CM3 * cm3).toFixed(1);
     el.hours.value = manualHours !== '' ? manualHours : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
@@ -1788,8 +1794,11 @@
       applySimpleToAdvanced();
       showToast('Modo simple activado');
     } else {
+      simpleWeightIsAuto = false;
+      simpleHoursIsAuto = false;
       showToast('Modo avanzado activado');
     }
+    calculate();
   });
 
   // ---------- main calculation ----------
@@ -1914,6 +1923,16 @@
       outFinal.textContent = fmt(finalPrice);
       outFinalSub.textContent = 'incluye tu margen de ganancia';
     }
+
+    // La etiqueta dice "estimado" solo cuando el valor viene de un cálculo
+    // (modo simple sin dato manual, o reescalado a otra medida) — si el
+    // usuario puso el dato exacto, se muestra tal cual, sin ese aviso.
+    const isSimpleMode = document.body.classList.contains('simple-mode');
+    const isRescaled = scaleFactor !== 1;
+    const hoursEstimated = isSimpleMode ? simpleHoursIsAuto : isRescaled;
+    const weightEstimated = isSimpleMode ? simpleWeightIsAuto : isRescaled;
+    lblPrintTime.textContent = 'Tiempo de impresión' + (hoursEstimated ? ' estimado' : '');
+    lblWeight.textContent = 'Peso' + (weightEstimated ? ' estimado' : '');
 
     outPrintTime.textContent = fmtHours(scaledHours);
     outWeight.textContent = scaledWeight.toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g' +
