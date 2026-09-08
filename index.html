@@ -458,14 +458,6 @@
   }
   .client-group .list{ margin-top: 0; gap: 6px; }
 
-  .item-status{
-    font-size: 11px;
-    margin-left: 3px;
-    filter: grayscale(1);
-    opacity: .3;
-  }
-  .item-status.done{ filter: none; opacity: 1; }
-
   .client-profile-header{ margin-top: 14px; }
   .client-profile-summary{
     display: flex;
@@ -597,6 +589,24 @@
   .order-item{ flex-direction: column; align-items: stretch; gap: 10px; }
   .order-item .order-top{ display:flex; justify-content: space-between; gap: 10px; }
   .order-item .badges{ display:flex; gap: 6px; flex-wrap: wrap; }
+
+  .order-items-detail{ display:flex; flex-direction: column; gap: 10px; }
+  .order-item-line{
+    display:flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .item-line-text{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .item-line-empty{ color: var(--text-faint); font-size: 12px; font-style: italic; }
+
   .badge{
     font-family: 'Inter', sans-serif;
     font-size: 10.5px;
@@ -2089,17 +2099,21 @@
   }
 
   function renderOrdersSummary(){
-    const paid = orders.filter(o => o.pagado);
-    const pending = orders.filter(o => !o.pagado);
-    const toMake = orders.filter(o => !o.hecho);
-    const toDeliver = orders.filter(o => !o.entregado);
-    const totalEarned = paid.reduce((sum, o) => sum + (parseFloat(o.precio) || 0), 0);
-    const totalDue = pending.reduce((sum, o) => sum + (parseFloat(o.precio) || 0), 0);
+    let totalEarned = 0, totalDue = 0, paidCount = 0, dueCount = 0, toMakeCount = 0, toDeliverCount = 0;
+    orders.forEach(o => {
+      (o.items || []).forEach(it => {
+        const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
+        if(it.pagado){ totalEarned += val; paidCount++; }
+        else { totalDue += val; dueCount++; }
+        if(!it.hecho) toMakeCount++;
+        if(!it.entregado) toDeliverCount++;
+      });
+    });
     ordersSummary.innerHTML =
-      '<div class="stat highlight"><div class="num">' + fmt(totalEarned) + '</div><div class="lbl">Generado (' + paid.length + ' pedido' + (paid.length === 1 ? '' : 's') + ' pagado' + (paid.length === 1 ? '' : 's') + ')</div></div>' +
-      '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Por cobrar (' + pending.length + ' pedido' + (pending.length === 1 ? '' : 's') + ')</div></div>' +
-      '<div class="stat"><div class="num">' + toMake.length + '</div><div class="lbl">Por hacer</div></div>' +
-      '<div class="stat"><div class="num">' + toDeliver.length + '</div><div class="lbl">Por entregar</div></div>';
+      '<div class="stat highlight"><div class="num">' + fmt(totalEarned) + '</div><div class="lbl">Generado (' + paidCount + ' artículo' + (paidCount === 1 ? '' : 's') + ' pagado' + (paidCount === 1 ? '' : 's') + ')</div></div>' +
+      '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Por cobrar (' + dueCount + ' artículo' + (dueCount === 1 ? '' : 's') + ')</div></div>' +
+      '<div class="stat"><div class="num">' + toMakeCount + '</div><div class="lbl">Por hacer</div></div>' +
+      '<div class="stat"><div class="num">' + toDeliverCount + '</div><div class="lbl">Por entregar</div></div>';
   }
 
   // Pestañas de "Pendientes": qué campo revisan, cómo se llama el botón de
@@ -2172,30 +2186,33 @@
 
   function renderPendingToMake(){
     const field = PENDING_TAB_FIELD[currentPendingTab];
-    const pending = orders
-      .map((o, i) => ({ o, i }))
-      .filter(({ o }) => !o[field])
-      .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
+    const pending = [];
+    orders.forEach((o, oi) => {
+      (o.items || []).forEach((it, ii) => {
+        if(!it[field]) pending.push({ o, oi, it, ii });
+      });
+    });
+    pending.sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
 
     pendingToMakeList.innerHTML = '';
     if(pending.length === 0){
       pendingToMakeList.innerHTML = '<p class="empty-note">' + PENDING_TAB_EMPTY[currentPendingTab] + '</p>';
       return;
     }
-    pending.forEach(({ o, i }) => {
+    pending.forEach(({ o, oi, it, ii }) => {
       const row = document.createElement('div');
       row.className = 'list-item';
       const dateLabel = fmtOrderDate(o.fecha);
       row.innerHTML =
         '<div class="info">' +
           '<div class="name">' + escapeHTML(o.cliente || 'Sin nombre') + '</div>' +
-          '<div class="meta">' + escapeHTML(o.descripcion || '') + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
+          '<div class="meta">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
         '</div>' +
         '<div class="actions">' +
           '<button type="button" class="btn small" data-mark>' + PENDING_TAB_ACTION[currentPendingTab] + '</button>' +
         '</div>';
       row.querySelector('[data-mark]').addEventListener('click', () => {
-        orders[i][field] = true;
+        orders[oi].items[ii][field] = true;
         saveJSON(ORDERS_KEY, orders);
         renderOrders();
       });
@@ -2205,9 +2222,9 @@
 
   const ORDERS_FILTERS = {
     all: () => true,
-    hacer: o => !o.hecho,
-    cobrar: o => !o.pagado,
-    entregar: o => !o.entregado
+    hacer: o => (o.items || []).some(it => !it.hecho),
+    cobrar: o => (o.items || []).some(it => !it.pagado),
+    entregar: o => (o.items || []).some(it => !it.entregado)
   };
   const ORDERS_FILTER_EMPTY_NOTE = {
     all: 'Aún no guardas ningún pedido.',
@@ -2217,62 +2234,52 @@
   };
   let currentOrdersFilter = 'all';
 
-  function buildOrderRow(o, i, forceAllBadges){
+  function buildOrderRow(o, i){
     const row = document.createElement('div');
     row.className = 'list-item order-item';
     const dateLabel = fmtOrderDate(o.fecha);
-    const hasItems = Array.isArray(o.items) && o.items.length > 0;
-    const itemStatusIcons =
-      '<span class="item-status ' + (o.hecho ? 'done' : '') + '" title="Hecho">🖨️</span>' +
-      '<span class="item-status ' + (o.entregado ? 'done' : '') + '" title="Entregado">📦</span>' +
-      '<span class="item-status ' + (o.pagado ? 'done' : '') + '" title="Cobrado">💰</span>';
-    const itemsLines = hasItems
-      ? o.items.map(it => (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + ' ' + itemStatusIcons).join('<br>')
-      : '';
-    const showAll = forceAllBadges || currentOrdersFilter === 'all';
-    row.innerHTML =
-      '<div class="order-top">' +
-        '<div class="info">' +
-          (hasItems
-            ? '<div class="name items-name">' + itemsLines + '</div>'
-            : '<div class="name">' + escapeHTML(o.descripcion || 'Sin descripción') + '</div>') +
-          '<div class="meta">' + fmt(parseFloat(o.precio) || 0) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
-        '</div>' +
-        '<div class="actions">' +
-          '<button type="button" class="btn small" data-edit="' + i + '" title="Editar">✎</button>' +
-          '<button type="button" class="btn small danger" data-del="' + i + '" title="Eliminar">✕</button>' +
-        '</div>' +
-      '</div>' +
-      '<div class="badges">' +
-        (showAll || currentOrdersFilter === 'hacer'
-          ? '<button type="button" class="badge ' + (o.hecho ? 'on' : 'warn-off') + '" data-toggle-hecho="' + i + '">' + (o.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>'
-          : '') +
-        (showAll || currentOrdersFilter === 'entregar'
-          ? '<button type="button" class="badge ' + (o.entregado ? 'on' : 'warn-off') + '" data-toggle-entregado="' + i + '">' + (o.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>'
-          : '') +
-        (showAll || currentOrdersFilter === 'cobrar'
-          ? '<button type="button" class="badge ' + (o.pagado ? 'on' : 'warn-off') + '" data-toggle-pagado="' + i + '">' + (o.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>'
-          : '') +
+    const items = Array.isArray(o.items) ? o.items : [];
+    const total = items.reduce((s, it) => s + (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0), 0);
+
+    const top = document.createElement('div');
+    top.className = 'order-top';
+    top.innerHTML =
+      '<div class="info"><div class="meta">' + fmt(total) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div></div>' +
+      '<div class="actions">' +
+        '<button type="button" class="btn small" data-edit title="Editar">✎</button>' +
+        '<button type="button" class="btn small danger" data-del title="Eliminar">✕</button>' +
       '</div>';
+    row.appendChild(top);
+
+    const detail = document.createElement('div');
+    detail.className = 'order-items-detail';
+    if(items.length === 0){
+      detail.innerHTML = '<div class="item-line-empty">Sin artículos</div>';
+    } else {
+      items.forEach((it, ii) => {
+        const line = document.createElement('div');
+        line.className = 'order-item-line';
+        line.innerHTML =
+          '<div class="item-line-text">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + '</div>' +
+          '<div class="badges">' +
+            '<button type="button" class="badge ' + (it.hecho ? 'on' : 'warn-off') + '" data-item-field="hecho">' + (it.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>' +
+            '<button type="button" class="badge ' + (it.entregado ? 'on' : 'warn-off') + '" data-item-field="entregado">' + (it.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
+            '<button type="button" class="badge ' + (it.pagado ? 'on' : 'warn-off') + '" data-item-field="pagado">' + (it.pagado ? '✓ Pagado' : '💰 Por cobrar') + '</button>' +
+          '</div>';
+        line.querySelectorAll('[data-item-field]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const field = btn.dataset.itemField;
+            orders[i].items[ii][field] = !orders[i].items[ii][field];
+            saveJSON(ORDERS_KEY, orders);
+            renderOrders();
+          });
+        });
+        detail.appendChild(line);
+      });
+    }
+    row.appendChild(detail);
+
     if(i === editingOrderIndex) row.style.borderColor = 'var(--orange)';
-    const hechoBadge = row.querySelector('[data-toggle-hecho]');
-    if(hechoBadge) hechoBadge.addEventListener('click', () => {
-      orders[i].hecho = !orders[i].hecho;
-      saveJSON(ORDERS_KEY, orders);
-      renderOrders();
-    });
-    const pagadoBadge = row.querySelector('[data-toggle-pagado]');
-    if(pagadoBadge) pagadoBadge.addEventListener('click', () => {
-      orders[i].pagado = !orders[i].pagado;
-      saveJSON(ORDERS_KEY, orders);
-      renderOrders();
-    });
-    const entregadoBadge = row.querySelector('[data-toggle-entregado]');
-    if(entregadoBadge) entregadoBadge.addEventListener('click', () => {
-      orders[i].entregado = !orders[i].entregado;
-      saveJSON(ORDERS_KEY, orders);
-      renderOrders();
-    });
     row.querySelector('[data-edit]').addEventListener('click', () => {
       editingOrderIndex = i;
       const clientName = orders[i].cliente || '';
@@ -2284,8 +2291,12 @@
       if(Array.isArray(orders[i].items) && orders[i].items.length > 0){
         currentOrderItems = JSON.parse(JSON.stringify(orders[i].items));
       } else if(orders[i].descripcion || orders[i].precio){
-        // Pedido guardado antes de tener artículos: lo convertimos a uno solo.
-        currentOrderItems = [{ nombre: orders[i].descripcion || 'Artículo', cantidad: 1, precio: parseFloat(orders[i].precio) || 0 }];
+        // Pedido guardado antes de tener artículos: lo convertimos a uno solo,
+        // conservando su estado hecho/entregado/pagado de ese entonces.
+        currentOrderItems = [{
+          nombre: orders[i].descripcion || 'Artículo', cantidad: 1, precio: parseFloat(orders[i].precio) || 0,
+          hecho: !!orders[i].hecho, entregado: !!orders[i].entregado, pagado: !!orders[i].pagado
+        }];
       } else {
         currentOrderItems = [];
       }
@@ -2319,20 +2330,25 @@
   });
 
   function renderClientProfile(clientName){
-    const items = orders
+    const clientOrders = orders
       .map((o, i) => ({ o, i }))
       .filter(({ o }) => ((o.cliente || '').trim() || 'Sin nombre') === clientName)
       .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
 
-    if(items.length === 0){
+    if(clientOrders.length === 0){
       openClientProfile = null;
       renderOrders();
       return;
     }
 
-    const totalGenerado = items.filter(({ o }) => o.pagado).reduce((s, { o }) => s + (parseFloat(o.precio) || 0), 0);
-    const totalPorCobrar = items.filter(({ o }) => !o.pagado).reduce((s, { o }) => s + (parseFloat(o.precio) || 0), 0);
-    const porEntregar = items.filter(({ o }) => !o.entregado).length;
+    let totalGenerado = 0, totalPorCobrar = 0, porEntregar = 0;
+    clientOrders.forEach(({ o }) => {
+      (o.items || []).forEach(it => {
+        const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
+        if(it.pagado) totalGenerado += val; else totalPorCobrar += val;
+        if(!it.entregado) porEntregar++;
+      });
+    });
 
     ordersListHeader.classList.add('hidden');
     clientProfileHeader.classList.remove('hidden');
@@ -2344,12 +2360,12 @@
     summary.innerHTML =
       '<div class="stat"><div class="num">' + fmt(totalGenerado) + '</div><div class="lbl">Cobrado</div></div>' +
       '<div class="stat"><div class="num">' + fmt(totalPorCobrar) + '</div><div class="lbl">Por cobrar</div></div>' +
-      '<div class="stat"><div class="num">' + porEntregar + '</div><div class="lbl">Por entregar</div></div>';
+      '<div class="stat"><div class="num">' + porEntregar + '</div><div class="lbl">Artículos por entregar</div></div>';
     ordersList.appendChild(summary);
 
     const list = document.createElement('div');
     list.className = 'list';
-    items.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i, true)));
+    clientOrders.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i)));
     ordersList.appendChild(list);
   }
 
@@ -2425,7 +2441,10 @@
     const cliente = currentClientName();
     const items = currentOrderItems
       .filter(it => (it.nombre || '').trim())
-      .map(it => ({ nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0 }));
+      .map(it => ({
+        nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0,
+        hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado
+      }));
     if(!cliente && items.length === 0){ showToast('Pon al menos el cliente o un artículo'); return; }
     const data = {
       cliente, items,
