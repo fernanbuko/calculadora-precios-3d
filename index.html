@@ -478,6 +478,35 @@
   }
   .extra-row input[type="text"]{ text-align: left; }
 
+  .item-row{
+    display: grid;
+    grid-template-columns: 1fr 52px 74px 28px;
+    gap: 6px;
+    align-items: center;
+    padding: 5px 0;
+  }
+  .item-row input[type="text"]{ text-align: left; }
+  .item-row input[type="number"]{ padding: 8px 6px; }
+  .item-row-header{
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-faint);
+    padding-bottom: 2px;
+  }
+  .items-subtotal-row{
+    display: flex;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 8px 2px;
+    margin-bottom: 8px;
+    border-top: 1px dashed var(--line);
+  }
+  .items-subtotal-row span:last-child{ color: var(--text); }
+
   .save-row{ display:flex; gap: 8px; margin-top: 14px; }
   .save-row input[type="text"]{ text-align: left; flex: 1; }
 
@@ -1171,16 +1200,29 @@
       <div class="input-box"><input type="text" id="orderDesc" placeholder="Ej: Maceta 12cm x3, roja y blanca"></div>
     </div>
 
+    <p class="card-title" style="margin-top:12px;font-size:13px;">Artículos <span class="tag">OPCIONAL — UNO POR CASILLA</span></p>
+    <div class="item-row item-row-header">
+      <span>Artículo</span><span>Cant.</span><span>Precio c/u</span><span></span>
+    </div>
+    <div id="orderItemsList"></div>
+    <div class="btn-row" style="margin: 8px 0;">
+      <button type="button" class="btn small" id="addOrderItemBtn">+ Agregar artículo</button>
+    </div>
+    <div class="items-subtotal-row hidden" id="itemsSubtotalRow">
+      <span>Subtotal artículos</span><span id="orderItemsSubtotal">$ 0.00</span>
+    </div>
+
     <div class="field">
       <div>
         <label for="orderPrice">Precio a cobrar</label>
-        <small>Usa el botón para copiar el precio calculado arriba</small>
+        <small>Usa alguno de los botones para copiar un precio</small>
       </div>
       <div class="input-box"><input type="number" id="orderPrice" value="0" min="0" step="0.5"></div>
     </div>
 
     <div class="btn-row" style="margin-bottom:8px;">
       <button type="button" class="btn small" id="useCalculatedPriceBtn">↑ Usar precio calculado</button>
+      <button type="button" class="btn small hidden" id="useItemsSubtotalBtn">↓ Usar subtotal de artículos</button>
     </div>
 
     <div class="field">
@@ -1892,6 +1934,69 @@
   const cancelEditOrderBtn = document.getElementById('cancelEditOrderBtn');
   const orderClientSelect = document.getElementById('orderClientSelect');
   const newClientField = document.getElementById('newClientField');
+  const orderItemsList = document.getElementById('orderItemsList');
+  const addOrderItemBtn = document.getElementById('addOrderItemBtn');
+  const itemsSubtotalRow = document.getElementById('itemsSubtotalRow');
+  const orderItemsSubtotal = document.getElementById('orderItemsSubtotal');
+  const useItemsSubtotalBtn = document.getElementById('useItemsSubtotalBtn');
+  let currentOrderItems = []; // [{nombre, cantidad, precio}]
+
+  function itemsSubtotal(){
+    return currentOrderItems.reduce((sum, it) => sum + (parseFloat(it.cantidad) || 0) * (parseFloat(it.precio) || 0), 0);
+  }
+
+  function renderOrderItems(){
+    orderItemsList.innerHTML = '';
+    currentOrderItems.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML =
+        '<input type="text" placeholder="Ej: Llavero" data-f="nombre">' +
+        '<input type="number" min="0" step="1" data-f="cantidad">' +
+        '<input type="number" min="0" step="0.01" data-f="precio">' +
+        '<button type="button" class="btn small danger" data-remove-item title="Quitar">✕</button>';
+      const nombreInput = row.querySelector('[data-f="nombre"]');
+      const cantInput = row.querySelector('[data-f="cantidad"]');
+      const precioInput = row.querySelector('[data-f="precio"]');
+      nombreInput.value = item.nombre;
+      cantInput.value = item.cantidad;
+      precioInput.value = item.precio;
+      nombreInput.addEventListener('input', () => { currentOrderItems[idx].nombre = nombreInput.value; });
+      cantInput.addEventListener('input', () => { currentOrderItems[idx].cantidad = parseFloat(cantInput.value) || 0; updateItemsSubtotal(); });
+      precioInput.addEventListener('input', () => { currentOrderItems[idx].precio = parseFloat(precioInput.value) || 0; updateItemsSubtotal(); });
+      row.querySelector('[data-remove-item]').addEventListener('click', () => {
+        currentOrderItems.splice(idx, 1);
+        renderOrderItems();
+      });
+      orderItemsList.appendChild(row);
+    });
+    updateItemsSubtotal();
+  }
+
+  function updateItemsSubtotal(){
+    const subtotal = itemsSubtotal();
+    const hasItems = currentOrderItems.length > 0;
+    itemsSubtotalRow.classList.toggle('hidden', !hasItems);
+    useItemsSubtotalBtn.classList.toggle('hidden', !hasItems);
+    orderItemsSubtotal.textContent = fmt(subtotal);
+  }
+
+  addOrderItemBtn.addEventListener('click', () => {
+    currentOrderItems.push({ nombre: '', cantidad: 1, precio: 0 });
+    renderOrderItems();
+  });
+
+  useItemsSubtotalBtn.addEventListener('click', () => {
+    orderPrice.value = itemsSubtotal().toFixed(2);
+    showToast('Subtotal copiado');
+  });
+
+  function itemsToDescription(items){
+    return items
+      .filter(it => (it.nombre || '').trim())
+      .map(it => (parseFloat(it.cantidad) || 1) + 'x ' + it.nombre.trim())
+      .join(', ');
+  }
 
   function getUniqueClientNames(){
     // Nombres únicos, alfabético, sin importar mayúsculas.
@@ -1934,6 +2039,8 @@
     orderDesc.value = '';
     orderPrice.value = '0';
     orderDate.value = '';
+    currentOrderItems = [];
+    renderOrderItems();
   }
 
   function exitEditMode(){
@@ -2015,10 +2122,15 @@
     const row = document.createElement('div');
     row.className = 'list-item order-item';
     const dateLabel = fmtOrderDate(o.fecha);
+    const hasItems = Array.isArray(o.items) && o.items.length > 0;
+    const itemsLines = hasItems
+      ? o.items.map(it => (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0)).join('<br>')
+      : '';
     row.innerHTML =
       '<div class="order-top">' +
         '<div class="info">' +
-          '<div class="name">' + escapeHTML(o.descripcion || 'Sin descripción') + '</div>' +
+          '<div class="name">' + escapeHTML(o.descripcion || (hasItems ? '' : 'Sin descripción')) + '</div>' +
+          (hasItems ? '<div class="meta">' + itemsLines + '</div>' : '') +
           '<div class="meta">' + fmt(parseFloat(o.precio) || 0) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
         '</div>' +
         '<div class="actions">' +
@@ -2066,6 +2178,8 @@
       orderDesc.value = orders[i].descripcion || '';
       orderPrice.value = orders[i].precio || 0;
       orderDate.value = orders[i].fecha || '';
+      currentOrderItems = Array.isArray(orders[i].items) ? JSON.parse(JSON.stringify(orders[i].items)) : [];
+      renderOrderItems();
       addOrderBtn.textContent = '✓ Guardar cambios';
       cancelEditOrderBtn.classList.remove('hidden');
       orderClientSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2142,9 +2256,12 @@
   addOrderBtn.addEventListener('click', () => {
     const cliente = currentClientName();
     const descripcion = orderDesc.value.trim();
-    if(!cliente && !descripcion){ showToast('Pon al menos el cliente o el pedido'); return; }
+    const items = currentOrderItems
+      .filter(it => (it.nombre || '').trim())
+      .map(it => ({ nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0 }));
+    if(!cliente && !descripcion && items.length === 0){ showToast('Pon al menos el cliente, el pedido o un artículo'); return; }
     const data = {
-      cliente, descripcion,
+      cliente, descripcion, items,
       precio: parseFloat(orderPrice.value) || 0,
       fecha: orderDate.value || ''
     };
@@ -2162,6 +2279,8 @@
       orderDesc.value = '';
       orderPrice.value = '0';
       orderDate.value = '';
+      currentOrderItems = [];
+      renderOrderItems();
       renderOrders();
       orderClientSelect.value = cliente;
       toggleNewClientField();
