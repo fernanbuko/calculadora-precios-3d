@@ -492,6 +492,8 @@
   }
   .list-item .info{ min-width:0; }
   .list-item .info .name{ font-size: 13.5px; color: var(--text); font-weight: 600; }
+  .list-item .info .name[data-client-link]{ cursor: pointer; }
+  .list-item .info .name[data-client-link]:hover{ text-decoration: underline; }
   .list-item .info .meta{ font-family:'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--text-faint); margin-top: 3px; }
   .list-item .actions{ display:flex; gap: 6px; flex-shrink: 0; }
   .empty-note{ color: var(--text-faint); font-size: 12.5px; font-style: italic; }
@@ -2116,11 +2118,10 @@
       '<div class="stat"><div class="num">' + toDeliverCount + '</div><div class="lbl">Por entregar</div></div>';
   }
 
-  // Pestañas de "Pendientes": qué campo revisan, cómo se llama el botón de
-  // marcar, y el aviso cuando no queda nada pendiente en esa vista.
+  // Pestañas de "Pendientes": qué campo revisan y el aviso cuando no
+  // queda nada pendiente en esa vista.
   const PENDING_TABS = ['hacer', 'entregar', 'cobrar'];
   const PENDING_TAB_FIELD = { hacer: 'hecho', entregar: 'entregado', cobrar: 'pagado' };
-  const PENDING_TAB_ACTION = { hacer: '✓ Marcar hecho', entregar: '✓ Marcar entregado', cobrar: '✓ Marcar cobrado' };
   const PENDING_TAB_EMPTY = {
     hacer: 'Nada pendiente por hacer 🎉',
     entregar: 'Nada pendiente por entregar 🎉',
@@ -2199,23 +2200,17 @@
       pendingToMakeList.innerHTML = '<p class="empty-note">' + PENDING_TAB_EMPTY[currentPendingTab] + '</p>';
       return;
     }
-    pending.forEach(({ o, oi, it, ii }) => {
+    pending.forEach(({ o, it }) => {
       const row = document.createElement('div');
       row.className = 'list-item';
       const dateLabel = fmtOrderDate(o.fecha);
+      const clientName = o.cliente || 'Sin nombre';
       row.innerHTML =
         '<div class="info">' +
-          '<div class="name">' + escapeHTML(o.cliente || 'Sin nombre') + '</div>' +
+          '<div class="name" data-client-link>' + escapeHTML(clientName) + '</div>' +
           '<div class="meta">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
-        '</div>' +
-        '<div class="actions">' +
-          '<button type="button" class="btn small" data-mark>' + PENDING_TAB_ACTION[currentPendingTab] + '</button>' +
         '</div>';
-      row.querySelector('[data-mark]').addEventListener('click', () => {
-        orders[oi].items[ii][field] = true;
-        saveJSON(ORDERS_KEY, orders);
-        renderOrders();
-      });
+      row.querySelector('[data-client-link]').addEventListener('click', () => openClient(clientName));
       pendingToMakeList.appendChild(row);
     });
   }
