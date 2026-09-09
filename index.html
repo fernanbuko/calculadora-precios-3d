@@ -610,11 +610,25 @@
   .orders-summary .stat.highlight .num{ color: var(--teal); font-size: 24px; }
   .orders-summary .stat.highlight .lbl{ color: var(--text-dim); }
 
-  .order-item{ flex-direction: column; align-items: stretch; gap: 10px; }
-  .order-item .order-top{ display:flex; justify-content: space-between; gap: 10px; }
+  .order-item{ flex-direction: column; align-items: stretch; gap: 0; }
+  .order-item .order-top{ display:flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .order-item .order-top.collapsible{ cursor: pointer; }
+  .order-item .order-top-left{ min-width: 0; }
   .order-item .badges{ display:flex; gap: 6px; flex-wrap: wrap; }
 
-  .order-items-detail{ display:flex; flex-direction: column; gap: 10px; }
+  .status-chips{ display:flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+  .chip{
+    font-family: 'Inter', sans-serif;
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    border: 1px solid var(--line-strong); color: var(--text-faint);
+  }
+  .chip.warn{ border-color: var(--orange); color: var(--orange); }
+  .chip.ok{ border-color: var(--teal); color: var(--teal); }
+  .chevron{ color: var(--text-faint); font-size: 12px; transition: transform .15s; flex-shrink: 0; }
+  .order-item.open .chevron{ transform: rotate(180deg); }
+
+  .order-items-detail{ display:none; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .order-item.open .order-items-detail{ display:flex; }
   .order-item-line{
     display:flex;
     flex-direction: column;
@@ -2514,6 +2528,7 @@
   const ORDERS_KEY = 'calc3d_orders';
   let orders = loadJSON(ORDERS_KEY, []);
   let editingOrderIndex = null;
+  let openOrderRows = new Set(); // índices de pedidos expandidos, para que no se cierren al re-renderizar
   const orderClient = document.getElementById('orderClient');
   const orderDate = document.getElementById('orderDate');
   const ordersList = document.getElementById('ordersList');
@@ -2840,6 +2855,13 @@
     cobrar: o => (o.items || []).some(it => !it.pagado),
     entregar: o => (o.items || []).some(it => !it.entregado)
   };
+  // Mismo criterio pero por artículo individual, para mostrar solo los que coinciden con el filtro activo.
+  const ITEM_FILTERS = {
+    all: () => true,
+    hacer: it => !it.hecho,
+    cobrar: it => !it.pagado,
+    entregar: it => !it.entregado
+  };
   const ORDERS_FILTER_EMPTY_NOTE = {
     all: 'Aún no guardas ningún pedido.',
     hacer: 'No hay pedidos pendientes por hacer 🎉',
@@ -2848,29 +2870,63 @@
   };
   let currentOrdersFilter = 'all';
 
-  function buildOrderRow(o, i){
+  function buildStatusChipsHTML(items){
+    if(items.length === 0) return '';
+    const total = items.length;
+    const hechoCount = items.filter(it => it.hecho).length;
+    const entregadoCount = items.filter(it => it.entregado).length;
+    let totalVal = 0, paidVal = 0;
+    items.forEach(it => {
+      const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
+      totalVal += val;
+      paidVal += Math.min(parseFloat(it.montoPagado) || 0, val);
+    });
+    const debe = totalVal - paidVal;
+    if(hechoCount === total && entregadoCount === total && debe <= 0.004){
+      return '<span class="chip ok">✓ listo y pagado</span>';
+    }
+    const chips = [];
+    chips.push('<span class="chip ' + (hechoCount === total ? 'ok' : 'warn') + '">🖨️ ' + hechoCount + '/' + total + ' hecho</span>');
+    chips.push('<span class="chip ' + (entregadoCount === total ? 'ok' : 'warn') + '">📦 ' + entregadoCount + '/' + total + ' entregado</span>');
+    chips.push(debe > 0.004
+      ? '<span class="chip warn">💰 debe ' + fmt(debe) + '</span>'
+      : '<span class="chip ok">💰 cobrado</span>');
+    return chips.join('');
+  }
+
+  function buildOrderRow(o, i, itemFilterKey){
     const row = document.createElement('div');
     row.className = 'list-item order-item';
     const dateLabel = fmtOrderDate(o.fecha);
     const items = Array.isArray(o.items) ? o.items : [];
     const total = items.reduce((s, it) => s + (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0), 0);
+    // El total y los chips del encabezado siempre reflejan el pedido completo;
+    // solo la lista de artículos del detalle se filtra según el filtro activo.
+    const itemFilterFn = itemFilterKey ? (ITEM_FILTERS[itemFilterKey] || ITEM_FILTERS.all) : ITEM_FILTERS.all;
+    const visibleItems = items
+      .map((it, ii) => ({ it, ii }))
+      .filter(({ it }) => itemFilterFn(it));
 
     const top = document.createElement('div');
-    top.className = 'order-top';
+    top.className = 'order-top collapsible';
     top.innerHTML =
-      '<div class="info"><div class="meta">' + fmt(total) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div></div>' +
-      '<div class="actions">' +
-        '<button type="button" class="btn small" data-edit title="Editar">✎</button>' +
-        '<button type="button" class="btn small danger" data-del title="Eliminar">✕</button>' +
-      '</div>';
+      '<div class="order-top-left">' +
+        '<div class="meta">' + fmt(total) + (dateLabel ? ' · entrega ' + dateLabel : '') + '</div>' +
+        '<div class="status-chips">' + buildStatusChipsHTML(items) + '</div>' +
+      '</div>' +
+      '<span class="chevron">▾</span>';
+    top.addEventListener('click', () => {
+      row.classList.toggle('open');
+      if(row.classList.contains('open')) openOrderRows.add(i); else openOrderRows.delete(i);
+    });
     row.appendChild(top);
 
     const detail = document.createElement('div');
     detail.className = 'order-items-detail';
-    if(items.length === 0){
-      detail.innerHTML = '<div class="item-line-empty">Sin artículos</div>';
+    if(visibleItems.length === 0){
+      detail.innerHTML = '<div class="item-line-empty">Sin artículos' + (itemFilterKey && itemFilterKey !== 'all' ? ' en este filtro' : '') + '</div>';
     } else {
-      items.forEach((it, ii) => {
+      visibleItems.forEach(({ it, ii }) => {
         const line = document.createElement('div');
         line.className = 'order-item-line';
         const itemTotal = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
@@ -2921,10 +2977,20 @@
         detail.appendChild(line);
       });
     }
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'actions';
+    actionsRow.style.justifyContent = 'flex-end';
+    actionsRow.style.marginTop = '2px';
+    actionsRow.innerHTML =
+      '<button type="button" class="btn small" data-edit title="Editar">✎ Editar</button>' +
+      '<button type="button" class="btn small danger" data-del title="Eliminar">✕ Eliminar</button>';
+    detail.appendChild(actionsRow);
     row.appendChild(detail);
 
+    if(openOrderRows.has(i) || i === editingOrderIndex) row.classList.add('open');
     if(i === editingOrderIndex) row.style.borderColor = 'var(--orange)';
-    row.querySelector('[data-edit]').addEventListener('click', () => {
+    row.querySelector('[data-edit]').addEventListener('click', (e) => {
+      e.stopPropagation();
       editingOrderIndex = i;
       const clientName = orders[i].cliente || '';
       const names = getUniqueClientNames();
@@ -2950,10 +3016,17 @@
       orderModalTitle.textContent = 'Editar pedido';
       openOrderModal();
     });
-    row.querySelector('[data-del]').addEventListener('click', async () => {
+    row.querySelector('[data-del]').addEventListener('click', async (e) => {
+      e.stopPropagation();
       if(!(await showConfirm('¿Eliminar este pedido?', 'Eliminar pedido'))) return;
       orders.splice(i, 1);
       if(editingOrderIndex === i) exitEditMode();
+      const shifted = new Set();
+      openOrderRows.forEach(idx => {
+        if(idx < i) shifted.add(idx);
+        else if(idx > i) shifted.add(idx - 1);
+      });
+      openOrderRows = shifted;
       saveJSON(ORDERS_KEY, orders);
       renderOrders();
     });
@@ -3063,7 +3136,7 @@
         '<div class="list"></div>';
       group.querySelector('.client-group-header').addEventListener('click', () => openClient(clientName));
       const list = group.querySelector('.list');
-      items.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i)));
+      items.forEach(({ o, i }) => list.appendChild(buildOrderRow(o, i, currentOrdersFilter)));
       ordersList.appendChild(group);
     });
   }
