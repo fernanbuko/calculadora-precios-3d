@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "787724472609",
+    "project_id": "caluladora3d",
+    "storage_bucket": "caluladora3d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787724472609:android:b666b795a839473f2e2e60",
+        "android_client_info": {
+          "package_name": "com.precios3d.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "787724472609-77362boit3cat2k7milm8ok4fauff4f9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkMrfMoX1OfDjugrIxRm2UchV7bAYOgRc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "787724472609-77362boit3cat2k7milm8ok4fauff4f9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
