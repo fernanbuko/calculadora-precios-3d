@@ -907,7 +907,7 @@
     <div class="field field-wide hidden" id="simpleFlatFields">
       <div>
         <label for="simpleFlatWidth">Medidas (ancho × alto × grosor)</label>
-        <small>En milímetros — el peso se calcula de estas medidas, no del tamaño de arriba</small>
+        <small>En milímetros — pon el peso abajo (pésala o mira tu slicer); con algo tan delgado no lo adivinamos solo con las medidas</small>
       </div>
       <div class="hms-row">
         <div class="input-box"><input type="number" id="simpleFlatWidth" min="0" step="1" placeholder="60"><span class="hms-unit">mm</span></div>
@@ -916,26 +916,10 @@
       </div>
     </div>
 
-    <div class="field hidden" id="simpleFlatInfillField">
-      <div>
-        <label for="simpleFlatInfill">% de relleno</label>
-        <small>Piezas delgadas como llaveros suelen imprimirse casi sólidas</small>
-      </div>
-      <div class="input-box"><input type="number" id="simpleFlatInfill" value="100" min="1" max="100" step="5"></div>
-    </div>
-
-    <div class="field hidden" id="simpleFlatDensityField">
-      <div>
-        <label for="simpleFlatDensity">Densidad del filamento</label>
-        <small>En g/cm³ — PLA ≈ 1.24, PETG ≈ 1.27, ABS ≈ 1.04</small>
-      </div>
-      <div class="input-box"><input type="number" id="simpleFlatDensity" value="1.24" min="0.1" step="0.01"></div>
-    </div>
-
     <div class="field">
       <div>
-        <label for="simpleWeight">Peso de la pieza (opcional)</label>
-        <small>En gramos, si lo sabes (del slicer). Si lo dejas vacío, lo estimamos con el tamaño</small>
+        <label for="simpleWeight" id="simpleWeightLabel">Peso de la pieza (opcional)</label>
+        <small id="simpleWeightHint">En gramos, si lo sabes (del slicer). Si lo dejas vacío, lo estimamos con el tamaño</small>
       </div>
       <div class="input-box"><input type="number" id="simpleWeight" value="" min="0" step="1" placeholder="Auto"></div>
     </div>
@@ -1891,7 +1875,7 @@
   const SIMPLE_DEFAULTS_LIST = [
     ['simpleSize', '10'], ['simpleWeight', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', '4'],
     ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5'],
-    ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', ''], ['simpleFlatInfill', '100'], ['simpleFlatDensity', '1.24']
+    ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', '']
   ];
   const simpleModeToggle = document.getElementById('simpleModeToggle');
   const simpleCard = document.getElementById('simpleCard');
@@ -1900,10 +1884,10 @@
   const simpleFlatToggle = document.getElementById('simpleFlatToggle');
   const simpleSizeField = document.getElementById('simpleSizeField');
   const simpleFlatFields = document.getElementById('simpleFlatFields');
-  const simpleFlatInfillField = document.getElementById('simpleFlatInfillField');
-  const simpleFlatDensityField = document.getElementById('simpleFlatDensityField');
+  const simpleWeightLabel = document.getElementById('simpleWeightLabel');
+  const simpleWeightHint = document.getElementById('simpleWeightHint');
   const simpleFieldIds = ['simpleSize', 'simpleWeight', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
-                          'simpleFlatWidth', 'simpleFlatHeight', 'simpleFlatThickness', 'simpleFlatInfill', 'simpleFlatDensity'];
+                          'simpleFlatWidth', 'simpleFlatHeight', 'simpleFlatThickness'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
 
@@ -1911,8 +1895,10 @@
     const isFlat = simpleFlatToggle.checked;
     simpleSizeField.classList.toggle('hidden', isFlat);
     simpleFlatFields.classList.toggle('hidden', !isFlat);
-    simpleFlatInfillField.classList.toggle('hidden', !isFlat);
-    simpleFlatDensityField.classList.toggle('hidden', !isFlat);
+    simpleWeightLabel.textContent = isFlat ? 'Peso de la pieza' : 'Peso de la pieza (opcional)';
+    simpleWeightHint.textContent = isFlat
+      ? 'En gramos — pésala o mira tu slicer. Con algo tan delgado no lo adivinamos solo con las medidas'
+      : 'En gramos, si lo sabes (del slicer). Si lo dejas vacío, lo estimamos con el tamaño';
     applySimpleToAdvanced();
   });
 
@@ -1930,7 +1916,6 @@
     const isFlat = simpleFlatToggle.checked;
     const flatWidth = Math.max(0, parseFloat(simpleEl.simpleFlatWidth.value) || 0);
     const flatHeight = Math.max(0, parseFloat(simpleEl.simpleFlatHeight.value) || 0);
-    const flatThickness = Math.max(0, parseFloat(simpleEl.simpleFlatThickness.value) || 0);
 
     // Para el tiempo (cuando no lo pones a mano) seguimos usando la misma
     // fórmula de "tamaño al cubo" — en pieza plana, basada en el lado más
@@ -1952,18 +1937,10 @@
     simpleWeightIsAuto = manualWeight === '';
     simpleHoursIsAuto = !hasManualHours;
 
-    // Pieza plana: el peso sale de las medidas reales (volumen × densidad ×
-    // % de relleno) en vez del estimado genérico por tamaño — mucho más
-    // exacto para algo delgado como un llavero, que no escala como un cubo.
-    let autoWeight;
-    if(isFlat){
-      const volumeCm3 = (flatWidth * flatHeight * flatThickness) / 1000;
-      const density = Math.max(0.01, parseFloat(simpleEl.simpleFlatDensity.value) || 1.24);
-      const infill = Math.min(100, Math.max(1, parseFloat(simpleEl.simpleFlatInfill.value) || 100));
-      autoWeight = volumeCm3 * density * (infill / 100);
-    } else {
-      autoWeight = SIMPLE_WEIGHT_PER_CM3 * cm3;
-    }
+    // En pieza plana no hay un buen estimado automático de peso solo con
+    // las medidas (no sabemos la densidad del filamento ni el relleno) —
+    // el peso hay que ponerlo a mano, pesándola o mirando el slicer.
+    const autoWeight = isFlat ? 0 : SIMPLE_WEIGHT_PER_CM3 * cm3;
 
     el.pieceWeight.value = manualWeight !== '' ? manualWeight : autoWeight.toFixed(1);
     el.hours.value = hasManualHours ? manualHoursDecimal.toFixed(4) : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
