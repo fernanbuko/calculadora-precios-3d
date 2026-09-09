@@ -1640,7 +1640,7 @@
   <div class="modal-card">
     <p class="modal-title" id="modalTitle"></p>
     <p class="modal-message" id="modalMessage"></p>
-    <input type="text" inputmode="decimal" class="modal-input hidden" id="modalInput">
+    <input type="text" class="modal-input hidden" id="modalInput">
     <div class="modal-actions">
       <button type="button" class="btn" id="modalCancelBtn">Cancelar</button>
       <button type="button" class="btn primary" id="modalOkBtn">Aceptar</button>
@@ -1842,13 +1842,16 @@
   const modalCancelBtn = document.getElementById('modalCancelBtn');
   const modalOkBtn = document.getElementById('modalOkBtn');
 
-  function openModal({ title, message, withInput, inputValue }){
+  function openModal({ title, message, withInput, inputValue, inputMode }){
     return new Promise(resolve => {
       modalTitle.textContent = title || '';
       modalTitle.classList.toggle('hidden', !title);
       modalMessage.textContent = message || '';
       modalInput.classList.toggle('hidden', !withInput);
-      if(withInput) modalInput.value = inputValue != null ? inputValue : '';
+      if(withInput){
+        modalInput.value = inputValue != null ? inputValue : '';
+        modalInput.setAttribute('inputmode', inputMode || 'text');
+      }
 
       const cleanup = (result) => {
         modalOverlay.classList.add('hidden');
@@ -1879,8 +1882,8 @@
   function showConfirm(message, title){
     return openModal({ title, message, withInput: false });
   }
-  function showPrompt(message, defaultValue, title){
-    return openModal({ title, message, withInput: true, inputValue: defaultValue });
+  function showPrompt(message, defaultValue, title, inputMode){
+    return openModal({ title, message, withInput: true, inputValue: defaultValue, inputMode });
   }
 
   function loadJSON(key, fallback){
@@ -2963,7 +2966,7 @@
                 item.pagado = false;
               } else {
                 const remaining = total - paid;
-                const input = await showPrompt('¿Cuánto te pagaron ahora? (falta ' + fmt(remaining) + ')', remaining.toFixed(2), 'Registrar pago');
+                const input = await showPrompt('¿Cuánto te pagaron ahora? (falta ' + fmt(remaining) + ')', remaining.toFixed(2), 'Registrar pago', 'decimal');
                 if(input === null) return;
                 const amount = parseFloat(String(input).replace(',', '.'));
                 if(!(amount > 0)) return;
