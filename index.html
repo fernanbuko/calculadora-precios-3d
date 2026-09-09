@@ -133,6 +133,15 @@
     line-height: 1.2;
   }
 
+  .greeting{
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin: 0 0 16px;
+    line-height: 1.2;
+  }
+
   header p{
     color: var(--text-dim);
     font-size: 14px;
@@ -810,6 +819,8 @@
 
   <div class="tab-panel" data-tab="inicio" id="tabPanelInicio">
   <!-- INICIO -->
+  <p class="greeting" id="greetingText">¡Hola!</p>
+
   <div class="card">
     <p class="card-title">Pedidos <span class="tag">QUÉ ENTREGAR Y COBRAR</span></p>
     <div class="orders-summary" id="ordersSummary"></div>
@@ -2259,6 +2270,7 @@
   const clientProfileTitle = document.getElementById('clientProfileTitle');
   const backToOrdersBtn = document.getElementById('backToOrdersBtn');
   const ordersSummary = document.getElementById('ordersSummary');
+  const greetingText = document.getElementById('greetingText');
   const pendingToMakeList = document.getElementById('pendingToMakeList');
   const pendingSwipeArea = document.getElementById('pendingSwipeArea');
   const addOrderBtn = document.getElementById('addOrderBtn');
@@ -2422,23 +2434,31 @@
   }
 
   function renderOrdersSummary(){
-    let totalEarned = 0, totalDue = 0, paidCount = 0, dueCount = 0, toMakeCount = 0, toDeliverCount = 0;
+    let toMakeCount = 0, toDeliverCount = 0, toChargeCount = 0;
     orders.forEach(o => {
       (o.items || []).forEach(it => {
         const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
         const paid = Math.min(parseFloat(it.montoPagado) || 0, val);
-        totalEarned += paid;
-        totalDue += (val - paid);
-        if(val > 0 && paid >= val) paidCount++; else dueCount++;
+        if(!(val > 0 && paid >= val)) toChargeCount++;
         if(!it.hecho) toMakeCount++;
         if(!it.entregado) toDeliverCount++;
       });
     });
     ordersSummary.innerHTML =
-      '<div class="stat highlight"><div class="num">' + fmt(totalEarned) + '</div><div class="lbl">Generado (' + paidCount + ' artículo' + (paidCount === 1 ? '' : 's') + ' pagado' + (paidCount === 1 ? '' : 's') + ')</div></div>' +
-      '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Por cobrar (' + dueCount + ' artículo' + (dueCount === 1 ? '' : 's') + ')</div></div>' +
       '<div class="stat"><div class="num">' + toMakeCount + '</div><div class="lbl">Por hacer</div></div>' +
-      '<div class="stat"><div class="num">' + toDeliverCount + '</div><div class="lbl">Por entregar</div></div>';
+      '<div class="stat"><div class="num">' + toDeliverCount + '</div><div class="lbl">Por entregar</div></div>' +
+      '<div class="stat"><div class="num">' + toChargeCount + '</div><div class="lbl">Por cobrar</div></div>';
+  }
+
+  // Saludo según la hora en Ecuador (America/Guayaquil), sin importar en
+  // qué zona horaria esté el dispositivo.
+  function renderGreeting(){
+    const hour = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil', hour: 'numeric', hour12: false }), 10);
+    let text;
+    if(hour >= 5 && hour < 12) text = '¡Buenos días! ☀️';
+    else if(hour >= 12 && hour < 19) text = '¡Buenas tardes! 🌤️';
+    else text = '¡Buenas noches! 🌙';
+    greetingText.textContent = text;
   }
 
   // Pestañas de "Pendientes": qué campo revisan y el aviso cuando no
@@ -3004,6 +3024,7 @@
     if(!found) tab = 'inicio';
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    if(tab === 'inicio') renderGreeting();
     window.scrollTo(0, 0);
   }
 
