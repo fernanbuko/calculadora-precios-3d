@@ -883,12 +883,53 @@
       <div class="input-box"><input type="text" id="simpleFigureName" placeholder="Nombre de la pieza"></div>
     </div>
 
-    <div class="field">
+    <div class="field" style="border-bottom:none; padding-bottom:0;">
+      <div>
+        <label for="simpleFlatToggle">🔑 Pieza plana</label>
+        <small>Llavero, placa, insignia... — calcula el peso por sus medidas reales en vez de un tamaño aproximado</small>
+      </div>
+      <div class="input-box">
+        <label class="switch">
+          <input type="checkbox" id="simpleFlatToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field" id="simpleSizeField">
       <div>
         <label for="simpleSize">Tamaño de la pieza</label>
         <small>Su dimensión más grande, en cm (aproximado)</small>
       </div>
       <div class="input-box"><input type="number" id="simpleSize" value="10" min="1" step="0.5"></div>
+    </div>
+
+    <div class="field field-wide hidden" id="simpleFlatFields">
+      <div>
+        <label for="simpleFlatWidth">Medidas (ancho × alto × grosor)</label>
+        <small>En milímetros — el peso se calcula de estas medidas, no del tamaño de arriba</small>
+      </div>
+      <div class="hms-row">
+        <div class="input-box"><input type="number" id="simpleFlatWidth" min="0" step="1" placeholder="60"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="simpleFlatHeight" min="0" step="1" placeholder="50"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="simpleFlatThickness" min="0" step="0.5" placeholder="4"><span class="hms-unit">mm</span></div>
+      </div>
+    </div>
+
+    <div class="field hidden" id="simpleFlatInfillField">
+      <div>
+        <label for="simpleFlatInfill">% de relleno</label>
+        <small>Piezas delgadas como llaveros suelen imprimirse casi sólidas</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleFlatInfill" value="100" min="1" max="100" step="5"></div>
+    </div>
+
+    <div class="field hidden" id="simpleFlatDensityField">
+      <div>
+        <label for="simpleFlatDensity">Densidad del filamento</label>
+        <small>En g/cm³ — PLA ≈ 1.24, PETG ≈ 1.27, ABS ≈ 1.04</small>
+      </div>
+      <div class="input-box"><input type="number" id="simpleFlatDensity" value="1.24" min="0.1" step="0.01"></div>
     </div>
 
     <div class="field">
@@ -1849,15 +1890,31 @@
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
     ['simpleSize', '10'], ['simpleWeight', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', '4'],
-    ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5']
+    ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5'],
+    ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', ''], ['simpleFlatInfill', '100'], ['simpleFlatDensity', '1.24']
   ];
   const simpleModeToggle = document.getElementById('simpleModeToggle');
   const simpleCard = document.getElementById('simpleCard');
   const simpleSpeedCustomField = document.getElementById('simpleSpeedCustomField');
   const sparkxNote = document.getElementById('sparkxNote');
-  const simpleFieldIds = ['simpleSize', 'simpleWeight', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage'];
+  const simpleFlatToggle = document.getElementById('simpleFlatToggle');
+  const simpleSizeField = document.getElementById('simpleSizeField');
+  const simpleFlatFields = document.getElementById('simpleFlatFields');
+  const simpleFlatInfillField = document.getElementById('simpleFlatInfillField');
+  const simpleFlatDensityField = document.getElementById('simpleFlatDensityField');
+  const simpleFieldIds = ['simpleSize', 'simpleWeight', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
+                          'simpleFlatWidth', 'simpleFlatHeight', 'simpleFlatThickness', 'simpleFlatInfill', 'simpleFlatDensity'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
+
+  simpleFlatToggle.addEventListener('change', () => {
+    const isFlat = simpleFlatToggle.checked;
+    simpleSizeField.classList.toggle('hidden', isFlat);
+    simpleFlatFields.classList.toggle('hidden', !isFlat);
+    simpleFlatInfillField.classList.toggle('hidden', !isFlat);
+    simpleFlatDensityField.classList.toggle('hidden', !isFlat);
+    applySimpleToAdvanced();
+  });
 
   simpleEl.simplePrinterSpeed.addEventListener('change', () => {
     simpleSpeedCustomField.classList.toggle('hidden', simpleEl.simplePrinterSpeed.value !== 'custom');
@@ -1870,7 +1927,16 @@
   simpleEl.simplePrinterSpeed.dispatchEvent(new Event('change'));
 
   function applySimpleToAdvanced(){
-    const cm = Math.max(0, parseFloat(simpleEl.simpleSize.value) || 0);
+    const isFlat = simpleFlatToggle.checked;
+    const flatWidth = Math.max(0, parseFloat(simpleEl.simpleFlatWidth.value) || 0);
+    const flatHeight = Math.max(0, parseFloat(simpleEl.simpleFlatHeight.value) || 0);
+    const flatThickness = Math.max(0, parseFloat(simpleEl.simpleFlatThickness.value) || 0);
+
+    // Para el tiempo (cuando no lo pones a mano) seguimos usando la misma
+    // fórmula de "tamaño al cubo" — en pieza plana, basada en el lado más
+    // largo, ya que no hay una forma simple y confiable de estimar tiempo
+    // de impresión real solo con las medidas.
+    const cm = isFlat ? Math.max(flatWidth, flatHeight) / 10 : Math.max(0, parseFloat(simpleEl.simpleSize.value) || 0);
     const cm3 = Math.pow(cm, 3);
 
     const speedFactor = simpleEl.simplePrinterSpeed.value === 'custom'
@@ -1886,7 +1952,20 @@
     simpleWeightIsAuto = manualWeight === '';
     simpleHoursIsAuto = !hasManualHours;
 
-    el.pieceWeight.value = manualWeight !== '' ? manualWeight : (SIMPLE_WEIGHT_PER_CM3 * cm3).toFixed(1);
+    // Pieza plana: el peso sale de las medidas reales (volumen × densidad ×
+    // % de relleno) en vez del estimado genérico por tamaño — mucho más
+    // exacto para algo delgado como un llavero, que no escala como un cubo.
+    let autoWeight;
+    if(isFlat){
+      const volumeCm3 = (flatWidth * flatHeight * flatThickness) / 1000;
+      const density = Math.max(0.01, parseFloat(simpleEl.simpleFlatDensity.value) || 1.24);
+      const infill = Math.min(100, Math.max(1, parseFloat(simpleEl.simpleFlatInfill.value) || 100));
+      autoWeight = volumeCm3 * density * (infill / 100);
+    } else {
+      autoWeight = SIMPLE_WEIGHT_PER_CM3 * cm3;
+    }
+
+    el.pieceWeight.value = manualWeight !== '' ? manualWeight : autoWeight.toFixed(1);
     el.hours.value = hasManualHours ? manualHoursDecimal.toFixed(4) : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
     el.refSizeMm.value = '100';
     el.newSizeMm.value = '100';
