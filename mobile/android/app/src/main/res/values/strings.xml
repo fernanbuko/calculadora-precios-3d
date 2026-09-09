@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Precios 3D</string>
+    <string name="title_activity_main">Precios 3D</string>
+    <string name="package_name">com.precios3d.app</string>
+    <string name="custom_url_scheme">com.precios3d.app</string>
+</resources>
