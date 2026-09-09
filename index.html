@@ -1083,7 +1083,20 @@
       <div class="input-box"><input type="number" id="pieceWeight" value="35" min="0" step="1"></div>
     </div>
 
-    <div class="field">
+    <div class="field" style="border-bottom:none; padding-bottom:0;">
+      <div>
+        <label for="rescaleToggle">¿Cotizar a otro tamaño?</label>
+        <small>Activa esto solo si vas a cambiar el tamaño de la pieza sin volver a laminarla — si no, déjalo apagado</small>
+      </div>
+      <div class="input-box">
+        <label class="switch">
+          <input type="checkbox" id="rescaleToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field hidden" id="refSizeMmField">
       <div>
         <label for="refSizeMm">Medida de referencia</label>
         <small>En milímetros — la dimensión más grande de la pieza con la que mediste el peso y las horas</small>
@@ -1091,7 +1104,7 @@
       <div class="input-box"><input type="number" id="refSizeMm" value="100" min="1" step="1"></div>
     </div>
 
-    <div class="field">
+    <div class="field hidden" id="newSizeMmField">
       <div>
         <label for="newSizeMm">Nueva medida a cotizar</label>
         <small>En milímetros — cámbiala para cotizar la misma pieza más grande o más chica, sin volver a laminar</small>
@@ -1646,6 +1659,31 @@
   // El campo "hours" (usado en el cálculo, historial y links compartidos)
   // se sigue guardando como decimal — estas tres casillas visibles de
   // horas/minutos/segundos son solo una forma más cómoda de escribirlo.
+  const rescaleToggle = document.getElementById('rescaleToggle');
+  const refSizeMmField = document.getElementById('refSizeMmField');
+  const newSizeMmField = document.getElementById('newSizeMmField');
+  function syncRescaleFields(){
+    const on = rescaleToggle.checked;
+    refSizeMmField.classList.toggle('hidden', !on);
+    newSizeMmField.classList.toggle('hidden', !on);
+  }
+  // Al restaurar un estado guardado (historial o link compartido) que sí
+  // trae una escala distinta, prende el interruptor para que se vea por
+  // qué el resultado no coincide con el peso/horas que se muestran.
+  function detectRescaleFromState(){
+    rescaleToggle.checked = el.refSizeMm.value !== el.newSizeMm.value;
+    syncRescaleFields();
+  }
+  rescaleToggle.addEventListener('change', () => {
+    if(!rescaleToggle.checked){
+      // Al apagarlo, iguala las medidas para que no se quede una
+      // escala vieja aplicada sin que se note.
+      el.refSizeMm.value = el.newSizeMm.value;
+    }
+    syncRescaleFields();
+    calculate();
+  });
+
   const flatToggle = document.getElementById('flatToggle');
   const flatFields = document.getElementById('flatFields');
   const flatWidth = document.getElementById('flatWidth');
@@ -1933,6 +1971,8 @@
     flatToggle.value = '0';
     flatFields.classList.add('hidden');
     flatWidth.value = ''; flatHeight.value = ''; flatThickness.value = '';
+    rescaleToggle.checked = false;
+    syncRescaleFields();
     syncHoursFromDecimal();
     calculate();
     showToast('Valores reiniciados');
@@ -2322,6 +2362,7 @@
     el.profit.disabled = el.reverseToggle.checked;
     profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
     syncHoursFromDecimal();
+    detectRescaleFromState();
     calculate();
   }
 
@@ -3163,6 +3204,7 @@
     el.profit.disabled = el.reverseToggle.checked;
     profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
     syncHoursFromDecimal();
+    detectRescaleFromState();
     userEditedChanges = true;
   }
 
