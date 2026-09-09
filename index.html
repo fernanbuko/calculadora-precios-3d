@@ -288,14 +288,14 @@
 
   .hms-row{ display: flex; gap: 8px; }
   .hms-row .input-box{ flex: 1; min-width: 0; position: relative; }
-  .hms-row input{ padding-right: 24px; }
+  .hms-row input{ padding-right: 32px; }
   .hms-unit{
     position: absolute;
     right: 10px;
     top: 50%;
     transform: translateY(-50%);
     font-family: 'Inter', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-faint);
     pointer-events: none;
@@ -883,16 +883,16 @@
       <div class="input-box"><input type="text" id="simpleFigureName" placeholder="Nombre de la pieza"></div>
     </div>
 
-    <div class="field" style="border-bottom:none; padding-bottom:0;">
+    <div class="field">
       <div>
-        <label for="simpleFlatToggle">🔑 Pieza plana</label>
-        <small>Llavero, placa, insignia... — calcula el peso por sus medidas reales en vez de un tamaño aproximado</small>
+        <label for="simpleFlatToggle">Tipo de pieza</label>
+        <small>Llavero = plana y delgada (placa, insignia...): pides sus medidas en vez de un tamaño aproximado</small>
       </div>
       <div class="input-box">
-        <label class="switch">
-          <input type="checkbox" id="simpleFlatToggle">
-          <span class="slider"></span>
-        </label>
+        <select id="simpleFlatToggle" style="width:100%;">
+          <option value="0">Pieza 3D</option>
+          <option value="1">🔑 Llavero</option>
+        </select>
       </div>
     </div>
 
@@ -1892,7 +1892,7 @@
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
 
   simpleFlatToggle.addEventListener('change', () => {
-    const isFlat = simpleFlatToggle.checked;
+    const isFlat = simpleFlatToggle.value === '1';
     simpleSizeField.classList.toggle('hidden', isFlat);
     simpleFlatFields.classList.toggle('hidden', !isFlat);
     simpleWeightLabel.textContent = isFlat ? 'Peso de la pieza' : 'Peso de la pieza (opcional)';
@@ -1913,7 +1913,7 @@
   simpleEl.simplePrinterSpeed.dispatchEvent(new Event('change'));
 
   function applySimpleToAdvanced(){
-    const isFlat = simpleFlatToggle.checked;
+    const isFlat = simpleFlatToggle.value === '1';
     const flatWidth = Math.max(0, parseFloat(simpleEl.simpleFlatWidth.value) || 0);
     const flatHeight = Math.max(0, parseFloat(simpleEl.simpleFlatHeight.value) || 0);
 
