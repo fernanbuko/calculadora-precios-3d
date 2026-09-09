@@ -1445,6 +1445,7 @@
       <input type="text" id="profileName" placeholder="Nombre del perfil (ej: + PLA genérico)">
       <button type="button" class="btn primary" id="saveProfileBtn">Guardar perfil</button>
     </div>
+    <button type="button" class="btn hidden" id="cancelEditProfileBtn" style="margin-bottom:12px;">Cancelar edición</button>
     <div class="list" id="profileList"></div>
   </div>
   </div><!-- /tab-panel perfiles -->
@@ -2349,6 +2350,7 @@
         '<div class="meta">' + (p.model ? escapeHTML(p.model) + ' · ' : '') + (p.currency || '$') + ' ' + costHour.toFixed(3) + '/hora · rollo ' + (p.currency || '$') + parseFloat(p.rollPrice || 0).toFixed(2) + '</div></div>' +
         '<div class="actions">' +
         '<button type="button" class="btn small" data-load="' + i + '">Cargar</button>' +
+        '<button type="button" class="btn small" data-edit="' + i + '" title="Editar">✎</button>' +
         '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
         '</div>';
       row.querySelector('[data-load]').addEventListener('click', () => {
@@ -2356,8 +2358,20 @@
         calculate();
         showToast('Perfil "' + p.name + '" cargado');
       });
+      row.querySelector('[data-edit]').addEventListener('click', () => {
+        editingProfileIndex = i;
+        profileModelInput.value = p.model || '';
+        profilePrinterPriceInput.value = p.printerPrice || '';
+        profileWattsInput.value = p.watts || '';
+        document.getElementById('profileName').value = p.name || '';
+        saveProfileBtn.textContent = '✓ Guardar cambios';
+        cancelEditProfileBtn.classList.remove('hidden');
+        profileModelInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      if(i === editingProfileIndex) row.style.borderColor = 'var(--orange)';
       row.querySelector('[data-del]').addEventListener('click', () => {
         profiles.splice(i, 1);
+        if(editingProfileIndex === i) exitProfileEditMode();
         saveJSON(PROFILES_KEY, profiles);
         renderProfiles();
       });
@@ -2368,8 +2382,25 @@
   const profileModelInput = document.getElementById('profileModel');
   const profilePrinterPriceInput = document.getElementById('profilePrinterPrice');
   const profileWattsInput = document.getElementById('profileWatts');
+  const saveProfileBtn = document.getElementById('saveProfileBtn');
+  const cancelEditProfileBtn = document.getElementById('cancelEditProfileBtn');
+  let editingProfileIndex = null;
 
-  document.getElementById('saveProfileBtn').addEventListener('click', () => {
+  function exitProfileEditMode(){
+    editingProfileIndex = null;
+    saveProfileBtn.textContent = 'Guardar perfil';
+    cancelEditProfileBtn.classList.add('hidden');
+    document.getElementById('profileName').value = '';
+    profileModelInput.value = '';
+    profilePrinterPriceInput.value = '';
+    profileWattsInput.value = '';
+  }
+  cancelEditProfileBtn.addEventListener('click', () => {
+    exitProfileEditMode();
+    renderProfiles();
+  });
+
+  saveProfileBtn.addEventListener('click', () => {
     const nameInput = document.getElementById('profileName');
     const model = profileModelInput.value.trim();
     const name = nameInput.value.trim() || model;
@@ -2379,14 +2410,22 @@
     calculate();
     const profile = { name, model };
     PROFILE_FIELDS.forEach(f => { profile[f] = el[f].value; });
-    profiles.push(profile);
-    saveJSON(PROFILES_KEY, profiles);
-    nameInput.value = '';
-    profileModelInput.value = '';
-    profilePrinterPriceInput.value = '';
-    profileWattsInput.value = '';
-    renderProfiles();
-    showToast('Perfil guardado');
+    if(editingProfileIndex !== null){
+      profiles[editingProfileIndex] = profile;
+      saveJSON(PROFILES_KEY, profiles);
+      exitProfileEditMode();
+      renderProfiles();
+      showToast('Perfil actualizado');
+    } else {
+      profiles.push(profile);
+      saveJSON(PROFILES_KEY, profiles);
+      nameInput.value = '';
+      profileModelInput.value = '';
+      profilePrinterPriceInput.value = '';
+      profileWattsInput.value = '';
+      renderProfiles();
+      showToast('Perfil guardado');
+    }
   });
 
   // ---------- history (cotizaciones) ----------
