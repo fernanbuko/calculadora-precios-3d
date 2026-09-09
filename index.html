@@ -696,7 +696,6 @@
     transition: transform .12s;
   }
   .fab:active{ transform: scale(.92); }
-  body:not(.tab-pedidos-active) .fab{ display: none; }
   @media (min-width: 900px){
     .fab{ right: 36px; bottom: 36px; }
   }
@@ -2264,10 +2263,27 @@
   const orderModalTitle = document.getElementById('orderModalTitle');
   const closeOrderModalBtn = document.getElementById('closeOrderModalBtn');
 
-  function openOrderModal(){ orderModalOverlay.classList.remove('hidden'); }
+  function openOrderModal(){
+    orderModalOverlay.classList.remove('hidden');
+    window.history.pushState({ calc3dLayer: 'orderModal' }, '');
+  }
   function closeOrderModal(){ orderModalOverlay.classList.add('hidden'); }
 
+  // El botón/gesto de "atrás" del celular cierra lo que esté abierto
+  // (modal o perfil de cliente) en vez de salir de la app entera.
+  window.addEventListener('popstate', () => {
+    if(!orderModalOverlay.classList.contains('hidden')){
+      exitEditMode();
+      return;
+    }
+    if(openClientProfile !== null){
+      openClientProfile = null;
+      renderOrders();
+    }
+  });
+
   addOrderFab.addEventListener('click', () => {
+    setActiveTab('pedidos');
     exitEditMode();
     if(openClientProfile && getUniqueClientNames().includes(openClientProfile)){
       orderClientSelect.value = openClientProfile;
@@ -2660,6 +2676,7 @@
     openClientProfile = clientName;
     renderOrders();
     clientProfileHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.pushState({ calc3dLayer: 'client' }, '');
   }
 
   backToOrdersBtn.addEventListener('click', () => {
@@ -2984,7 +3001,6 @@
     if(!found) tab = 'calc';
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-    document.body.classList.toggle('tab-pedidos-active', tab === 'pedidos');
     window.scrollTo(0, 0);
     saveJSON(TAB_KEY, tab);
   }
