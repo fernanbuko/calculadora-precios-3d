@@ -1086,42 +1086,9 @@
     <div class="field">
       <div>
         <label for="pieceWeight">Peso de la pieza</label>
-        <small>Gramos usados — lo ves en el slicer (de 1 sola pieza, a la medida de referencia)</small>
+        <small>Gramos usados — lo ves en el slicer (de 1 sola pieza)</small>
       </div>
       <div class="input-box"><input type="number" id="pieceWeight" value="35" min="0" step="1"></div>
-    </div>
-
-    <div class="field" style="border-bottom:none; padding-bottom:0;">
-      <div>
-        <label for="rescaleToggle">¿Cotizar a otro tamaño?</label>
-        <small>Activa esto solo si vas a cambiar el tamaño de la pieza sin volver a laminarla — si no, déjalo apagado</small>
-      </div>
-      <div class="input-box">
-        <label class="switch">
-          <input type="checkbox" id="rescaleToggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="field hidden" id="refSizeMmField">
-      <div>
-        <label for="refSizeMm">Medida de referencia</label>
-        <small>En milímetros — la dimensión más grande de la pieza con la que mediste el peso y las horas</small>
-      </div>
-      <div class="input-box"><input type="number" id="refSizeMm" value="100" min="1" step="1"></div>
-    </div>
-
-    <div class="field hidden" id="newSizeMmField">
-      <div>
-        <label for="newSizeMm">Nueva medida a cotizar</label>
-        <small>En milímetros — cámbiala para cotizar la misma pieza más grande o más chica, sin volver a laminar</small>
-      </div>
-      <div class="input-box"><input type="number" id="newSizeMm" value="100" min="1" step="1"></div>
-    </div>
-
-    <div class="breakdown-row hidden" id="rowScaled">
-      <span>A esta medida</span><span id="outScaled">—</span>
     </div>
 
     <div class="field">
@@ -1683,7 +1650,7 @@
     }catch(e){ console.error('Firebase init error:', e); }
   }
 
-  const ids = ['rollPrice','rollWeight','pieceWeight','refSizeMm','newSizeMm','quantity','supportWeight','hours','watts','kwhPrice',
+  const ids = ['rollPrice','rollWeight','pieceWeight','quantity','supportWeight','hours','watts','kwhPrice',
                'printerPrice','lifeHours','workHours','wage','failRate','profit','currency',
                'multiToggle','numColors','colorChanges','purgePerChange','extraMinPerChange',
                'purgeCostToggle','purgeCostPerGram','shippingCost','reverseToggle','targetPrice','marketPrice'];
@@ -1693,30 +1660,6 @@
   // El campo "hours" (usado en el cálculo, historial y links compartidos)
   // se sigue guardando como decimal — estas tres casillas visibles de
   // horas/minutos/segundos son solo una forma más cómoda de escribirlo.
-  const rescaleToggle = document.getElementById('rescaleToggle');
-  const refSizeMmField = document.getElementById('refSizeMmField');
-  const newSizeMmField = document.getElementById('newSizeMmField');
-  function syncRescaleFields(){
-    const on = rescaleToggle.checked;
-    refSizeMmField.classList.toggle('hidden', !on);
-    newSizeMmField.classList.toggle('hidden', !on);
-  }
-  // Al restaurar un estado guardado (historial o link compartido) que sí
-  // trae una escala distinta, prende el interruptor para que se vea por
-  // qué el resultado no coincide con el peso/horas que se muestran.
-  function detectRescaleFromState(){
-    rescaleToggle.checked = el.refSizeMm.value !== el.newSizeMm.value;
-    syncRescaleFields();
-  }
-  rescaleToggle.addEventListener('change', () => {
-    if(!rescaleToggle.checked){
-      // Al apagarlo, iguala las medidas para que no se quede una
-      // escala vieja aplicada sin que se note.
-      el.refSizeMm.value = el.newSizeMm.value;
-    }
-    syncRescaleFields();
-    calculate();
-  });
 
   // Ayuda rápida en modo avanzado: si pones una altura, estimamos el peso
   // con la misma lógica de modo simple (escala al cubo) — sigue siendo
@@ -1764,7 +1707,7 @@
   });
 
   const DEFAULTS = {
-    currency: '$', rollPrice: '25', rollWeight: '1000', pieceWeight: '35', refSizeMm: '100', newSizeMm: '100', quantity: '1', supportWeight: '0',
+    currency: '$', rollPrice: '25', rollWeight: '1000', pieceWeight: '35', quantity: '1', supportWeight: '0',
     hours: '2.5', watts: '400', kwhPrice: '0.50', printerPrice: '300', lifeHours: '4000',
     workHours: '0.5', wage: '5', failRate: '10', profit: '40',
     multiToggle: false, numColors: '2', colorChanges: '1', purgePerChange: '3', extraMinPerChange: '1.5',
@@ -1777,8 +1720,6 @@
   const outWeight = document.getElementById('outWeight');
   const lblPrintTime = document.getElementById('lblPrintTime');
   const lblWeight = document.getElementById('lblWeight');
-  const rowScaled = document.getElementById('rowScaled');
-  const outScaled = document.getElementById('outScaled');
   const outSupport = document.getElementById('outSupport');
   const rowSupport = document.getElementById('rowSupport');
   const outElectricity = document.getElementById('outElectricity');
@@ -2016,8 +1957,6 @@
     flatToggle.value = '0';
     flatFields.classList.add('hidden');
     flatWidth.value = ''; flatHeight.value = ''; flatThickness.value = '';
-    rescaleToggle.checked = false;
-    syncRescaleFields();
     syncHoursFromDecimal();
     calculate();
     showToast('Valores reiniciados');
@@ -2103,8 +2042,6 @@
 
     el.pieceWeight.value = manualWeight !== '' ? manualWeight : autoWeight.toFixed(1);
     el.hours.value = hasManualHours ? manualHoursDecimal.toFixed(4) : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
-    el.refSizeMm.value = '100';
-    el.newSizeMm.value = '100';
 
     const colors = Math.max(1, parseInt(simpleEl.simpleColors.value, 10) || 1);
     if(colors >= 2){
@@ -2154,8 +2091,6 @@
     const rollPrice = num('rollPrice');
     const rollWeight = num('rollWeight') || 1;
     const pieceWeight = num('pieceWeight');
-    const refSizeMm = num('refSizeMm') || 100;
-    const newSizeMm = num('newSizeMm') || refSizeMm;
     const quantity = Math.max(1, num('quantity'));
     const supportWeight = num('supportWeight');
     const hours = num('hours');
@@ -2172,29 +2107,14 @@
     const isReverse = el.reverseToggle.checked;
     const targetPrice = num('targetPrice');
 
-    // El peso y las horas que mediste corresponden a la medida de
-    // referencia. Un cambio uniforme de tamaño escala el volumen (y por
-    // tanto el peso y el tiempo, aproximadamente) al cubo del factor lineal.
-    const scaleFactor = Math.pow(newSizeMm / refSizeMm, 3);
-    const scaledWeight = pieceWeight * scaleFactor;
-    const scaledHours = hours * scaleFactor;
-
-    if(newSizeMm !== refSizeMm){
-      rowScaled.classList.remove('hidden');
-      outScaled.textContent = scaledWeight.toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g · ' +
-        scaledHours.toLocaleString('en-US', {maximumFractionDigits: 2}) + ' h (' + newSizeMm + ' mm)';
-    } else {
-      rowScaled.classList.add('hidden');
-    }
-
     const costPerGram = rollPrice / rollWeight;
-    const materialCost = costPerGram * scaledWeight * quantity;
-    const supportCost = costPerGram * supportWeight * scaleFactor;
+    const materialCost = costPerGram * pieceWeight * quantity;
+    const supportCost = costPerGram * supportWeight;
 
-    const electricityCost = (watts * scaledHours / 1000) * kwhPrice;
+    const electricityCost = (watts * hours / 1000) * kwhPrice;
 
     const wearPerHour = printerPrice / lifeHours;
-    const wearCost = wearPerHour * scaledHours;
+    const wearCost = wearPerHour * hours;
 
     const laborCost = workHours * wage;
 
@@ -2271,18 +2191,17 @@
     }
 
     // La etiqueta dice "estimado" solo cuando el valor viene de un cálculo
-    // (modo simple sin dato manual, o reescalado a otra medida) — si el
-    // usuario puso el dato exacto, se muestra tal cual, sin ese aviso.
+    // (modo simple sin dato manual) — si el usuario puso el dato exacto,
+    // se muestra tal cual, sin ese aviso.
     const isSimpleMode = document.body.classList.contains('simple-mode');
-    const isRescaled = scaleFactor !== 1;
-    const hoursEstimated = isSimpleMode ? simpleHoursIsAuto : isRescaled;
-    const weightEstimated = isSimpleMode ? simpleWeightIsAuto : isRescaled;
+    const hoursEstimated = isSimpleMode && simpleHoursIsAuto;
+    const weightEstimated = isSimpleMode && simpleWeightIsAuto;
     lblPrintTime.textContent = 'Tiempo de impresión' + (hoursEstimated ? ' estimado' : '');
     lblWeight.textContent = 'Peso' + (weightEstimated ? ' estimado' : '');
 
-    outPrintTime.textContent = fmtHours(scaledHours);
-    outWeight.textContent = scaledWeight.toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g' +
-      (quantity > 1 ? ' c/u · ' + (scaledWeight * quantity).toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g total' : '');
+    outPrintTime.textContent = fmtHours(hours);
+    outWeight.textContent = pieceWeight.toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g' +
+      (quantity > 1 ? ' c/u · ' + (pieceWeight * quantity).toLocaleString('en-US', {maximumFractionDigits: 1}) + ' g total' : '');
     outMaterial.textContent = fmt(materialCost);
     outElectricity.textContent = fmt(electricityCost);
     outWear.textContent = fmt(wearCost);
@@ -2456,7 +2375,6 @@
     el.profit.disabled = el.reverseToggle.checked;
     profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
     syncHoursFromDecimal();
-    detectRescaleFromState();
     calculate();
   }
 
@@ -3298,7 +3216,6 @@
     el.profit.disabled = el.reverseToggle.checked;
     profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
     syncHoursFromDecimal();
-    detectRescaleFromState();
     userEditedChanges = true;
   }
 
