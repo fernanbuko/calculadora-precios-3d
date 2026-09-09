@@ -1484,7 +1484,10 @@
     </div>
     <div class="client-profile-header hidden" id="clientProfileHeader">
       <button type="button" class="btn small" id="backToOrdersBtn">← Volver a todos los pedidos</button>
-      <p class="card-title" style="margin:10px 0 0;" id="clientProfileTitle"></p>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;">
+        <p class="card-title" style="margin:0;" id="clientProfileTitle"></p>
+        <button type="button" class="btn small" id="editClientNameBtn" title="Editar nombre del cliente">✎ Editar</button>
+      </div>
     </div>
     <div class="list" id="ordersList"></div>
   </div>
@@ -2542,6 +2545,7 @@
   const clientProfileHeader = document.getElementById('clientProfileHeader');
   const clientProfileTitle = document.getElementById('clientProfileTitle');
   const backToOrdersBtn = document.getElementById('backToOrdersBtn');
+  const editClientNameBtn = document.getElementById('editClientNameBtn');
   const ordersSummary = document.getElementById('ordersSummary');
   const financeSummary = document.getElementById('financeSummary');
   const greetingText = document.getElementById('greetingText');
@@ -3046,6 +3050,22 @@
   backToOrdersBtn.addEventListener('click', () => {
     openClientProfile = null;
     renderOrders();
+  });
+
+  function clientKeyOf(o){ return (o.cliente || '').trim() || 'Sin nombre'; }
+
+  editClientNameBtn.addEventListener('click', async () => {
+    const current = openClientProfile;
+    if(current === null) return;
+    const input = await showPrompt('Nuevo nombre para este cliente', current === 'Sin nombre' ? '' : current, 'Editar cliente');
+    if(input === null) return;
+    const newName = input.trim();
+    if(!newName || newName === current) return;
+    orders.forEach(o => { if(clientKeyOf(o) === current) o.cliente = newName; });
+    saveJSON(ORDERS_KEY, orders);
+    openClientProfile = newName;
+    renderOrders();
+    showToast('Cliente actualizado');
   });
 
   function renderClientProfile(clientName){
