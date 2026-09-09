@@ -8,7 +8,7 @@ Interfaz moderna con tarjetas blancas de esquinas redondeadas, sombras suaves y 
 
 ## Navegación por pestañas
 
-La app está organizada en 6 pestañas: **Inicio**, **Calculadora**, **Perfiles**, **Historial**, **Pedidos** y **Ajustes**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga, y la última pestaña abierta se recuerda entre visitas (la primera vez, abre en Inicio).
+La app está organizada en 6 pestañas: **Inicio**, **Calculadora**, **Perfiles**, **Historial**, **Pedidos** y **Ajustes**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga. La app siempre **abre en Inicio**, sin importar en qué pestaña la hayas dejado la última vez.
 
 **Inicio** es justo eso: lo primero que ves al abrir la app. Muestra el resumen de Pedidos (generado, por cobrar, por hacer, por entregar) y la sección de "Pendientes" agrupada por cliente, para tener un vistazo del negocio sin tener que entrar a la pestaña de Pedidos — tocar un cliente ahí te lleva directo a su perfil, en Pedidos.
 

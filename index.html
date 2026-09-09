@@ -2991,7 +2991,6 @@
   }
 
   // ---------- pestañas ----------
-  const TAB_KEY = 'calc3d_activeTab';
   const tabBarBtns = document.querySelectorAll('.tab-bar-btn');
   const tabPanels = document.querySelectorAll('.tab-panel');
 
@@ -3006,7 +3005,6 @@
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     window.scrollTo(0, 0);
-    saveJSON(TAB_KEY, tab);
   }
 
   tabBarBtns.forEach(btn => {
@@ -3093,7 +3091,7 @@
   // pisamos con el estimado de modo simple.
   if(hasSharedQuery) simpleModeToggle.checked = false;
   syncSimpleMode(false);
-  setActiveTab(loadJSON(TAB_KEY, 'inicio'));
+  setActiveTab('inicio');
 
   if("serviceWorker" in navigator){
     window.addEventListener("load", () => {
