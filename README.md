@@ -8,9 +8,9 @@ Interfaz moderna con tarjetas blancas de esquinas redondeadas, sombras suaves y 
 
 ## Navegación por pestañas
 
-La app está organizada en 6 pestañas: **Inicio**, **Calculadora**, **Perfiles**, **Historial**, **Pedidos** y **Ajustes**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga. La app siempre **abre en Inicio**, sin importar en qué pestaña la hayas dejado la última vez.
+La app está organizada en 7 pestañas: **Inicio**, **Calculadora**, **Perfiles**, **Historial**, **Pedidos**, **Finanzas** y **Ajustes**. Cada una guarda su contenido en su propio espacio en vez de tener todo en una sola página larga. La app siempre **abre en Inicio**, sin importar en qué pestaña la hayas dejado la última vez.
 
-**Inicio** es justo eso: lo primero que ves al abrir la app. Saluda según la hora del dispositivo (Buenos días/tardes/noches), así tiene sentido sin importar desde qué país se abra, y muestra cuántos artículos tienes por hacer, por entregar y por cobrar (sin montos de dinero, solo cantidades), más la sección de "Pendientes" agrupada por cliente, para tener un vistazo del negocio sin tener que entrar a la pestaña de Pedidos — tocar un cliente ahí te lleva directo a su perfil, en Pedidos.
+**Inicio** es justo eso: lo primero que ves al abrir la app. Saluda según la hora del dispositivo (Buenos días/tardes/noches), así tiene sentido sin importar desde qué país se abra, y muestra cuántos artículos tienes por hacer, por entregar y por cobrar (sin montos de dinero, solo cantidades), más la sección de "Pendientes" agrupada por cliente, para tener un vistazo del negocio sin tener que entrar a la pestaña de Pedidos — tocar un cliente ahí te lleva directo a su perfil, en Pedidos. Los montos de dinero (cuánto has generado y cuánto tienes por cobrar) están en su propia pestaña, **Finanzas**.
 
 En celular y tablet la navegación es una barra fija abajo (como una app móvil). En pantallas de escritorio (900px de ancho o más) se convierte automáticamente en una barra lateral fija a la izquierda, y el contenido usa más ancho — sin necesidad de dos versiones separadas, es la misma página que se adapta con CSS.
 

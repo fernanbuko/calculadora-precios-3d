@@ -1476,6 +1476,15 @@
   </div>
   </div><!-- /tab-panel pedidos -->
 
+  <div class="tab-panel hidden" data-tab="finanzas" id="tabPanelFinanzas">
+  <!-- FINANZAS -->
+  <div class="card">
+    <p class="card-title">Finanzas <span class="tag">DINERO DE PEDIDOS</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Cuánto has generado (artículos ya pagados, pagos parciales incluidos) y cuánto tienes todavía por cobrar, sumando todos tus pedidos.</p>
+    <div class="orders-summary" id="financeSummary"></div>
+  </div>
+  </div><!-- /tab-panel finanzas -->
+
   <button type="button" class="fab" id="addOrderFab" title="Agregar pedido">+</button>
 
   <div class="modal-overlay hidden" id="orderModalOverlay">
@@ -1599,6 +1608,9 @@
   </button>
   <button type="button" class="tab-bar-btn" data-tab="pedidos">
     <span class="tab-icon">📦</span><span class="tab-label">Pedidos</span>
+  </button>
+  <button type="button" class="tab-bar-btn" data-tab="finanzas">
+    <span class="tab-icon">💰</span><span class="tab-label">Finanzas</span>
   </button>
   <button type="button" class="tab-bar-btn" data-tab="ajustes">
     <span class="tab-icon">⚙️</span><span class="tab-label">Ajustes</span>
@@ -2516,6 +2528,7 @@
   const clientProfileTitle = document.getElementById('clientProfileTitle');
   const backToOrdersBtn = document.getElementById('backToOrdersBtn');
   const ordersSummary = document.getElementById('ordersSummary');
+  const financeSummary = document.getElementById('financeSummary');
   const greetingText = document.getElementById('greetingText');
   const pendingToMakeList = document.getElementById('pendingToMakeList');
   const pendingSwipeArea = document.getElementById('pendingSwipeArea');
@@ -2681,10 +2694,13 @@
 
   function renderOrdersSummary(){
     let toMakeCount = 0, toDeliverCount = 0, toChargeCount = 0;
+    let totalEarned = 0, totalDue = 0;
     orders.forEach(o => {
       (o.items || []).forEach(it => {
         const val = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
         const paid = Math.min(parseFloat(it.montoPagado) || 0, val);
+        totalEarned += paid;
+        totalDue += (val - paid);
         if(!(val > 0 && paid >= val)) toChargeCount++;
         if(!it.hecho) toMakeCount++;
         if(!it.entregado) toDeliverCount++;
@@ -2694,6 +2710,9 @@
       '<div class="stat"><div class="num">' + toMakeCount + '</div><div class="lbl">Por hacer</div></div>' +
       '<div class="stat"><div class="num">' + toDeliverCount + '</div><div class="lbl">Por entregar</div></div>' +
       '<div class="stat"><div class="num">' + toChargeCount + '</div><div class="lbl">Por cobrar</div></div>';
+    financeSummary.innerHTML =
+      '<div class="stat highlight"><div class="num">' + fmt(totalEarned) + '</div><div class="lbl">Generado</div></div>' +
+      '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Por cobrar</div></div>';
   }
 
   // Saludo según la hora local del dispositivo, para que tenga sentido
