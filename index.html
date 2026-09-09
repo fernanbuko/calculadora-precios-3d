@@ -2450,10 +2450,10 @@
       '<div class="stat"><div class="num">' + toChargeCount + '</div><div class="lbl">Por cobrar</div></div>';
   }
 
-  // Saludo según la hora en Ecuador (America/Guayaquil), sin importar en
-  // qué zona horaria esté el dispositivo.
+  // Saludo según la hora local del dispositivo, para que tenga sentido
+  // sin importar desde qué país/zona horaria se abra la app.
   function renderGreeting(){
-    const hour = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil', hour: 'numeric', hour12: false }), 10);
+    const hour = new Date().getHours();
     let text;
     if(hour >= 5 && hour < 12) text = '¡Buenos días! ☀️';
     else if(hour >= 12 && hour < 19) text = '¡Buenas tardes! 🌤️';
