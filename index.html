@@ -1077,6 +1077,14 @@
 
     <div class="field">
       <div>
+        <label for="advHeight">Altura de la pieza (opcional)</label>
+        <small>En cm, parada como se imprime — si no conoces el peso, ponla aquí y calculamos el de abajo por ti</small>
+      </div>
+      <div class="input-box"><input type="number" id="advHeight" min="0" step="0.5" placeholder="Auto"></div>
+    </div>
+
+    <div class="field">
+      <div>
         <label for="pieceWeight">Peso de la pieza</label>
         <small>Gramos usados — lo ves en el slicer (de 1 sola pieza, a la medida de referencia)</small>
       </div>
@@ -1407,9 +1415,34 @@
   <!-- PERFILES -->
   <div class="card">
     <p class="card-title">Perfiles <span class="tag">GUARDAR IMPRESORA Y FILAMENTO</span></p>
-    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Guarda tu impresora + filamento actuales para no volver a escribirlos. La columna "costo/hora" te sirve para comparar impresoras entre sí.</p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Guarda tu impresora + filamento para no volver a escribirlos. La columna "costo/hora" te sirve para comparar impresoras entre sí.</p>
+
+    <div class="field field-wide">
+      <div>
+        <label for="profileModel">Modelo de la impresora</label>
+        <small>Ej: Ender 3 V2, Bambu Lab A1...</small>
+      </div>
+      <div class="input-box"><input type="text" id="profileModel" placeholder="Modelo"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="profilePrinterPrice">Precio de la impresora</label>
+        <small>Lo que costó, para calcular su desgaste por hora</small>
+      </div>
+      <div class="input-box"><input type="number" id="profilePrinterPrice" min="0" step="1" placeholder="300"></div>
+    </div>
+
+    <div class="field">
+      <div>
+        <label for="profileWatts">Consumo</label>
+        <small>En Watts, promedio mientras imprime</small>
+      </div>
+      <div class="input-box"><input type="number" id="profileWatts" min="0" step="10" placeholder="400"></div>
+    </div>
+
     <div class="save-row">
-      <input type="text" id="profileName" placeholder="Nombre del perfil (ej: Ender 3 + PLA genérico)">
+      <input type="text" id="profileName" placeholder="Nombre del perfil (ej: + PLA genérico)">
       <button type="button" class="btn primary" id="saveProfileBtn">Guardar perfil</button>
     </div>
     <div class="list" id="profileList"></div>
@@ -1681,6 +1714,17 @@
       el.refSizeMm.value = el.newSizeMm.value;
     }
     syncRescaleFields();
+    calculate();
+  });
+
+  // Ayuda rápida en modo avanzado: si pones una altura, estimamos el peso
+  // con la misma lógica de modo simple (escala al cubo) — sigue siendo
+  // editable a mano después, esto solo llena un punto de partida.
+  const advHeight = document.getElementById('advHeight');
+  advHeight.addEventListener('input', () => {
+    const cm = Math.max(0, parseFloat(advHeight.value) || 0);
+    if(advHeight.value.trim() === '') return;
+    el.pieceWeight.value = (SIMPLE_WEIGHT_PER_CM3 * Math.pow(cm, 3)).toFixed(1);
     calculate();
   });
 
@@ -2302,7 +2346,7 @@
       const costHour = costPerHourFor(p);
       row.innerHTML =
         '<div class="info"><div class="name">' + escapeHTML(p.name) + '</div>' +
-        '<div class="meta">' + (p.currency || '$') + ' ' + costHour.toFixed(3) + '/hora · rollo ' + (p.currency || '$') + parseFloat(p.rollPrice || 0).toFixed(2) + '</div></div>' +
+        '<div class="meta">' + (p.model ? escapeHTML(p.model) + ' · ' : '') + (p.currency || '$') + ' ' + costHour.toFixed(3) + '/hora · rollo ' + (p.currency || '$') + parseFloat(p.rollPrice || 0).toFixed(2) + '</div></div>' +
         '<div class="actions">' +
         '<button type="button" class="btn small" data-load="' + i + '">Cargar</button>' +
         '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
@@ -2321,15 +2365,26 @@
     });
   }
 
+  const profileModelInput = document.getElementById('profileModel');
+  const profilePrinterPriceInput = document.getElementById('profilePrinterPrice');
+  const profileWattsInput = document.getElementById('profileWatts');
+
   document.getElementById('saveProfileBtn').addEventListener('click', () => {
     const nameInput = document.getElementById('profileName');
-    const name = nameInput.value.trim();
-    if(!name){ showToast('Ponle un nombre al perfil'); return; }
-    const profile = { name };
+    const model = profileModelInput.value.trim();
+    const name = nameInput.value.trim() || model;
+    if(!name){ showToast('Ponle un nombre o el modelo de la impresora'); return; }
+    if(profilePrinterPriceInput.value !== '') el.printerPrice.value = profilePrinterPriceInput.value;
+    if(profileWattsInput.value !== '') el.watts.value = profileWattsInput.value;
+    calculate();
+    const profile = { name, model };
     PROFILE_FIELDS.forEach(f => { profile[f] = el[f].value; });
     profiles.push(profile);
     saveJSON(PROFILES_KEY, profiles);
     nameInput.value = '';
+    profileModelInput.value = '';
+    profilePrinterPriceInput.value = '';
+    profileWattsInput.value = '';
     renderProfiles();
     showToast('Perfil guardado');
   });
