@@ -3264,7 +3264,7 @@
     }
   }
 
-  async function loadCloudData(){
+  async function loadCloudData(notify){
     cloudDataLoaded = false;
     try{
       const ref = firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid);
@@ -3279,18 +3279,24 @@
         await ref.set({ profiles, history, orders }, { merge: true });
       }
       cloudDataLoaded = true;
-      showToast('Sesión iniciada — datos sincronizados');
+      if(notify) showToast('Sesión iniciada — datos sincronizados');
     }catch(e){
       cloudDataLoaded = true;
-      showToast('No se pudo sincronizar con la nube');
+      if(notify) showToast('No se pudo sincronizar con la nube');
     }
   }
 
+  // El primer aviso de onAuthStateChanged, al cargar la página, solo
+  // restaura la sesión que ya tenías — no es un inicio de sesión nuevo,
+  // así que no debe mostrar el toast (a diferencia de cuando sí tocas
+  // "Iniciar sesión con Google").
+  let authInitialized = false;
   if(firebaseReady){
     firebase.auth().onAuthStateChanged(user => {
       currentUser = user;
       updateAccountUI();
-      if(user) loadCloudData();
+      if(user) loadCloudData(authInitialized);
+      authInitialized = true;
     });
   }
 
