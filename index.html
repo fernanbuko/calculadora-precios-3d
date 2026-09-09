@@ -575,7 +575,7 @@
   .qr-box{ display:flex; justify-content:center; padding: 14px 0 4px; }
   .qr-box canvas, .qr-box img{ border-radius: 12px; background: #fff; padding: 10px; }
 
-  #orderClient, #orderSearchInput, #simpleFigureName{ text-align: left; }
+  #orderClient, #orderSearchInput, #simpleFigureName, #simpleClientName, #advPieceName, #advClientName{ text-align: left; }
 
   .orders-summary{
     display:flex;
@@ -877,10 +877,18 @@
 
     <div class="field field-wide">
       <div>
-        <label for="simpleFigureName">Nombre de la figura (opcional)</label>
+        <label for="simpleFigureName">Nombre de la pieza (opcional)</label>
         <small>Ej: Maceta 12cm — se usa para guardar la cotización al final</small>
       </div>
       <div class="input-box"><input type="text" id="simpleFigureName" placeholder="Nombre de la pieza"></div>
+    </div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="simpleClientName">Nombre del cliente (opcional)</label>
+        <small>Para saber para quién es esta cotización</small>
+      </div>
+      <div class="input-box"><input type="text" id="simpleClientName" placeholder="Nombre del cliente"></div>
     </div>
 
     <div class="field">
@@ -1012,6 +1020,22 @@
   <!-- MATERIAL -->
   <div class="card">
     <p class="card-title">01 · Material <span class="tag">FILAMENTO</span></p>
+
+    <div class="field field-wide">
+      <div>
+        <label for="advPieceName">Nombre de la pieza (opcional)</label>
+        <small>Ej: Maceta 12cm — se usa para guardar la cotización al final</small>
+      </div>
+      <div class="input-box"><input type="text" id="advPieceName" placeholder="Nombre de la pieza"></div>
+    </div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="advClientName">Nombre del cliente (opcional)</label>
+        <small>Para saber para quién es esta cotización</small>
+      </div>
+      <div class="input-box"><input type="text" id="advClientName" placeholder="Nombre del cliente"></div>
+    </div>
 
     <div class="field field-wide">
       <div>
@@ -2392,7 +2416,7 @@
       const date = new Date(h.savedAt);
       row.innerHTML =
         '<div class="info"><div class="name">' + escapeHTML(h.name) + '</div>' +
-        '<div class="meta">' + h.finalPriceLabel + ' · ' + date.toLocaleDateString() + '</div></div>' +
+        '<div class="meta">' + h.finalPriceLabel + (h.client ? ' · ' + escapeHTML(h.client) : '') + ' · ' + date.toLocaleDateString() + '</div></div>' +
         '<div class="actions">' +
         '<button type="button" class="btn small" data-load="' + i + '">Cargar</button>' +
         '<button type="button" class="btn small" data-dup="' + i + '">Duplicar</button>' +
@@ -2400,6 +2424,8 @@
         '</div>';
       row.querySelector('[data-load]').addEventListener('click', () => {
         applyState(history[i].state);
+        activePieceNameInput().value = history[i].name || '';
+        activeClientNameInput().value = history[i].client || '';
         showToast('Cotización "' + history[i].name + '" cargada');
       });
       row.querySelector('[data-dup]').addEventListener('click', () => {
@@ -2420,10 +2446,22 @@
     });
   }
 
-  function saveQuote(name){
+  function activePieceNameInput(){
+    return document.body.classList.contains('simple-mode')
+      ? document.getElementById('simpleFigureName')
+      : document.getElementById('advPieceName');
+  }
+  function activeClientNameInput(){
+    return document.body.classList.contains('simple-mode')
+      ? document.getElementById('simpleClientName')
+      : document.getElementById('advClientName');
+  }
+
+  function saveQuote(name, client){
     calculate();
     history.push({
       name,
+      client: client || '',
       savedAt: Date.now(),
       finalPriceLabel: fmt(lastResult.finalPrice),
       state: captureState()
@@ -2437,21 +2475,21 @@
     const nameInput = document.getElementById('quoteName');
     const name = nameInput.value.trim();
     if(!name){ showToast('Ponle un nombre a la pieza'); return; }
-    saveQuote(name);
+    saveQuote(name, activeClientNameInput().value.trim());
     nameInput.value = '';
   });
 
   document.getElementById('saveResultQuoteBtn').addEventListener('click', async () => {
-    const figureNameInput = document.getElementById('simpleFigureName');
-    const isSimple = document.body.classList.contains('simple-mode');
-    let name = isSimple ? figureNameInput.value.trim() : '';
+    const pieceNameInput = activePieceNameInput();
+    const client = activeClientNameInput().value.trim();
+    let name = pieceNameInput.value.trim();
     if(!name){
       const input = await showPrompt('¿Cómo se llama esta pieza?', '', 'Guardar cotización');
       if(input === null) return;
       name = input.trim();
       if(!name){ showToast('Ponle un nombre a la pieza'); return; }
     }
-    saveQuote(name);
+    saveQuote(name, client);
   });
 
   function escapeHTML(str){
