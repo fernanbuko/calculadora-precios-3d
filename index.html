@@ -1052,6 +1052,31 @@
 
     <div class="field">
       <div>
+        <label for="flatToggle">Tipo de pieza</label>
+        <small>Llavero = plana y delgada (placa, insignia...): pide sus medidas como referencia además del peso</small>
+      </div>
+      <div class="input-box">
+        <select id="flatToggle" style="width:100%;">
+          <option value="0">Pieza 3D</option>
+          <option value="1">🔑 Llavero</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field field-wide hidden" id="flatFields">
+      <div>
+        <label for="flatWidth">Medidas (ancho × alto × grosor)</label>
+        <small>En milímetros — solo de referencia, el peso de abajo sigue siendo el que se usa en el cálculo</small>
+      </div>
+      <div class="hms-row">
+        <div class="input-box"><input type="number" id="flatWidth" min="0" step="1" placeholder="60"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="flatHeight" min="0" step="1" placeholder="50"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="flatThickness" min="0" step="0.5" placeholder="4"><span class="hms-unit">mm</span></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div>
         <label for="pieceWeight">Peso de la pieza</label>
         <small>Gramos usados — lo ves en el slicer (de 1 sola pieza, a la medida de referencia)</small>
       </div>
@@ -1099,12 +1124,17 @@
   <div class="card">
     <p class="card-title">02 · Máquina <span class="tag">ELECTRICIDAD + DESGASTE</span></p>
 
-    <div class="field">
+    <div class="field field-wide">
       <div>
-        <label for="hours">Horas de impresión</label>
+        <label for="hoursH">Tiempo de impresión</label>
         <small>Tiempo total a la medida de referencia (todo el lote, si son varias)</small>
       </div>
-      <div class="input-box"><input type="number" id="hours" value="2.5" min="0" step="0.1"></div>
+      <div class="hms-row">
+        <div class="input-box"><input type="number" id="hoursH" min="0" step="1" placeholder="0"><span class="hms-unit">h</span></div>
+        <div class="input-box"><input type="number" id="hoursM" min="0" max="59" step="1" placeholder="0"><span class="hms-unit">m</span></div>
+        <div class="input-box"><input type="number" id="hoursS" min="0" max="59" step="1" placeholder="0"><span class="hms-unit">s</span></div>
+      </div>
+      <input type="hidden" id="hours" value="2.5">
     </div>
 
     <div class="field">
@@ -1613,6 +1643,43 @@
   const el = {};
   ids.forEach(id => el[id] = document.getElementById(id));
 
+  // El campo "hours" (usado en el cálculo, historial y links compartidos)
+  // se sigue guardando como decimal — estas tres casillas visibles de
+  // horas/minutos/segundos son solo una forma más cómoda de escribirlo.
+  const flatToggle = document.getElementById('flatToggle');
+  const flatFields = document.getElementById('flatFields');
+  const flatWidth = document.getElementById('flatWidth');
+  const flatHeight = document.getElementById('flatHeight');
+  const flatThickness = document.getElementById('flatThickness');
+  flatToggle.addEventListener('change', () => {
+    flatFields.classList.toggle('hidden', flatToggle.value !== '1');
+  });
+
+  const hoursH = document.getElementById('hoursH');
+  const hoursM = document.getElementById('hoursM');
+  const hoursS = document.getElementById('hoursS');
+  function syncHoursToDecimal(){
+    const h = parseFloat(hoursH.value) || 0;
+    const m = parseFloat(hoursM.value) || 0;
+    const s = parseFloat(hoursS.value) || 0;
+    el.hours.value = (h + m / 60 + s / 3600).toFixed(4);
+    calculate();
+  }
+  function syncHoursFromDecimal(){
+    const totalHours = Math.max(0, parseFloat(el.hours.value) || 0);
+    const h = Math.floor(totalHours);
+    const remainMin = (totalHours - h) * 60;
+    const m = Math.floor(remainMin);
+    const s = Math.round((remainMin - m) * 60);
+    hoursH.value = h;
+    hoursM.value = m;
+    hoursS.value = s;
+  }
+  [hoursH, hoursM, hoursS].forEach(input => {
+    input.addEventListener('input', syncHoursToDecimal);
+    input.addEventListener('change', syncHoursToDecimal);
+  });
+
   const DEFAULTS = {
     currency: '$', rollPrice: '25', rollWeight: '1000', pieceWeight: '35', refSizeMm: '100', newSizeMm: '100', quantity: '1', supportWeight: '0',
     hours: '2.5', watts: '400', kwhPrice: '0.50', printerPrice: '300', lifeHours: '4000',
@@ -1860,6 +1927,10 @@
     profitField.style.opacity = '1';
     SIMPLE_DEFAULTS_LIST.forEach(([id, val]) => { document.getElementById(id).value = val; });
     document.getElementById('simpleSpeedCustomField').classList.add('hidden');
+    flatToggle.value = '0';
+    flatFields.classList.add('hidden');
+    flatWidth.value = ''; flatHeight.value = ''; flatThickness.value = '';
+    syncHoursFromDecimal();
     calculate();
     showToast('Valores reiniciados');
   });
@@ -1981,6 +2052,7 @@
     } else {
       simpleWeightIsAuto = false;
       simpleHoursIsAuto = false;
+      syncHoursFromDecimal();
       if(notify) showToast('Modo avanzado activado');
     }
     calculate();
@@ -2246,6 +2318,7 @@
     targetPriceField.classList.toggle('hidden', !el.reverseToggle.checked);
     el.profit.disabled = el.reverseToggle.checked;
     profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
+    syncHoursFromDecimal();
     calculate();
   }
 
@@ -3086,6 +3159,7 @@
     targetPriceField.classList.toggle('hidden', !el.reverseToggle.checked);
     el.profit.disabled = el.reverseToggle.checked;
     profitField.style.opacity = el.reverseToggle.checked ? '0.45' : '1';
+    syncHoursFromDecimal();
     userEditedChanges = true;
   }
 

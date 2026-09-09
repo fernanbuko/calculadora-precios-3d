@@ -17,6 +17,8 @@ En celular y tablet la navegación es una barra fija abajo (como una app móvil)
 ## Qué incluye el cálculo
 
 - **Material**: costo por gramo según el precio y peso del rollo, multiplicado por el peso de la pieza y la cantidad. Incluye soportes descartables.
+- **Tipo de pieza**: igual que en modo simple, un selector "Pieza 3D / 🔑 Llavero" — al elegir Llavero aparecen unas casillas de ancho × alto × grosor (mm) solo de referencia; el peso que se usa en el cálculo sigue siendo el campo de peso de abajo.
+- **Tiempo de impresión en horas/minutos/segundos**: como lo muestra tu slicer, en vez de una sola cifra decimal — el campo interno sigue siendo un decimal para guardarlo/compartirlo, pero se ve y se llena en h/m/s.
 - **Escala de tamaño (en milímetros)**: mides peso y horas una vez, a una medida de referencia (en mm), y luego cotizas la misma pieza a otra medida cambiando solo el campo "Nueva medida a cotizar" — el peso y el tiempo se recalculan automáticamente (escalan al cubo del factor lineal entre ambas medidas), sin volver a laminar en el slicer.
 - **Electricidad**: consumo de la impresora (W) durante las horas de impresión, al precio del kWh.
 - **Desgaste de máquina**: precio de la impresora ÷ vida útil estimada (horas), por las horas usadas.
