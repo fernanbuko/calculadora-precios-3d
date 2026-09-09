@@ -1413,7 +1413,7 @@
         <label for="profileModel">Modelo de la impresora</label>
         <small>Ej: Ender 3 V2, Bambu Lab A1...</small>
       </div>
-      <div class="input-box"><input type="text" id="profileModel" placeholder="Modelo"></div>
+      <div class="input-box"><input type="text" id="profileModel" value="SparkX i7 Combo" placeholder="Modelo"></div>
     </div>
 
     <div class="field">
@@ -2334,7 +2334,7 @@
     saveProfileBtn.textContent = 'Guardar perfil';
     cancelEditProfileBtn.classList.add('hidden');
     document.getElementById('profileName').value = '';
-    profileModelInput.value = '';
+    profileModelInput.value = 'SparkX i7 Combo';
     profilePrinterPriceInput.value = '';
     profileWattsInput.value = '';
   }
@@ -2363,7 +2363,7 @@
       profiles.push(profile);
       saveJSON(PROFILES_KEY, profiles);
       nameInput.value = '';
-      profileModelInput.value = '';
+      profileModelInput.value = 'SparkX i7 Combo';
       profilePrinterPriceInput.value = '';
       profileWattsInput.value = '';
       renderProfiles();
