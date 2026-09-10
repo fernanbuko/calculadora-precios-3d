@@ -1,0 +1,12 @@
+{
+  "appId": "com.precios3d.app",
+  "appName": "Precios 3D",
+  "webDir": "www",
+  "backgroundColor": "#f5f5f8",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
+    }
+  }
+}

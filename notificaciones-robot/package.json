@@ -1,0 +1,8 @@
+{
+  "name": "precios3d-revisar-pedidos",
+  "private": true,
+  "description": "Robot de GitHub Actions que revisa pedidos pendientes y manda notificaciones push nativas (Precios 3D)",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
