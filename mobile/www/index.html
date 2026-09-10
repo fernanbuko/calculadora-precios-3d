@@ -1565,7 +1565,7 @@
     <p class="card-title">Cuenta</p>
     <div class="field account-field">
       <div class="account-info">
-        <img id="accountAvatar" class="account-avatar hidden" alt="">
+        <img id="accountAvatar" class="account-avatar hidden" alt="" referrerpolicy="no-referrer">
         <div>
           <label id="accountLabel">Invitado (sin sincronizar)</label>
           <small id="accountSub">Inicia sesión con Google para guardar tus pedidos, perfiles e historial en la nube.</small>
@@ -3410,6 +3410,10 @@
     googleSignInBtn.classList.toggle('hidden', signedIn);
     signOutBtn.classList.toggle('hidden', !signedIn);
     if(signedIn && currentUser.photoURL){
+      // Si la foto de Google no llega a cargar (pasa a veces dentro del
+      // WebView de la app empaquetada), se oculta en vez de dejar el
+      // ícono de imagen rota.
+      accountAvatar.onerror = () => accountAvatar.classList.add('hidden');
       accountAvatar.src = currentUser.photoURL;
       accountAvatar.classList.remove('hidden');
     } else {
