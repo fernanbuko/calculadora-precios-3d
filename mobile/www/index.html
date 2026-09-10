@@ -3075,7 +3075,7 @@
     const clientOrders = orders
       .map((o, i) => ({ o, i }))
       .filter(({ o }) => ((o.cliente || '').trim() || 'Sin nombre') === clientName)
-      .sort((a, b) => a.i - b.i); // del pedido más antiguo al más nuevo, según cuándo se agregó
+      .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
 
     if(clientOrders.length === 0){
       openClientProfile = null;
@@ -3130,7 +3130,7 @@
     const sorted = orders
       .map((o, i) => ({ o, i }))
       .filter(({ o }) => filterFn(o) && (!currentOrderSearch || (o.cliente || 'Sin nombre').toLowerCase().includes(currentOrderSearch)))
-      .sort((a, b) => a.i - b.i); // del pedido más antiguo al más nuevo, según cuándo se agregó
+      .sort((a, b) => (a.o.fecha || '9999') < (b.o.fecha || '9999') ? -1 : 1);
 
     if(sorted.length === 0){
       ordersList.innerHTML = '<p class="empty-note">' + (currentOrderSearch ? 'Ningún cliente coincide con "' + escapeHTML(orderSearchInput.value.trim()) + '"' : ORDERS_FILTER_EMPTY_NOTE[currentOrdersFilter]) + '</p>';
