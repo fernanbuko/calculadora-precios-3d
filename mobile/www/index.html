@@ -3484,6 +3484,17 @@
     });
   }
 
+  // La app (sobre todo la empaquetada) no siempre arranca "en frío": al
+  // volver a ella desde el selector de apps recientes, la página sigue
+  // corriendo tal cual la dejaste — nunca vuelve a preguntarle a la nube
+  // si algo cambió desde OTRO dispositivo mientras tanto. Cada vez que la
+  // pestaña/app vuelve a estar visible, se refresca sola desde el servidor.
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && currentUser && firestoreDb){
+      loadCloudData(false);
+    }
+  });
+
   // Dentro de la app empaquetada (APK / iPhone), signInWithPopup no
   // funciona: Google bloquea el login dentro de cualquier WebView
   // embebido por seguridad. Ahí se usa el selector de cuentas NATIVO
