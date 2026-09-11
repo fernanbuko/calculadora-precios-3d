@@ -3516,6 +3516,36 @@
     if(typeof renderDiagnostics === 'function') renderDiagnostics();
   }
 
+  // Conexión EN VIVO a la nube: en vez de solo consultar Firestore una vez
+  // (al abrir o al volver a la app), se queda escuchando cambios — así un
+  // pedido marcado en otro dispositivo aparece al instante aquí, sin tener
+  // que reabrir nada. loadCloudData() sigue encargándose de crear el
+  // documento la primera vez que una cuenta usa la app (ver ahí el porqué
+  // de pedir siempre al servidor y no a la caché); esta escucha es solo
+  // para mantenerse al día MIENTRAS la sesión sigue abierta.
+  let cloudUnsubscribe = null;
+  function startCloudListener(){
+    stopCloudListener();
+    cloudUnsubscribe = firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid).onSnapshot(
+      snap => {
+        if(!snap.exists) return; // nunca pisar datos locales solo porque aún no existe el documento
+        const data = snap.data() || {};
+        if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
+        if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
+        if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
+        lastCloudAttempt = { when: new Date(), ok: true, docExisted: true, ordersInCloud: Array.isArray(data.orders) ? data.orders.length : 'orders no es array', errorMsg: null };
+        renderDiagnostics();
+      },
+      err => {
+        lastCloudAttempt = { when: new Date(), ok: false, docExisted: null, ordersInCloud: null, errorMsg: String(err && (err.message || err.code || err)) };
+        renderDiagnostics();
+      }
+    );
+  }
+  function stopCloudListener(){
+    if(cloudUnsubscribe){ cloudUnsubscribe(); cloudUnsubscribe = null; }
+  }
+
   // El primer aviso de onAuthStateChanged, al cargar la página, solo
   // restaura la sesión que ya tenías — no es un inicio de sesión nuevo,
   // así que no debe mostrar el toast (a diferencia de cuando sí tocas
@@ -3527,20 +3557,21 @@
       updateAccountUI();
       if(user){
         loadCloudData(authInitialized);
+        startCloudListener();
         // Reactiva el push nativo solo (sin volver a pedir permiso si ya
         // estaba concedido) cada vez que se abre la app con sesión ya
         // iniciada — así no depende de que la persona vuelva a tocar nada.
         if(enAppNativa()) activarPushNativoParaCuenta();
+      } else {
+        stopCloudListener();
       }
       authInitialized = true;
     });
   }
 
-  // La app (sobre todo la empaquetada) no siempre arranca "en frío": al
-  // volver a ella desde el selector de apps recientes, la página sigue
-  // corriendo tal cual la dejaste — nunca vuelve a preguntarle a la nube
-  // si algo cambió desde OTRO dispositivo mientras tanto. Cada vez que la
-  // pestaña/app vuelve a estar visible, se refresca sola desde el servidor.
+  // Respaldo por si la conexión en vivo se cae en segundo plano (pasa en
+  // algunos Android al minimizar la app un buen rato): al volver a estar
+  // visible, se vuelve a pedir el dato fresco al servidor por si acaso.
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState === 'visible' && currentUser && firestoreDb){
       loadCloudData(false);
