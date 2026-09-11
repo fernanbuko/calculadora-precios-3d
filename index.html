@@ -1731,7 +1731,11 @@
       <p class="card-title" style="margin:0;">Agregar foto</p>
       <button type="button" class="icon-btn small" id="photoPickerCloseBtn" title="Cerrar">✕</button>
     </div>
-    <button type="button" class="btn primary" id="photoPickerUploadBtn" style="width:100%;margin-bottom:14px;">📷 Subir foto nueva</button>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button type="button" class="btn primary" id="photoPickerCameraBtn" style="flex:1;">📷 Tomar foto</button>
+      <button type="button" class="btn" id="photoPickerUploadBtn" style="flex:1;">🖼️ Elegir de galería</button>
+    </div>
+    <input type="file" accept="image/*" capture="environment" class="hidden" id="photoPickerCameraInput">
     <input type="file" accept="image/*" class="hidden" id="photoPickerFileInput">
     <p class="card-title" id="photoPickerRecentLabel" style="font-size:12.5px;">Reusar una que ya subiste <span class="tag">SIN GASTAR ESPACIO EXTRA</span></p>
     <div class="photo-picker-grid" id="photoPickerGrid"></div>
@@ -2113,6 +2117,8 @@
   const photoPickerGrid = document.getElementById('photoPickerGrid');
   const photoPickerRecentLabel = document.getElementById('photoPickerRecentLabel');
   const photoPickerCloseBtn = document.getElementById('photoPickerCloseBtn');
+  const photoPickerCameraBtn = document.getElementById('photoPickerCameraBtn');
+  const photoPickerCameraInput = document.getElementById('photoPickerCameraInput');
   const photoPickerUploadBtn = document.getElementById('photoPickerUploadBtn');
   const photoPickerFileInput = document.getElementById('photoPickerFileInput');
   let photoPickerContext = null; // { orderIndex, itemIndex, tipo }
@@ -2174,10 +2180,12 @@
   }
   photoPickerCloseBtn.addEventListener('click', closePhotoPicker);
   photoPickerOverlay.addEventListener('click', (e) => { if(e.target === photoPickerOverlay) closePhotoPicker(); });
+  photoPickerCameraBtn.addEventListener('click', () => photoPickerCameraInput.click());
   photoPickerUploadBtn.addEventListener('click', () => photoPickerFileInput.click());
-  photoPickerFileInput.addEventListener('change', async () => {
-    const file = photoPickerFileInput.files && photoPickerFileInput.files[0];
-    photoPickerFileInput.value = '';
+
+  async function subirFotoDesdeInput(input){
+    const file = input.files && input.files[0];
+    input.value = '';
     if(!file || !photoPickerContext) return;
     const { orderIndex, itemIndex, tipo } = photoPickerContext;
     showToast('Subiendo foto…');
@@ -2191,7 +2199,9 @@
       showToast('No se pudo subir la foto: ' + (err.message || 'intenta de nuevo'));
     }
     closePhotoPicker();
-  });
+  }
+  photoPickerCameraInput.addEventListener('change', () => subirFotoDesdeInput(photoPickerCameraInput));
+  photoPickerFileInput.addEventListener('change', () => subirFotoDesdeInput(photoPickerFileInput));
 
   function loadJSON(key, fallback){
     try{
