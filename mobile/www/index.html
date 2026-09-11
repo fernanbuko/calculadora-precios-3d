@@ -1578,7 +1578,6 @@
           <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
           Iniciar sesión con Google
         </button>
-        <button type="button" class="btn hidden" id="forceSyncBtn">☁️ Subir mis datos a la nube ahora</button>
         <button type="button" class="btn hidden" id="signOutBtn">Cerrar sesión</button>
       </div>
     </div>
@@ -1608,12 +1607,6 @@
         <button type="button" class="icon-btn" id="resetBtn" title="Reiniciar valores">↺</button>
       </div>
     </div>
-  </div>
-
-  <div class="card">
-    <p class="card-title">Diagnóstico <span class="tag">SINCRONIZACIÓN</span></p>
-    <p style="font-size:12px;font-family:'IBM Plex Mono', monospace;color:var(--text-dim);line-height:1.7;white-space:pre-wrap;margin:0 0 10px;" id="diagText">Cargando…</p>
-    <button type="button" class="btn small" id="diagRefreshBtn">🔄 Actualizar diagnóstico</button>
   </div>
   </div><!-- /tab-panel ajustes -->
 
@@ -1703,10 +1696,6 @@
   let currentUser = null;
   let firestoreDb = null;
   let cloudDataLoaded = false;
-  // Info del último intento de leer/escribir la nube, solo para el panel
-  // de Diagnóstico en Ajustes — así se puede ver qué pasó sin necesitar
-  // conectar el celular a una PC.
-  let lastCloudAttempt = null; // { when, ok, docExisted, ordersInCloud, errorMsg }
   const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders' };
 
   if(firebaseReady){
@@ -3421,43 +3410,7 @@
   const accountSub = document.getElementById('accountSub');
   const accountAvatar = document.getElementById('accountAvatar');
   const googleSignInBtn = document.getElementById('googleSignInBtn');
-  const forceSyncBtn = document.getElementById('forceSyncBtn');
   const signOutBtn = document.getElementById('signOutBtn');
-  const diagText = document.getElementById('diagText');
-  const diagRefreshBtn = document.getElementById('diagRefreshBtn');
-
-  // Panel de solo-lectura en Ajustes con el estado real de la sincronización
-  // en este dispositivo, en este momento — para diagnosticar sin cable ni
-  // consola (útil sobre todo dentro de la app empaquetada).
-  function renderDiagnostics(){
-    const lines = [];
-    lines.push('Plataforma: ' + (enAppNativa() ? 'App empaquetada (APK/iOS)' : 'Navegador web'));
-    lines.push('Firebase cargado: ' + (firebaseReady ? 'sí' : 'NO (revisa tu conexión)'));
-    lines.push('Sesión: ' + (currentUser ? (currentUser.email || currentUser.displayName || 'sí, sin nombre') : 'Invitado (no iniciada)'));
-    if(currentUser) lines.push('UID: ' + currentUser.uid);
-    lines.push('Pedidos en este dispositivo (memoria): ' + orders.length);
-    lines.push('cloudDataLoaded: ' + cloudDataLoaded);
-    if(lastCloudAttempt){
-      lines.push('Último intento de leer la nube: ' + lastCloudAttempt.when.toLocaleTimeString());
-      lines.push('  Resultado: ' + (lastCloudAttempt.ok ? 'OK' : 'FALLÓ — ' + lastCloudAttempt.errorMsg));
-      if(lastCloudAttempt.ok){
-        lines.push('  ¿Documento existía en la nube?: ' + (lastCloudAttempt.docExisted ? 'sí' : 'NO (se creó vacío)'));
-        lines.push('  Pedidos que trajo la nube: ' + lastCloudAttempt.ordersInCloud);
-      }
-    } else {
-      lines.push('Último intento de leer la nube: (todavía ninguno en esta sesión)');
-    }
-    diagText.textContent = lines.join('\n');
-  }
-
-  diagRefreshBtn.addEventListener('click', () => {
-    diagText.textContent = 'Consultando la nube…';
-    if(currentUser && firestoreDb){
-      loadCloudData(false); // ya llama a renderDiagnostics() al terminar
-    } else {
-      renderDiagnostics();
-    }
-  });
 
   function updateAccountUI(){
     const signedIn = !!currentUser;
@@ -3466,7 +3419,6 @@
       ? 'Tus pedidos, perfiles e historial se guardan en tu cuenta y los ves en cualquier dispositivo.'
       : 'Inicia sesión con Google para guardar tus pedidos, perfiles e historial en la nube.';
     googleSignInBtn.classList.toggle('hidden', signedIn);
-    forceSyncBtn.classList.toggle('hidden', !signedIn);
     signOutBtn.classList.toggle('hidden', !signedIn);
     if(signedIn && currentUser.photoURL){
       // Si la foto de Google no llega a cargar (pasa a veces dentro del
@@ -3478,9 +3430,7 @@
     } else {
       accountAvatar.classList.add('hidden');
     }
-    renderDiagnostics();
   }
-  renderDiagnostics(); // estado inicial, incluso antes de que Firebase responda
 
   async function loadCloudData(notify){
     cloudDataLoaded = false;
@@ -3494,10 +3444,8 @@
       // dispositivos. Pidiendo al servidor, si de verdad no hay conexión
       // esto falla (va al catch) en vez de fingir que la cuenta está vacía.
       const snap = await ref.get({ source: 'server' });
-      let ordersInCloud = null;
       if(snap.exists){
         const data = snap.data() || {};
-        ordersInCloud = Array.isArray(data.orders) ? data.orders.length : 'orders no es array';
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
@@ -3506,14 +3454,11 @@
         await ref.set({ profiles, history, orders }, { merge: true });
       }
       cloudDataLoaded = true;
-      lastCloudAttempt = { when: new Date(), ok: true, docExisted: snap.exists, ordersInCloud, errorMsg: null };
       if(notify) showToast('Sesión iniciada — datos sincronizados');
     }catch(e){
       cloudDataLoaded = true;
-      lastCloudAttempt = { when: new Date(), ok: false, docExisted: null, ordersInCloud: null, errorMsg: String(e && (e.message || e.code || e)) };
       if(notify) showToast('No se pudo sincronizar con la nube');
     }
-    if(typeof renderDiagnostics === 'function') renderDiagnostics();
   }
 
   // Conexión EN VIVO a la nube: en vez de solo consultar Firestore una vez
@@ -3533,13 +3478,8 @@
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
-        lastCloudAttempt = { when: new Date(), ok: true, docExisted: true, ordersInCloud: Array.isArray(data.orders) ? data.orders.length : 'orders no es array', errorMsg: null };
-        renderDiagnostics();
       },
-      err => {
-        lastCloudAttempt = { when: new Date(), ok: false, docExisted: null, ordersInCloud: null, errorMsg: String(err && (err.message || err.code || err)) };
-        renderDiagnostics();
-      }
+      err => { console.error('Error en la escucha de Firestore:', err); }
     );
   }
   function stopCloudListener(){
@@ -3684,22 +3624,6 @@
     // no seguir recibiendo avisos de una cuenta de la que ya se salió.
     if(enAppNativa()) desactivarPushNativoParaCuenta();
     if(firebaseReady) firebase.auth().signOut();
-  });
-
-  // Botón de respaldo: sube YA (sin esperar al próximo cambio) lo que este
-  // dispositivo tiene guardado — para cuando quieres estar seguro de que la
-  // nube quedó igual que aquí, en vez de confiar en que la sincronización
-  // automática ya haya corrido.
-  forceSyncBtn.addEventListener('click', async () => {
-    if(!currentUser || !firestoreDb){ showToast('Inicia sesión con Google primero'); return; }
-    forceSyncBtn.disabled = true;
-    try{
-      await firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid).set({ profiles, history, orders }, { merge: true });
-      showToast('✓ Tus datos de este dispositivo ya están en la nube');
-    }catch(e){
-      showToast('No se pudo subir a la nube: ' + (e.message || 'intenta de nuevo'));
-    }
-    forceSyncBtn.disabled = false;
   });
 
   // ---------- init ----------
