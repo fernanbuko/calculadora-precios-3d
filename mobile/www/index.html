@@ -3436,7 +3436,14 @@
     cloudDataLoaded = false;
     try{
       const ref = firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid);
-      const snap = await ref.get();
+      // OJO: pedir la lectura SIEMPRE al servidor (nunca a la caché local).
+      // Con la caché, un dispositivo nuevo (p.ej. la app recién instalada)
+      // puede devolver "no existe" antes de que llegue la respuesta real de
+      // Firestore — y eso hacía que el bloque de abajo subiera datos VACÍOS
+      // de este dispositivo, borrando lo que ya había en la nube de otros
+      // dispositivos. Pidiendo al servidor, si de verdad no hay conexión
+      // esto falla (va al catch) en vez de fingir que la cuenta está vacía.
+      const snap = await ref.get({ source: 'server' });
       if(snap.exists){
         const data = snap.data() || {};
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
