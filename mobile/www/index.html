@@ -712,6 +712,23 @@
     font-size: 18px; cursor: pointer;
   }
 
+  #photoPickerRecentLabel.hidden, .photo-picker-grid.hidden{ display: none; }
+  .photo-picker-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .photo-picker-grid img{
+    width: 100%; aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .photo-picker-grid img:hover{ border-color: var(--orange); }
+
   .toast{
     position: fixed;
     left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px));
@@ -1707,6 +1724,19 @@
   <img id="photoViewImg" src="" alt="Foto del pedido">
 </div>
 
+<div class="modal-overlay hidden" id="photoPickerOverlay">
+  <div class="modal-card">
+    <div class="modal-header-row">
+      <p class="card-title" style="margin:0;">Agregar foto</p>
+      <button type="button" class="icon-btn small" id="photoPickerCloseBtn" title="Cerrar">✕</button>
+    </div>
+    <button type="button" class="btn primary" id="photoPickerUploadBtn" style="width:100%;margin-bottom:14px;">📷 Subir foto nueva</button>
+    <input type="file" accept="image/*" class="hidden" id="photoPickerFileInput">
+    <p class="card-title" id="photoPickerRecentLabel" style="font-size:12.5px;">Reusar una que ya subiste <span class="tag">SIN GASTAR ESPACIO EXTRA</span></p>
+    <div class="photo-picker-grid" id="photoPickerGrid"></div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -2057,6 +2087,84 @@
   }
   photoViewCloseBtn.addEventListener('click', closePhotoViewer);
   photoViewOverlay.addEventListener('click', (e) => { if(e.target === photoViewOverlay) closePhotoViewer(); });
+
+  // ---------- selector al agregar foto: subir nueva o reusar una ya subida ----------
+  // Un mismo trabajo (ej. el mismo llavero) a veces se lo piden varios
+  // clientes — sin esto, cada uno subiría su propia copia idéntica a
+  // Cloudinary. Al tocar una casilla vacía, se puede elegir una foto que
+  // ya se subió antes (mismo link, sin gastar espacio de nuevo) en vez de
+  // subirla otra vez.
+  const photoPickerOverlay = document.getElementById('photoPickerOverlay');
+  const photoPickerGrid = document.getElementById('photoPickerGrid');
+  const photoPickerRecentLabel = document.getElementById('photoPickerRecentLabel');
+  const photoPickerCloseBtn = document.getElementById('photoPickerCloseBtn');
+  const photoPickerUploadBtn = document.getElementById('photoPickerUploadBtn');
+  const photoPickerFileInput = document.getElementById('photoPickerFileInput');
+  let photoPickerContext = null; // { orderIndex, itemIndex, field }
+
+  function collectExistingPhotoUrls(){
+    const set = new Set();
+    orders.forEach(o => (o.items || []).forEach(it => {
+      if(it.fotoReferencia) set.add(it.fotoReferencia);
+      if(it.fotoResultado) set.add(it.fotoResultado);
+    }));
+    return Array.from(set).reverse(); // las más recientes primero
+  }
+
+  // ¿Sigue usándose esta misma foto en algún OTRO artículo? Antes de
+  // encolar el borrado al quitarla de uno, hay que revisar esto — si la
+  // reusaste en varios clientes, quitarla de uno solo no debe borrarla
+  // de la nube mientras los demás la sigan necesitando.
+  function urlSigueUsadaEnOtroArticulo(url, exceptOrderIndex, exceptItemIndex){
+    return orders.some((o, oi) => (o.items || []).some((it, ii) => {
+      if(oi === exceptOrderIndex && ii === exceptItemIndex) return false;
+      return it.fotoReferencia === url || it.fotoResultado === url;
+    }));
+  }
+
+  function openPhotoPicker(orderIndex, itemIndex, field){
+    photoPickerContext = { orderIndex, itemIndex, field };
+    const urls = collectExistingPhotoUrls();
+    photoPickerRecentLabel.classList.toggle('hidden', urls.length === 0);
+    photoPickerGrid.classList.toggle('hidden', urls.length === 0);
+    photoPickerGrid.innerHTML = urls.map(u => '<img src="' + escapeHTML(u) + '" alt="Foto ya subida">').join('');
+    Array.from(photoPickerGrid.children).forEach((img, idx) => {
+      img.addEventListener('click', () => applyPhotoSelection(urls[idx]));
+    });
+    photoPickerOverlay.classList.remove('hidden');
+  }
+  function closePhotoPicker(){
+    photoPickerOverlay.classList.add('hidden');
+    photoPickerContext = null;
+  }
+  function applyPhotoSelection(url){
+    if(!photoPickerContext) return;
+    const { orderIndex, itemIndex, field } = photoPickerContext;
+    orders[orderIndex].items[itemIndex][field] = url;
+    saveJSON(ORDERS_KEY, orders);
+    renderOrders();
+    closePhotoPicker();
+  }
+  photoPickerCloseBtn.addEventListener('click', closePhotoPicker);
+  photoPickerOverlay.addEventListener('click', (e) => { if(e.target === photoPickerOverlay) closePhotoPicker(); });
+  photoPickerUploadBtn.addEventListener('click', () => photoPickerFileInput.click());
+  photoPickerFileInput.addEventListener('change', async () => {
+    const file = photoPickerFileInput.files && photoPickerFileInput.files[0];
+    photoPickerFileInput.value = '';
+    if(!file || !photoPickerContext) return;
+    const { orderIndex, itemIndex, field } = photoPickerContext;
+    showToast('Subiendo foto…');
+    try{
+      const url = await uploadPhotoToCloudinary(file, orders[orderIndex].cliente, orders[orderIndex].items[itemIndex].nombre);
+      orders[orderIndex].items[itemIndex][field] = url;
+      saveJSON(ORDERS_KEY, orders);
+      renderOrders();
+      showToast('✓ Foto subida');
+    }catch(err){
+      showToast('No se pudo subir la foto: ' + (err.message || 'intenta de nuevo'));
+    }
+    closePhotoPicker();
+  });
 
   function loadJSON(key, fallback){
     try{
@@ -3058,7 +3166,7 @@
   function buildPhotoSlotWrapHTML(url, slotKey, label){
     const slot = url
       ? '<div class="photo-slot has-photo" data-photo-view><img src="' + escapeHTML(url) + '" alt="' + label + '" loading="lazy"><button type="button" class="photo-remove" data-photo-remove="' + slotKey + '" title="Quitar foto">✕</button></div>'
-      : '<label class="photo-slot photo-slot-empty"><input type="file" accept="image/*" class="hidden" data-photo-input="' + slotKey + '"><span class="icon">📷</span></label>';
+      : '<button type="button" class="photo-slot photo-slot-empty" data-photo-add="' + slotKey + '"><span class="icon">📷</span></button>';
     return '<div class="photo-slot-wrap">' + slot + '<div class="photo-label">' + label + '</div></div>';
   }
 
@@ -3145,30 +3253,20 @@
             buildPhotoSlotWrapHTML(it.fotoReferencia, 'referencia', 'Referencia') +
             buildPhotoSlotWrapHTML(it.fotoResultado, 'resultado', 'Resultado') +
           '</div>';
-        line.querySelectorAll('[data-photo-input]').forEach(input => {
-          input.addEventListener('change', async () => {
-            const file = input.files && input.files[0];
-            input.value = '';
-            if(!file) return;
-            const field = input.dataset.photoInput === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
-            showToast('Subiendo foto…');
-            try{
-              const url = await uploadPhotoToCloudinary(file, orders[i].cliente, orders[i].items[ii].nombre);
-              orders[i].items[ii][field] = url;
-              saveJSON(ORDERS_KEY, orders);
-              renderOrders();
-              showToast('✓ Foto subida');
-            }catch(err){
-              showToast('No se pudo subir la foto: ' + (err.message || 'intenta de nuevo'));
-            }
+        line.querySelectorAll('[data-photo-add]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const field = btn.dataset.photoAdd === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
+            openPhotoPicker(i, ii, field);
           });
         });
         line.querySelectorAll('[data-photo-remove]').forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const field = btn.dataset.photoRemove === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
-            marcarCloudinariaParaBorrar(orders[i].items[ii][field]);
+            const url = orders[i].items[ii][field];
             orders[i].items[ii][field] = '';
+            if(!urlSigueUsadaEnOtroArticulo(url, i, ii)) marcarCloudinariaParaBorrar(url);
             saveJSON(ORDERS_KEY, orders);
             renderOrders();
           });
