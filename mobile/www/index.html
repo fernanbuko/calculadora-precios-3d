@@ -1541,7 +1541,7 @@
   <!-- PEDIDOS -->
   <div class="card">
     <div id="ordersListHeader">
-      <p class="card-title" style="margin-top:0;">Todos los pedidos</p>
+      <p class="card-title" style="margin-top:0;">Todos los pedidos <button type="button" class="btn small" id="catalogPdfBtn">📖 Catálogo PDF</button></p>
       <div class="input-box field-wide" style="margin-bottom:10px;">
         <input type="text" id="orderSearchInput" placeholder="Buscar cliente...">
       </div>
@@ -3631,6 +3631,130 @@
     doc.text(outFinal.textContent, 195, y, { align: 'right' });
     doc.save('cotizacion-3d.pdf');
     showToast('PDF descargado');
+  });
+
+  // ---------- catálogo de trabajos (PDF con las fotos de referencia/resultado) ----------
+  // Carga una foto (desde su URL de Cloudinary) como imagen ya lista para meter
+  // en el PDF — la achica un poco de paso, para que el PDF no pese de más.
+  function loadImageAsDataUrl(url, maxDim){
+    maxDim = maxDim || 700;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        try{ resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.82), width, height }); }
+        catch(e){ reject(e); }
+      };
+      img.onerror = () => reject(new Error('No se pudo cargar la imagen'));
+      img.src = url;
+    });
+  }
+
+  // Un mismo "trabajo" (nombre + fotos) puede repetirse en varios pedidos —
+  // se agrupa por la combinación exacta de fotos para que el catálogo
+  // muestre cada diseño una sola vez, sin importar a cuántos clientes se
+  // les hizo.
+  function collectCatalogoTrabajos(){
+    const map = new Map();
+    orders.forEach(o => (o.items || []).forEach(it => {
+      if(!it.fotoReferencia && !it.fotoResultado) return;
+      const key = (it.fotoReferencia || '') + '|' + (it.fotoResultado || '');
+      if(!map.has(key)){
+        map.set(key, { nombre: it.nombre || '(sin nombre)', fotoReferencia: it.fotoReferencia || '', fotoResultado: it.fotoResultado || '', clientes: new Set(), veces: 0 });
+      }
+      const job = map.get(key);
+      job.veces++;
+      if(o.cliente) job.clientes.add(o.cliente);
+    }));
+    return Array.from(map.values());
+  }
+
+  document.getElementById('catalogPdfBtn').addEventListener('click', async (e) => {
+    if(!window.jspdf){ showToast('No se pudo cargar el generador de PDF'); return; }
+    const trabajos = collectCatalogoTrabajos();
+    if(trabajos.length === 0){ showToast('Todavía no hay fotos guardadas en ningún pedido'); return; }
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    showToast('Generando catálogo… puede tardar un poco');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 14;
+    const imgBox = 78; // mm de lado disponibles para cada foto
+
+    doc.setFontSize(18);
+    doc.text('Catálogo de trabajos', margin, 20);
+    doc.setFontSize(10);
+    doc.setTextColor(120);
+    doc.text(new Date().toLocaleDateString() + ' · ' + trabajos.length + ' trabajo' + (trabajos.length === 1 ? '' : 's'), margin, 27);
+    doc.setTextColor(20);
+    let y = 38;
+
+    for(const job of trabajos){
+      if(y + imgBox + 22 > pageH - margin){
+        doc.addPage();
+        y = margin + 6;
+      }
+      doc.setFontSize(12);
+      doc.text(job.nombre, margin, y);
+      doc.setFontSize(9);
+      doc.setTextColor(130);
+      const metaParts = [];
+      if(job.veces > 1) metaParts.push('Pedido ' + job.veces + ' veces');
+      if(job.clientes.size > 0) metaParts.push(Array.from(job.clientes).slice(0, 3).join(', ') + (job.clientes.size > 3 ? '…' : ''));
+      if(metaParts.length) doc.text(metaParts.join(' · '), margin, y + 5);
+      doc.setTextColor(20);
+      y += 10;
+
+      let x = margin;
+      for(const par of [['Referencia', job.fotoReferencia], ['Resultado', job.fotoResultado]]){
+        const label = par[0], url = par[1];
+        doc.setFontSize(8.5);
+        doc.setTextColor(130);
+        doc.text(label, x, y);
+        doc.setTextColor(20);
+        if(url){
+          try{
+            const cargada = await loadImageAsDataUrl(url);
+            const ratio = Math.min(imgBox / cargada.width, imgBox / cargada.height);
+            doc.addImage(cargada.dataUrl, 'JPEG', x, y + 3, cargada.width * ratio, cargada.height * ratio);
+          }catch(err){
+            doc.setDrawColor(220);
+            doc.rect(x, y + 3, imgBox, imgBox * 0.6);
+            doc.setFontSize(8);
+            doc.setTextColor(180);
+            doc.text('No se pudo cargar', x + 6, y + 3 + imgBox * 0.3);
+            doc.setTextColor(20);
+          }
+        } else {
+          doc.setDrawColor(220);
+          doc.rect(x, y + 3, imgBox, imgBox * 0.6);
+          doc.setFontSize(8);
+          doc.setTextColor(180);
+          doc.text('Sin foto', x + imgBox / 2 - 8, y + 3 + imgBox * 0.3);
+          doc.setTextColor(20);
+        }
+        x += imgBox + 8;
+      }
+      y += imgBox + 14;
+      doc.setDrawColor(230);
+      doc.line(margin, y - 6, pageW - margin, y - 6);
+    }
+
+    doc.save('catalogo-trabajos.pdf');
+    showToast('✓ Catálogo descargado');
+    btn.disabled = false;
   });
 
   document.getElementById('imageBtn').addEventListener('click', () => {
