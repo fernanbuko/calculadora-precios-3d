@@ -83,15 +83,16 @@ Por defecto el botón de Google muestra un aviso de que falta configurarlo — h
 
 Estos datos de configuración son públicos (no son contraseñas) — la seguridad real la dan las reglas de Firestore del paso 3, que solo dejan a cada usuario leer y escribir sus propios datos.
 
-## Configurar las fotos de los pedidos (Cloudinary)
+## Fotos de los pedidos (Cloudinary)
 
-Las fotos de "Referencia"/"Resultado" de cada artículo se suben a [Cloudinary](https://cloudinary.com) (no a Firebase Storage, que cobra por uso) — con su plan gratis alcanza de sobra para este uso. Sin configurar esto, tocar una casilla de foto muestra un aviso de que falta configurarla, igual que pasa con el botón de Google si no configuraste Firebase.
+Las fotos de "Referencia"/"Resultado" de cada artículo se suben a [Cloudinary](https://cloudinary.com) (no a Firebase Storage, que cobra por uso), usando la **misma cuenta de Cloudinary** que ya comparten las demás apps de esta cuenta — mismo sistema de siempre: cada app en su propia carpeta raíz (esta usa `precios-3d`), y dentro, cada usuario en la suya (`precios-3d/{uid}`, o `precios-3d/local_dispositivo` sin sesión iniciada), organizada además por cliente. La subida se hace directo desde el navegador con un "unsigned upload preset" (`CLOUDINARY_CONFIG` en `index.html`) — sin necesitar backend ni exponer ninguna clave secreta.
 
-1. Crea una cuenta gratis en [cloudinary.com](https://cloudinary.com) y copia tu **Cloud name** (arriba en el Dashboard).
-2. Ve a **Settings (⚙️) → Upload → Upload presets → Add upload preset**. Ponle un nombre, y en **Signing Mode** elige **Unsigned** (así el navegador puede subir fotos directo, sin exponer ninguna contraseña) — guarda y copia el nombre del preset.
-3. En `index.html`, busca `const CLOUDINARY_CONFIG = { ... }` (cerca del bloque de Firebase) y reemplaza `"TU_CLOUD_NAME"` y `"TU_UPLOAD_PRESET"` con esos dos valores.
+Quitar una foto **no la borra de Cloudinary al instante**: por seguridad, borrar de verdad necesita la clave secreta de la cuenta, que nunca debe estar en el código del navegador. En su lugar, la app deja una "solicitud de borrado" guardada en Firestore (`calc3d_usuarios/{uid}/cloudinariaPendientes`), y el **robot** `robot/borrar-cloudinary.js` (corre cada 30 minutos vía `.github/workflows/borrar-cloudinary.yml`, igual que en `registro-de-consumo-con-datos`) la procesa usando esa clave, guardada solo como secreto de GitHub Actions — nunca en el código. Para que el robot funcione hacen falta estos secretos en **Settings → Secrets and variables → Actions** de este repositorio:
 
-Al ser un preset **sin firmar**, cualquiera con el link a una foto puede verla (así funcionan los links de Cloudinary), pero solo esta app puede subir fotos nuevas a tu cuenta. Quitar una foto desde la app solo borra la referencia guardada en el pedido — el archivo se queda en tu cuenta de Cloudinary (puedes borrarlo ahí manualmente si te preocupa el espacio, aunque el plan gratis da bastante margen).
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: la misma llave de cuenta de servicio que ya usa el robot de notificaciones (`notificaciones-robot/`) — si ya la agregaste para eso, el robot de fotos la reutiliza tal cual.
+- `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET`: las de la cuenta de Cloudinary compartida (Dashboard → Settings → API Keys) — las mismas que ya tengas configuradas como secretos en `registro-de-consumo-con-datos`.
+
+Sin esos secretos, las fotos se siguen subiendo y viendo con normalidad — solo que las solicitudes de borrado quedan pendientes hasta que el robot pueda procesarlas.
 
 ## Uso
 

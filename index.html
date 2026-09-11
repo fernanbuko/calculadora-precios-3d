@@ -1763,24 +1763,46 @@
   }
 
   /* ---------------------------------------------------------
-     Fotos de pedidos: se suben directo desde el navegador/app a
-     Cloudinary (no a Firebase Storage — Cloudinary tiene un plan
-     gratis más generoso), usando un "unsigned upload preset". Solo
-     guardamos el link (URL) que Cloudinary devuelve, así que las
-     fotos NO pesan nada dentro de Firestore/localStorage.
+     Fotos de pedidos: mismo sistema que ya usan las demás apps de esta
+     cuenta — se suben directo desde el navegador/app a Cloudinary (no a
+     Firebase Storage, que cobra por uso), a la MISMA cuenta de
+     Cloudinary compartida entre apps, cada una en su propia carpeta raíz
+     (CLOUDINARY_APP_NOMBRE) y, dentro, cada usuario en la suya. Solo se
+     guarda el link (URL) que Cloudinary devuelve — las fotos no pesan
+     nada en Firestore/localStorage.
 
-     Pasos en cloudinary.com (cuenta gratis):
-     1. Copia tu "Cloud name" (arriba en el Dashboard) y pégalo abajo.
-     2. Ve a Settings (⚙️) → Upload → Upload presets → "Add upload
-        preset". Ponle un nombre, y en "Signing Mode" elige
-        **Unsigned** (importante: sin esto no va a funcionar). Guarda
-        y pega ese nombre abajo también.
+     Borrar un archivo de verdad requiere la clave secreta de la cuenta,
+     que nunca debe estar en el código del navegador. Por eso "quitar
+     foto" nunca borra directo: deja una solicitud guardada en
+     calc3d_usuarios/{uid}/cloudinariaPendientes, y el robot de GitHub
+     Actions (robot/borrar-cloudinary.js, que sí corre con esa clave de
+     forma segura) la procesa cada cierto tiempo.
   ----------------------------------------------------------*/
   const CLOUDINARY_CONFIG = {
-    cloudName: "TU_CLOUD_NAME",
-    uploadPreset: "TU_UPLOAD_PRESET"
+    cloudName: "zcuh5bjn",
+    uploadPreset: "ehrzlu4w"
   };
+  const CLOUDINARY_APP_NOMBRE = "precios-3d";
   const cloudinaryReady = CLOUDINARY_CONFIG.cloudName && CLOUDINARY_CONFIG.cloudName !== "TU_CLOUD_NAME";
+
+  // Deja el nombre listo para usarse como parte de un nombre de carpeta:
+  // sin acentos, sin símbolos raros, espacios cambiados por guion bajo.
+  function sanitizarNombreParaCarpeta(nombre){
+    return (nombre || 'sin_nombre')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .trim()
+      .replace(/\s+/g, '_')
+      .slice(0, 40) || 'sin_nombre';
+  }
+  // Carpeta de este usuario dentro de Cloudinary — sin sesión iniciada,
+  // las fotos igual se suben (a una carpeta "local_dispositivo"), solo
+  // que no quedan ligadas a ninguna cuenta ni se pueden pedir borrar
+  // desde el robot (igual que el resto de la sincronización en la nube).
+  function carpetaCloudinariaDeEsteUsuario(){
+    const usuario = (currentUser && currentUser.uid) || 'local_dispositivo';
+    return CLOUDINARY_APP_NOMBRE + '/' + usuario;
+  }
 
   // Achica la foto antes de subirla (máx. 1280px de lado, JPEG) — para que
   // suba rápido y no gaste de más la cuota gratis de Cloudinary.
@@ -1811,17 +1833,31 @@
     });
   }
 
-  async function uploadPhotoToCloudinary(file){
+  async function uploadPhotoToCloudinary(file, clienteNombre, articuloNombre){
     if(!cloudinaryReady) throw new Error('Falta configurar Cloudinary en el código de la app');
     const blob = await compressImage(file);
     const formData = new FormData();
     formData.append('file', blob);
     formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    // Carpeta: {app}/{usuario}/{cliente} — así cada foto queda junto a
+    // las demás de ese cliente, y cada cuenta en su propio espacio.
+    formData.append('asset_folder', carpetaCloudinariaDeEsteUsuario() + '/' + sanitizarNombreParaCarpeta(clienteNombre));
+    formData.append('context', 'cliente=' + (clienteNombre || 'Sin nombre').replace(/[|=]/g, ' ') + '|articulo=' + (articuloNombre || '').replace(/[|=]/g, ' '));
     const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CONFIG.cloudName + '/image/upload', { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Cloudinary respondió con un error');
     const data = await res.json();
     if(!data.secure_url) throw new Error('Cloudinary no devolvió el link de la foto');
     return data.secure_url;
+  }
+
+  // Ver la explicación arriba: nunca borra directo, solo encola la
+  // solicitud para que el robot la procese con la clave secreta.
+  async function marcarCloudinariaParaBorrar(url){
+    if(!url || !url.startsWith('http') || !currentUser || !firestoreDb) return;
+    try{
+      await firestoreDb.collection('calc3d_usuarios').doc(currentUser.uid)
+        .collection('cloudinariaPendientes').add({ url, creadoEn: Date.now() });
+    }catch(e){ console.error('No se pudo encolar el borrado en Cloudinary:', e); }
   }
 
   const ids = ['rollPrice','rollWeight','pieceWeight','quantity','supportWeight','hours','watts','kwhPrice',
@@ -3117,7 +3153,7 @@
             const field = input.dataset.photoInput === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
             showToast('Subiendo foto…');
             try{
-              const url = await uploadPhotoToCloudinary(file);
+              const url = await uploadPhotoToCloudinary(file, orders[i].cliente, orders[i].items[ii].nombre);
               orders[i].items[ii][field] = url;
               saveJSON(ORDERS_KEY, orders);
               renderOrders();
@@ -3131,6 +3167,7 @@
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const field = btn.dataset.photoRemove === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
+            marcarCloudinariaParaBorrar(orders[i].items[ii][field]);
             orders[i].items[ii][field] = '';
             saveJSON(ORDERS_KEY, orders);
             renderOrders();
