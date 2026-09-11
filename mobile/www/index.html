@@ -3587,7 +3587,7 @@
     }
   });
 
-  document.getElementById('pdfBtn').addEventListener('click', () => {
+  document.getElementById('pdfBtn').addEventListener('click', async () => {
     if(!window.jspdf){ showToast('No se pudo cargar el generador de PDF'); return; }
     calculate();
     const { jsPDF } = window.jspdf;
@@ -3629,8 +3629,8 @@
     doc.setTextColor(20, 130, 110);
     doc.text(outFinalLabel.textContent, 14, y);
     doc.text(outFinal.textContent, 195, y, { align: 'right' });
-    doc.save('cotizacion-3d.pdf');
-    showToast('PDF descargado');
+    await guardarArchivoGenerado(doc.output('datauristring'), 'cotizacion-3d.pdf');
+    if(!enAppNativa()) showToast('PDF descargado');
   });
 
   // ---------- catálogo de trabajos (PDF con las fotos de referencia/resultado) ----------
@@ -3752,8 +3752,8 @@
       doc.line(margin, y - 6, pageW - margin, y - 6);
     }
 
-    doc.save('catalogo-trabajos.pdf');
-    showToast('✓ Catálogo descargado');
+    await guardarArchivoGenerado(doc.output('datauristring'), 'catalogo-trabajos.pdf');
+    if(!enAppNativa()) showToast('✓ Catálogo descargado');
     btn.disabled = false;
   });
 
@@ -3762,12 +3762,9 @@
     calculate();
     qrBox.classList.add('hidden');
     const target = document.getElementById('resultCard');
-    html2canvas(target, { backgroundColor: null, scale: 2 }).then(canvas => {
-      const link = document.createElement('a');
-      link.download = 'cotizacion-3d.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      showToast('Imagen descargada');
+    html2canvas(target, { backgroundColor: null, scale: 2 }).then(async canvas => {
+      await guardarArchivoGenerado(canvas.toDataURL('image/png'), 'cotizacion-3d.png');
+      if(!enAppNativa()) showToast('Imagen descargada');
     }).catch(() => showToast('No se pudo generar la imagen'));
   });
 
@@ -3961,6 +3958,32 @@
   // app (Firestore, etc.) siga viendo la sesión igual que en el navegador.
   function enAppNativa(){
     return typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+  }
+
+  // Guarda un archivo generado en el momento (PDF, PNG) y se lo ofrece a la
+  // persona. En el navegador, el truco de siempre (un <a download> con la
+  // URL de datos) funciona solo. Pero dentro de la app empaquetada, ese
+  // truco casi nunca hace nada visible — no hay una carpeta de "Descargas"
+  // ni una notificación esperando, así que la persona no tiene forma de
+  // encontrar el archivo. Ahí en cambio se escribe el archivo de verdad
+  // (plugin Filesystem) y se abre la hoja nativa de "Compartir/Guardar"
+  // (plugin Share) para que elija dónde mandarlo o guardarlo.
+  async function guardarArchivoGenerado(dataUri, filename){
+    if(enAppNativa()){
+      try{
+        const base64 = dataUri.split(',')[1];
+        showToast('Elige dónde guardarlo o compartirlo…');
+        const escrito = await Capacitor.Plugins.Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+        await Capacitor.Plugins.Share.share({ title: filename, url: escrito.uri });
+      }catch(e){
+        showToast('No se pudo guardar el archivo: ' + (e.message || 'intenta de nuevo'));
+      }
+      return;
+    }
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUri;
+    link.click();
   }
 
   // ---------- push nativo (solo app empaquetada) ----------
