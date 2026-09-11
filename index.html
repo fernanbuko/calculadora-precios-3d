@@ -1477,6 +1477,7 @@
       </div>
       <div class="btn-row" id="ordersFilterRow">
         <button type="button" class="btn filter-btn active" data-filter="all">Todos</button>
+        <button type="button" class="btn filter-btn" data-filter="disenar">🎨 Por diseñar</button>
         <button type="button" class="btn filter-btn" data-filter="hacer">🖨️ Por hacer</button>
         <button type="button" class="btn filter-btn" data-filter="cobrar">💰 Por cobrar</button>
         <button type="button" class="btn filter-btn" data-filter="entregar">📦 Por entregar</button>
@@ -2858,6 +2859,7 @@
 
   const ORDERS_FILTERS = {
     all: () => true,
+    disenar: o => (o.items || []).some(it => !it.disenado),
     hacer: o => (o.items || []).some(it => !it.hecho),
     cobrar: o => (o.items || []).some(it => !it.pagado),
     entregar: o => (o.items || []).some(it => !it.entregado)
@@ -2865,12 +2867,14 @@
   // Mismo criterio pero por artículo individual, para mostrar solo los que coinciden con el filtro activo.
   const ITEM_FILTERS = {
     all: () => true,
+    disenar: it => !it.disenado,
     hacer: it => !it.hecho,
     cobrar: it => !it.pagado,
     entregar: it => !it.entregado
   };
   const ORDERS_FILTER_EMPTY_NOTE = {
     all: 'Aún no guardas ningún pedido.',
+    disenar: 'No hay pedidos pendientes por diseñar 🎉',
     hacer: 'No hay pedidos pendientes por hacer 🎉',
     cobrar: 'No hay pedidos pendientes por cobrar 🎉',
     entregar: 'No hay pedidos pendientes por entregar 🎉'
@@ -2880,6 +2884,7 @@
   function buildStatusChipsHTML(items){
     if(items.length === 0) return '';
     const total = items.length;
+    const disenadoCount = items.filter(it => it.disenado).length;
     const hechoCount = items.filter(it => it.hecho).length;
     const entregadoCount = items.filter(it => it.entregado).length;
     let totalVal = 0, paidVal = 0;
@@ -2889,10 +2894,11 @@
       paidVal += Math.min(parseFloat(it.montoPagado) || 0, val);
     });
     const debe = totalVal - paidVal;
-    if(hechoCount === total && entregadoCount === total && debe <= 0.004){
+    if(disenadoCount === total && hechoCount === total && entregadoCount === total && debe <= 0.004){
       return '<span class="chip ok">✓ listo y pagado</span>';
     }
     const chips = [];
+    chips.push('<span class="chip ' + (disenadoCount === total ? 'ok' : 'warn') + '">🎨 ' + disenadoCount + '/' + total + ' diseñado</span>');
     chips.push('<span class="chip ' + (hechoCount === total ? 'ok' : 'warn') + '">🖨️ ' + hechoCount + '/' + total + ' hecho</span>');
     chips.push('<span class="chip ' + (entregadoCount === total ? 'ok' : 'warn') + '">📦 ' + entregadoCount + '/' + total + ' entregado</span>');
     chips.push(debe > 0.004
@@ -2949,6 +2955,7 @@
         line.innerHTML =
           '<div class="item-line-text">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + '</div>' +
           '<div class="badges">' +
+            '<button type="button" class="badge ' + (it.disenado ? 'on' : 'warn-off') + '" data-item-field="disenado">' + (it.disenado ? '✓ Diseñado' : '🎨 Por diseñar') + '</button>' +
             '<button type="button" class="badge ' + (it.hecho ? 'on' : 'warn-off') + '" data-item-field="hecho">' + (it.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>' +
             '<button type="button" class="badge ' + (it.entregado ? 'on' : 'warn-off') + '" data-item-field="entregado">' + (it.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
             pagoBadge +
@@ -3012,7 +3019,7 @@
         // conservando su estado hecho/entregado/pagado de ese entonces.
         currentOrderItems = [{
           nombre: orders[i].descripcion || 'Artículo', cantidad: 1, precio: parseFloat(orders[i].precio) || 0,
-          hecho: !!orders[i].hecho, entregado: !!orders[i].entregado, pagado: !!orders[i].pagado
+          disenado: false, hecho: !!orders[i].hecho, entregado: !!orders[i].entregado, pagado: !!orders[i].pagado
         }];
       } else {
         currentOrderItems = [];
@@ -3187,7 +3194,7 @@
       .filter(it => (it.nombre || '').trim())
       .map(it => ({
         nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0,
-        hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado, montoPagado: parseFloat(it.montoPagado) || 0
+        disenado: !!it.disenado, hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado, montoPagado: parseFloat(it.montoPagado) || 0
       }));
     if(!cliente && items.length === 0){ showToast('Pon al menos el cliente o un artículo'); return; }
     const data = {
