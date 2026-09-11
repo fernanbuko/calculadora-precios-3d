@@ -660,42 +660,43 @@
   .badge.warn-off{ border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
   .badge.partial{ border-color: var(--red); color: var(--red); background: transparent; border-style: dashed; }
 
-  .item-photos{ display: flex; gap: 8px; margin-top: 8px; }
-  .photo-slot-wrap{ flex: 1; min-width: 0; }
-  .photo-slot{
+  .item-photos{ display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  .photo-group-label{ font-size: 10px; font-weight: 700; color: var(--text-faint); margin-bottom: 5px; }
+  .photo-thumbs{ display: flex; flex-wrap: wrap; gap: 6px; }
+  .photo-thumb{
     position: relative;
-    display: flex; align-items: center; justify-content: center; gap: 4px;
-    flex-direction: column;
-    border-radius: 12px;
+    width: 58px; height: 58px;
+    border-radius: 10px;
     overflow: hidden;
-  }
-  .photo-slot-empty{
-    border: 1px dashed var(--line-strong);
-    padding: 10px 6px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--text-faint);
+    border: 1px solid var(--line);
     cursor: pointer;
-    aspect-ratio: 1;
-    justify-content: center;
+    flex-shrink: 0;
   }
-  .photo-slot-empty:hover{ border-color: var(--orange); color: var(--orange); }
-  .photo-slot-empty .icon{ font-size: 18px; }
-  .photo-slot.has-photo{ aspect-ratio: 1; cursor: pointer; border: 1px solid var(--line); }
-  .photo-slot.has-photo img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-thumb img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-add-thumb{
+    width: 58px; height: 58px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border: 1px dashed var(--line-strong);
+    background: none;
+    color: var(--text-faint);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .photo-add-thumb:hover{ border-color: var(--orange); color: var(--orange); }
   .photo-remove{
-    position: absolute; top: 4px; right: 4px;
-    width: 22px; height: 22px;
+    position: absolute; top: 3px; right: 3px;
+    width: 18px; height: 18px;
     border-radius: 50%;
     border: none;
     background: rgba(0,0,0,.55);
     color: #fff;
-    font-size: 12px;
+    font-size: 10px;
     line-height: 1;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
-  .photo-label{ font-size: 9.5px; color: var(--text-faint); text-align: center; margin-top: 3px; }
 
   .photo-view-overlay{
     position: fixed; inset: 0; z-index: 90;
@@ -1863,6 +1864,20 @@
     });
   }
 
+  // Cada artículo puede tener VARIAS fotos por categoría (Referencia /
+  // Resultado) — se guardan como arrays (fotosReferencia/fotosResultado).
+  // Pedidos viejos, de cuando solo se podía poner una, quedaron con los
+  // campos singulares (fotoReferencia/fotoResultado); este helper los lee
+  // igual sin tener que migrar nada a la fuerza — el primer array que se
+  // toque ya reemplaza al campo viejo solo.
+  function getFotosArray(it, tipo){
+    const arrKey = tipo === 'referencia' ? 'fotosReferencia' : 'fotosResultado';
+    const legacyKey = tipo === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
+    if(Array.isArray(it[arrKey])) return it[arrKey];
+    if(it[legacyKey]) return [it[legacyKey]];
+    return [];
+  }
+
   async function uploadPhotoToCloudinary(file, clienteNombre, articuloNombre){
     if(!cloudinaryReady) throw new Error('Falta configurar Cloudinary en el código de la app');
     const blob = await compressImage(file);
@@ -2100,13 +2115,13 @@
   const photoPickerCloseBtn = document.getElementById('photoPickerCloseBtn');
   const photoPickerUploadBtn = document.getElementById('photoPickerUploadBtn');
   const photoPickerFileInput = document.getElementById('photoPickerFileInput');
-  let photoPickerContext = null; // { orderIndex, itemIndex, field }
+  let photoPickerContext = null; // { orderIndex, itemIndex, tipo }
 
   function collectExistingPhotoUrls(){
     const set = new Set();
     orders.forEach(o => (o.items || []).forEach(it => {
-      if(it.fotoReferencia) set.add(it.fotoReferencia);
-      if(it.fotoResultado) set.add(it.fotoResultado);
+      getFotosArray(it, 'referencia').forEach(u => set.add(u));
+      getFotosArray(it, 'resultado').forEach(u => set.add(u));
     }));
     return Array.from(set).reverse(); // las más recientes primero
   }
@@ -2118,12 +2133,24 @@
   function urlSigueUsadaEnOtroArticulo(url, exceptOrderIndex, exceptItemIndex){
     return orders.some((o, oi) => (o.items || []).some((it, ii) => {
       if(oi === exceptOrderIndex && ii === exceptItemIndex) return false;
-      return it.fotoReferencia === url || it.fotoResultado === url;
+      return getFotosArray(it, 'referencia').includes(url) || getFotosArray(it, 'resultado').includes(url);
     }));
   }
 
-  function openPhotoPicker(orderIndex, itemIndex, field){
-    photoPickerContext = { orderIndex, itemIndex, field };
+  // Agrega una URL al array de fotos de esa categoría (creando el array la
+  // primera vez, a partir del campo viejo si hacía falta) y limpia el
+  // campo viejo para no arrastrar datos duplicados.
+  function agregarFotoAItem(it, tipo, url){
+    const arrKey = tipo === 'referencia' ? 'fotosReferencia' : 'fotosResultado';
+    const legacyKey = tipo === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
+    const arr = getFotosArray(it, tipo).slice();
+    arr.push(url);
+    it[arrKey] = arr;
+    delete it[legacyKey];
+  }
+
+  function openPhotoPicker(orderIndex, itemIndex, tipo){
+    photoPickerContext = { orderIndex, itemIndex, tipo };
     const urls = collectExistingPhotoUrls();
     photoPickerRecentLabel.classList.toggle('hidden', urls.length === 0);
     photoPickerGrid.classList.toggle('hidden', urls.length === 0);
@@ -2139,8 +2166,8 @@
   }
   function applyPhotoSelection(url){
     if(!photoPickerContext) return;
-    const { orderIndex, itemIndex, field } = photoPickerContext;
-    orders[orderIndex].items[itemIndex][field] = url;
+    const { orderIndex, itemIndex, tipo } = photoPickerContext;
+    agregarFotoAItem(orders[orderIndex].items[itemIndex], tipo, url);
     saveJSON(ORDERS_KEY, orders);
     renderOrders();
     closePhotoPicker();
@@ -2152,11 +2179,11 @@
     const file = photoPickerFileInput.files && photoPickerFileInput.files[0];
     photoPickerFileInput.value = '';
     if(!file || !photoPickerContext) return;
-    const { orderIndex, itemIndex, field } = photoPickerContext;
+    const { orderIndex, itemIndex, tipo } = photoPickerContext;
     showToast('Subiendo foto…');
     try{
       const url = await uploadPhotoToCloudinary(file, orders[orderIndex].cliente, orders[orderIndex].items[itemIndex].nombre);
-      orders[orderIndex].items[itemIndex][field] = url;
+      agregarFotoAItem(orders[orderIndex].items[itemIndex], tipo, url);
       saveJSON(ORDERS_KEY, orders);
       renderOrders();
       showToast('✓ Foto subida');
@@ -3163,11 +3190,15 @@
   };
   let currentOrdersFilter = 'all';
 
-  function buildPhotoSlotWrapHTML(url, slotKey, label){
-    const slot = url
-      ? '<div class="photo-slot has-photo" data-photo-view><img src="' + escapeHTML(url) + '" alt="' + label + '" loading="lazy"><button type="button" class="photo-remove" data-photo-remove="' + slotKey + '" title="Quitar foto">✕</button></div>'
-      : '<button type="button" class="photo-slot photo-slot-empty" data-photo-add="' + slotKey + '"><span class="icon">📷</span></button>';
-    return '<div class="photo-slot-wrap">' + slot + '<div class="photo-label">' + label + '</div></div>';
+  function buildPhotoGroupHTML(urls, tipo, label){
+    const thumbs = urls.map((url, idx) =>
+      '<div class="photo-thumb" data-photo-view data-photo-idx="' + idx + '" data-photo-tipo="' + tipo + '">' +
+        '<img src="' + escapeHTML(url) + '" alt="' + label + '" loading="lazy">' +
+        '<button type="button" class="photo-remove" data-photo-remove="' + tipo + '" data-photo-remove-idx="' + idx + '" title="Quitar foto">✕</button>' +
+      '</div>'
+    ).join('');
+    const addBtn = '<button type="button" class="photo-add-thumb" data-photo-add="' + tipo + '" title="Agregar foto de ' + label + '">+</button>';
+    return '<div class="photo-group"><div class="photo-group-label">' + label + '</div><div class="photo-thumbs">' + thumbs + addBtn + '</div></div>';
   }
 
   function buildStatusChipsHTML(items){
@@ -3250,22 +3281,26 @@
             pagoBadge +
           '</div>' +
           '<div class="item-photos">' +
-            buildPhotoSlotWrapHTML(it.fotoReferencia, 'referencia', 'Referencia') +
-            buildPhotoSlotWrapHTML(it.fotoResultado, 'resultado', 'Resultado') +
+            buildPhotoGroupHTML(getFotosArray(it, 'referencia'), 'referencia', 'Referencia') +
+            buildPhotoGroupHTML(getFotosArray(it, 'resultado'), 'resultado', 'Resultado') +
           '</div>';
         line.querySelectorAll('[data-photo-add]').forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const field = btn.dataset.photoAdd === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
-            openPhotoPicker(i, ii, field);
+            openPhotoPicker(i, ii, btn.dataset.photoAdd);
           });
         });
         line.querySelectorAll('[data-photo-remove]').forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const field = btn.dataset.photoRemove === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
-            const url = orders[i].items[ii][field];
-            orders[i].items[ii][field] = '';
+            const tipo = btn.dataset.photoRemove;
+            const idx = parseInt(btn.dataset.photoRemoveIdx, 10);
+            const arrKey = tipo === 'referencia' ? 'fotosReferencia' : 'fotosResultado';
+            const item = orders[i].items[ii];
+            const arr = getFotosArray(item, tipo).slice();
+            const url = arr[idx];
+            arr.splice(idx, 1);
+            item[arrKey] = arr;
             if(!urlSigueUsadaEnOtroArticulo(url, i, ii)) marcarCloudinariaParaBorrar(url);
             saveJSON(ORDERS_KEY, orders);
             renderOrders();
@@ -3509,7 +3544,7 @@
       .map(it => ({
         nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0,
         disenado: !!it.disenado, hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado, montoPagado: parseFloat(it.montoPagado) || 0,
-        fotoReferencia: it.fotoReferencia || '', fotoResultado: it.fotoResultado || ''
+        fotosReferencia: getFotosArray(it, 'referencia'), fotosResultado: getFotosArray(it, 'resultado')
       }));
     if(!cliente && items.length === 0){ showToast('Pon al menos el cliente o un artículo'); return; }
     const data = {
@@ -3666,16 +3701,53 @@
   function collectCatalogoTrabajos(){
     const map = new Map();
     orders.forEach(o => (o.items || []).forEach(it => {
-      if(!it.fotoReferencia && !it.fotoResultado) return;
-      const key = (it.fotoReferencia || '') + '|' + (it.fotoResultado || '');
+      const refs = getFotosArray(it, 'referencia');
+      const resultados = getFotosArray(it, 'resultado');
+      if(refs.length === 0 && resultados.length === 0) return;
+      const key = refs.join(',') + '|' + resultados.join(',');
       if(!map.has(key)){
-        map.set(key, { nombre: it.nombre || '(sin nombre)', fotoReferencia: it.fotoReferencia || '', fotoResultado: it.fotoResultado || '', clientes: new Set(), veces: 0 });
+        map.set(key, { nombre: it.nombre || '(sin nombre)', fotosReferencia: refs, fotosResultado: resultados, clientes: new Set(), veces: 0 });
       }
       const job = map.get(key);
       job.veces++;
       if(o.cliente) job.clientes.add(o.cliente);
     }));
     return Array.from(map.values());
+  }
+
+  // Dibuja una fila (con salto de línea automático) de miniaturas de una
+  // categoría (Referencia/Resultado) dentro del catálogo, devolviendo la
+  // posición Y donde sigue el contenido después. Salta de página sola si
+  // se queda sin espacio a la mitad.
+  async function dibujarFilaFotosPdf(doc, urls, label, margin, pageW, pageH, y){
+    const thumb = 42, gap = 6;
+    doc.setFontSize(8.5);
+    doc.setTextColor(130);
+    doc.text(label, margin, y);
+    doc.setTextColor(20);
+    y += 5;
+    if(urls.length === 0){
+      doc.setFontSize(8);
+      doc.setTextColor(180);
+      doc.text('Sin fotos', margin, y + thumb * 0.35);
+      doc.setTextColor(20);
+      return y + thumb * 0.6 + 8;
+    }
+    let x = margin;
+    for(const url of urls){
+      if(x + thumb > pageW - margin){ x = margin; y += thumb + gap; }
+      if(y + thumb > pageH - margin){ doc.addPage(); y = margin + 6; x = margin; }
+      try{
+        const cargada = await loadImageAsDataUrl(url);
+        const ratio = Math.min(thumb / cargada.width, thumb / cargada.height);
+        doc.addImage(cargada.dataUrl, 'JPEG', x, y, cargada.width * ratio, cargada.height * ratio);
+      }catch(err){
+        doc.setDrawColor(220);
+        doc.rect(x, y, thumb, thumb);
+      }
+      x += thumb + gap;
+    }
+    return y + thumb + 10;
   }
 
   document.getElementById('catalogPdfBtn').addEventListener('click', async (e) => {
@@ -3691,7 +3763,6 @@
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 14;
-    const imgBox = 78; // mm de lado disponibles para cada foto
 
     doc.setFontSize(18);
     doc.text('Catálogo de trabajos', margin, 20);
@@ -3702,7 +3773,7 @@
     let y = 38;
 
     for(const job of trabajos){
-      if(y + imgBox + 22 > pageH - margin){
+      if(y + 40 > pageH - margin){
         doc.addPage();
         y = margin + 6;
       }
@@ -3717,37 +3788,9 @@
       doc.setTextColor(20);
       y += 10;
 
-      let x = margin;
-      for(const par of [['Referencia', job.fotoReferencia], ['Resultado', job.fotoResultado]]){
-        const label = par[0], url = par[1];
-        doc.setFontSize(8.5);
-        doc.setTextColor(130);
-        doc.text(label, x, y);
-        doc.setTextColor(20);
-        if(url){
-          try{
-            const cargada = await loadImageAsDataUrl(url);
-            const ratio = Math.min(imgBox / cargada.width, imgBox / cargada.height);
-            doc.addImage(cargada.dataUrl, 'JPEG', x, y + 3, cargada.width * ratio, cargada.height * ratio);
-          }catch(err){
-            doc.setDrawColor(220);
-            doc.rect(x, y + 3, imgBox, imgBox * 0.6);
-            doc.setFontSize(8);
-            doc.setTextColor(180);
-            doc.text('No se pudo cargar', x + 6, y + 3 + imgBox * 0.3);
-            doc.setTextColor(20);
-          }
-        } else {
-          doc.setDrawColor(220);
-          doc.rect(x, y + 3, imgBox, imgBox * 0.6);
-          doc.setFontSize(8);
-          doc.setTextColor(180);
-          doc.text('Sin foto', x + imgBox / 2 - 8, y + 3 + imgBox * 0.3);
-          doc.setTextColor(20);
-        }
-        x += imgBox + 8;
-      }
-      y += imgBox + 14;
+      y = await dibujarFilaFotosPdf(doc, job.fotosReferencia, 'Referencia', margin, pageW, pageH, y);
+      y = await dibujarFilaFotosPdf(doc, job.fotosResultado, 'Resultado', margin, pageW, pageH, y);
+
       doc.setDrawColor(230);
       doc.line(margin, y - 6, pageW - margin, y - 6);
     }
