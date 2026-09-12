@@ -799,6 +799,12 @@
     padding: 20px;
     z-index: 80;
   }
+  /* Varias de estas ventanas se pueden abrir una encima de otra (ej. una
+     confirmación de borrar sobre el selector de fotos); estos z-index
+     fijan en qué orden se apilan visualmente. */
+  #photoPickerOverlay{ z-index: 82; }
+  #photoEditOverlay{ z-index: 84; }
+  #modalOverlay{ z-index: 95; }
   .modal-card{
     background: var(--surface);
     border: 1px solid var(--line);
@@ -1814,6 +1820,49 @@
 (function(){
 
   /* ---------------------------------------------------------
+     Pila de "atrás": toda ventana que se abre ENCIMA de la pantalla
+     principal (modal de pedido, perfil de cliente, confirmaciones,
+     selector/editor/visor de fotos...) empuja una entrada al historial
+     al abrirse, con pushBackLayer(nombre, cómoCerrarla). Así el botón/
+     gesto de "atrás" del celular cierra solo esa ventana en vez de
+     saltar directo a cerrar la app entera (que es lo que pasaba antes
+     con las ventanas que no dejaban rastro en el historial: al no
+     quedar nada más "atrás" en el WebView, el sistema entendía que
+     había que salir de la app).
+     ---------------------------------------------------------*/
+  let backLayerStack = [];
+  let suppressNextPopstate = false;
+
+  function pushBackLayer(name, onClose){
+    backLayerStack.push({ name, onClose });
+    window.history.pushState({ calc3dLayer: name }, '');
+  }
+  // Reemplaza la capa de más arriba sin agregar una entrada nueva al
+  // historial — para pasos que están al mismo "nivel" que el anterior
+  // (ej. el editor de fotos reemplaza al selector que lo abrió: "atrás"
+  // desde el editor debe salir del flujo, no volver al selector).
+  function replaceTopBackLayer(name, onClose){
+    if(backLayerStack.length) backLayerStack[backLayerStack.length - 1] = { name, onClose };
+    else pushBackLayer(name, onClose);
+  }
+  // Cierra la capa de más arriba. Si se cerró desde una "X"/botón (no
+  // desde el gesto de atrás), también retrocede el historial, para no
+  // dejar una entrada fantasma que obligue a tocar "atrás" dos veces.
+  function closeTopBackLayer(fromPopstate){
+    const layer = backLayerStack.pop();
+    if(!layer) return;
+    layer.onClose();
+    if(!fromPopstate){
+      suppressNextPopstate = true;
+      window.history.back();
+    }
+  }
+  window.addEventListener('popstate', () => {
+    if(suppressNextPopstate){ suppressNextPopstate = false; return; }
+    closeTopBackLayer(true);
+  });
+
+  /* ---------------------------------------------------------
      Firebase: configuración, inicio de sesión con Google y
      guardado en la nube (Firestore).
      ---------------------------------------------------------
@@ -2121,16 +2170,39 @@
         modalInput.setAttribute('inputmode', inputMode || 'text');
       }
 
-      const cleanup = (result) => {
+      let settled = false;
+      const cleanup = () => {
         modalOverlay.classList.add('hidden');
         modalOkBtn.removeEventListener('click', onOk);
         modalCancelBtn.removeEventListener('click', onCancel);
         modalOverlay.removeEventListener('click', onOverlayClick);
         modalInput.removeEventListener('keydown', onKeydown);
+      };
+      // La llama closeTopBackLayer cuando se cierra con el botón/gesto de
+      // "atrás" del celular — eso siempre cuenta como cancelar.
+      const closeModalLayer = () => {
+        if(settled) return;
+        settled = true;
+        cleanup();
+        resolve(withInput ? null : false);
+      };
+      // Cierre desde un botón propio de la ventana (Aceptar/Cancelar/tocar
+      // afuera) — si esta sigue siendo la capa de arriba, la saca de la
+      // pila y retrocede el historial para no dejar una entrada fantasma.
+      const dismiss = (result) => {
+        if(settled) return;
+        settled = true;
+        cleanup();
+        const top = backLayerStack[backLayerStack.length - 1];
+        if(top && top.name === 'confirmModal'){
+          backLayerStack.pop();
+          suppressNextPopstate = true;
+          window.history.back();
+        }
         resolve(result);
       };
-      const onOk = () => cleanup(withInput ? modalInput.value : true);
-      const onCancel = () => cleanup(withInput ? null : false);
+      const onOk = () => dismiss(withInput ? modalInput.value : true);
+      const onCancel = () => dismiss(withInput ? null : false);
       const onOverlayClick = (e) => { if(e.target === modalOverlay) onCancel(); };
       const onKeydown = (e) => {
         if(e.key === 'Enter'){ e.preventDefault(); onOk(); }
@@ -2143,6 +2215,7 @@
       modalInput.addEventListener('keydown', onKeydown);
 
       modalOverlay.classList.remove('hidden');
+      pushBackLayer('confirmModal', closeModalLayer);
       if(withInput){ modalInput.focus(); modalInput.select(); }
       else modalOkBtn.focus();
     });
@@ -2161,13 +2234,19 @@
   function openPhotoViewer(url){
     photoViewImg.src = url;
     photoViewOverlay.classList.remove('hidden');
+    pushBackLayer('photoView', closePhotoViewer);
   }
   function closePhotoViewer(){
     photoViewOverlay.classList.add('hidden');
     photoViewImg.src = '';
   }
-  photoViewCloseBtn.addEventListener('click', closePhotoViewer);
-  photoViewOverlay.addEventListener('click', (e) => { if(e.target === photoViewOverlay) closePhotoViewer(); });
+  function dismissPhotoViewer(){
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'photoView') closeTopBackLayer(false);
+    else closePhotoViewer();
+  }
+  photoViewCloseBtn.addEventListener('click', dismissPhotoViewer);
+  photoViewOverlay.addEventListener('click', (e) => { if(e.target === photoViewOverlay) dismissPhotoViewer(); });
 
   // ---------- selector al agregar foto: subir nueva o reusar una ya subida ----------
   // Un mismo trabajo (ej. el mismo llavero) a veces se lo piden varios
@@ -2250,18 +2329,24 @@
       cell.querySelector('img').addEventListener('click', () => applyPhotoSelection(urls[idx]));
       cell.querySelector('.photo-picker-item-delete').addEventListener('click', async (e) => {
         e.stopPropagation();
-        photoPickerOverlay.classList.add('hidden'); // el modal de confirmar queda detrás si no ocultamos este
         const ok = await showConfirm('¿Borrar esta foto de todos los artículos que la usan? No se puede deshacer.', 'Borrar foto');
-        if(!ok){ photoPickerOverlay.classList.remove('hidden'); return; }
+        if(!ok) return;
         eliminarFotoReusadaDeTodosLados(urls[idx]);
-        openPhotoPicker(orderIndex, itemIndex, tipo);
+        openPhotoPicker(orderIndex, itemIndex, tipo); // refresca la grilla; sigue siendo la misma capa de "atrás"
       });
     });
     photoPickerOverlay.classList.remove('hidden');
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(!top || top.name !== 'photoPicker') pushBackLayer('photoPicker', closePhotoPicker);
   }
   function closePhotoPicker(){
     photoPickerOverlay.classList.add('hidden');
     photoPickerContext = null;
+  }
+  function dismissPhotoPicker(){
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'photoPicker') closeTopBackLayer(false);
+    else closePhotoPicker();
   }
   function applyPhotoSelection(url){
     if(!photoPickerContext) return;
@@ -2269,10 +2354,10 @@
     agregarFotoAItem(orders[orderIndex].items[itemIndex], tipo, url);
     saveJSON(ORDERS_KEY, orders);
     renderOrders();
-    closePhotoPicker();
+    dismissPhotoPicker();
   }
-  photoPickerCloseBtn.addEventListener('click', closePhotoPicker);
-  photoPickerOverlay.addEventListener('click', (e) => { if(e.target === photoPickerOverlay) closePhotoPicker(); });
+  photoPickerCloseBtn.addEventListener('click', dismissPhotoPicker);
+  photoPickerOverlay.addEventListener('click', (e) => { if(e.target === photoPickerOverlay) dismissPhotoPicker(); });
   photoPickerCameraBtn.addEventListener('click', () => photoPickerCameraInput.click());
   photoPickerUploadBtn.addEventListener('click', () => photoPickerFileInput.click());
 
@@ -2281,7 +2366,7 @@
     input.value = '';
     if(!file || !photoPickerContext) return;
     const { orderIndex, itemIndex, tipo } = photoPickerContext;
-    closePhotoPicker();
+    closePhotoPicker(); // oculta el selector; el editor reemplaza esta misma capa de "atrás" (ver openPhotoEditor)
     const editedBlob = await openPhotoEditor(file);
     if(!editedBlob) return; // usuario canceló el ajuste
     showToast('Subiendo foto…');
@@ -2309,6 +2394,7 @@
   const photoEditCancelBtn = document.getElementById('photoEditCancelBtn');
   const photoEditConfirmBtn = document.getElementById('photoEditConfirmBtn');
   let photoEditState = null; // { img, rotatedCanvas, rotation, crop:{x,y,w,h} (fracciones 0-1), dispW, dispH, resolve }
+  let photoEditResolveValue = null; // con qué se resuelve la promesa al cerrar (null = canceló)
 
   function openPhotoEditor(file){
     return new Promise((resolve) => {
@@ -2319,6 +2405,9 @@
           photoEditState = { img, rotation: 0, crop: { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }, resolve };
           renderPhotoEditPreview();
           photoEditOverlay.classList.remove('hidden');
+          // Reemplaza la capa del selector (misma profundidad): "atrás"
+          // desde el editor sale del flujo completo, igual que "Cancelar".
+          replaceTopBackLayer('photoEdit', closePhotoEditorLayer);
         };
         img.onerror = () => resolve(null);
         img.src = reader.result;
@@ -2326,6 +2415,20 @@
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     });
+  }
+  function closePhotoEditorLayer(){
+    const st = photoEditState;
+    photoEditState = null;
+    photoEditOverlay.classList.add('hidden');
+    const value = photoEditResolveValue;
+    photoEditResolveValue = null;
+    if(st) st.resolve(value);
+  }
+  function dismissPhotoEditor(resolveValue){
+    photoEditResolveValue = resolveValue;
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'photoEdit') closeTopBackLayer(false);
+    else closePhotoEditorLayer();
   }
   function getRotatedDims(img, rotation){
     return (rotation % 180 === 0)
@@ -2418,20 +2521,10 @@
     const out = document.createElement('canvas');
     out.width = sw; out.height = sh;
     out.getContext('2d').drawImage(rotated, sx, sy, sw, sh, 0, 0, sw, sh);
-    out.toBlob(blob => {
-      const resolve = st.resolve;
-      photoEditOverlay.classList.add('hidden');
-      photoEditState = null;
-      resolve(blob);
-    }, 'image/jpeg', 0.9);
+    out.toBlob(blob => dismissPhotoEditor(blob), 'image/jpeg', 0.9);
   });
-  photoEditCancelBtn.addEventListener('click', () => {
-    const resolve = photoEditState.resolve;
-    photoEditOverlay.classList.add('hidden');
-    photoEditState = null;
-    resolve(null);
-  });
-  photoEditCloseBtn.addEventListener('click', () => photoEditCancelBtn.click());
+  photoEditCancelBtn.addEventListener('click', () => dismissPhotoEditor(null));
+  photoEditCloseBtn.addEventListener('click', () => dismissPhotoEditor(null));
 
   function loadJSON(key, fallback){
     try{
@@ -3110,22 +3203,18 @@
 
   function openOrderModal(){
     orderModalOverlay.classList.remove('hidden');
-    window.history.pushState({ calc3dLayer: 'orderModal' }, '');
+    pushBackLayer('orderModal', exitEditMode);
   }
   function closeOrderModal(){ orderModalOverlay.classList.add('hidden'); }
-
-  // El botón/gesto de "atrás" del celular cierra lo que esté abierto
-  // (modal o perfil de cliente) en vez de salir de la app entera.
-  window.addEventListener('popstate', () => {
-    if(!orderModalOverlay.classList.contains('hidden')){
-      exitEditMode();
-      return;
-    }
-    if(openClientProfile !== null){
-      openClientProfile = null;
-      renderOrders();
-    }
-  });
+  // Para cerrar desde una "X"/botón/toque afuera: si el modal sigue
+  // siendo la capa de más arriba (lo normal), la quita de la pila y
+  // retrocede el historial; si no (por alguna razón ya se cerró), solo
+  // deja todo en su estado de reposo.
+  function dismissOrderModal(){
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'orderModal') closeTopBackLayer(false);
+    else exitEditMode();
+  }
 
   addOrderFab.addEventListener('click', () => {
     setActiveTab('pedidos');
@@ -3137,15 +3226,9 @@
     orderModalTitle.textContent = 'Agregar pedido';
     openOrderModal();
   });
-  closeOrderModalBtn.addEventListener('click', () => {
-    exitEditMode();
-    closeOrderModal();
-  });
+  closeOrderModalBtn.addEventListener('click', dismissOrderModal);
   orderModalOverlay.addEventListener('click', (e) => {
-    if(e.target === orderModalOverlay){
-      exitEditMode();
-      closeOrderModal();
-    }
+    if(e.target === orderModalOverlay) dismissOrderModal();
   });
   const orderClientSelect = document.getElementById('orderClientSelect');
   const newClientField = document.getElementById('newClientField');
@@ -3623,7 +3706,7 @@
       e.stopPropagation();
       if(!(await showConfirm('¿Eliminar este pedido?', 'Eliminar pedido'))) return;
       orders.splice(i, 1);
-      if(editingOrderIndex === i) exitEditMode();
+      if(editingOrderIndex === i) dismissOrderModal();
       const shifted = new Set();
       openOrderRows.forEach(idx => {
         if(idx < i) shifted.add(idx);
@@ -3643,13 +3726,19 @@
     setActiveTab('pedidos');
     renderOrders();
     clientProfileHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.history.pushState({ calc3dLayer: 'client' }, '');
+    pushBackLayer('client', closeClientProfile);
   }
-
-  backToOrdersBtn.addEventListener('click', () => {
+  function closeClientProfile(){
     openClientProfile = null;
     renderOrders();
-  });
+  }
+  function dismissClientProfile(){
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'client') closeTopBackLayer(false);
+    else closeClientProfile();
+  }
+
+  backToOrdersBtn.addEventListener('click', dismissClientProfile);
 
   function clientKeyOf(o){ return (o.cliente || '').trim() || 'Sin nombre'; }
 
@@ -3675,6 +3764,12 @@
 
     if(clientOrders.length === 0){
       openClientProfile = null;
+      const top = backLayerStack[backLayerStack.length - 1];
+      if(top && top.name === 'client'){
+        backLayerStack.pop();
+        suppressNextPopstate = true;
+        window.history.back();
+      }
       renderOrders();
       return;
     }
@@ -3796,7 +3891,7 @@
     if(editingOrderIndex !== null){
       Object.assign(orders[editingOrderIndex], data);
       saveJSON(ORDERS_KEY, orders);
-      exitEditMode();
+      dismissOrderModal();
       renderOrders();
       showToast('Pedido actualizado');
     } else {
@@ -3806,14 +3901,12 @@
       currentOrderItems = [];
       renderOrderItems();
       renderOrders();
-      closeOrderModal();
+      dismissOrderModal();
       showToast('Pedido agregado');
     }
   });
 
-  cancelEditOrderBtn.addEventListener('click', () => {
-    exitEditMode();
-  });
+  cancelEditOrderBtn.addEventListener('click', dismissOrderModal);
 
   // ---------- export / share ----------
   function buildSummaryText(){
