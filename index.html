@@ -275,6 +275,32 @@
     border-color: var(--orange);
     box-shadow: 0 0 0 3px var(--orange-dim);
   }
+  .cuenta-bancaria-row{
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .cuenta-bancaria-row:last-child{ margin-bottom: 0; }
+  .cuenta-bancaria-nombre{
+    width: 100%;
+    background: var(--surface-2);
+    border: 1.5px solid transparent;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 10px;
+    border-radius: 10px;
+    outline: none;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .cuenta-bancaria-nombre:focus{
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-dim);
+  }
 
   select{
     background: var(--surface-2);
@@ -1636,11 +1662,12 @@
     <div class="orders-summary" id="financeSummary"></div>
   </div>
   <div class="card">
-    <p class="card-title">Cuenta bancaria <span class="tag">PARA QUE TE PAGUEN</span></p>
-    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 8px;">Banco, tipo de cuenta, número, alias, titular... lo que necesites que tus clientes tengan a mano para pagarte. Se guarda solo en este dispositivo (y en tu cuenta, si iniciaste sesión).</p>
-    <textarea id="cuentaBancariaInput" class="cuenta-bancaria-input" rows="4" placeholder="Ej: Banco XYZ, cuenta de ahorros N.º 0000-0000, alias miNegocio, a nombre de..."></textarea>
+    <p class="card-title">Cuentas bancarias <span class="tag">PARA QUE TE PAGUEN</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 8px;">Agrega una por cada banco que uses. Cada una tiene su propio botón de guardar y de compartir por WhatsApp (con exactamente el texto que pongas, sin agregarle nada).</p>
+    <p id="cuentasBancariasEmpty" style="font-size:12.5px;color:var(--text-faint);">Aún no agregaste ninguna cuenta.</p>
+    <div id="cuentasBancariasList"></div>
     <div class="btn-row" style="margin-top:10px;">
-      <button type="button" class="btn primary" id="shareCuentaWhatsappBtn">📱 Compartir por WhatsApp</button>
+      <button type="button" class="btn" id="addCuentaBancariaBtn">+ Agregar cuenta</button>
     </div>
   </div>
   </div><!-- /tab-panel finanzas -->
@@ -1926,7 +1953,7 @@
   let currentUser = null;
   let firestoreDb = null;
   let cloudDataLoaded = false;
-  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders', calc3d_cuenta_bancaria: 'cuentaBancaria' };
+  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders', calc3d_cuentas_bancarias: 'cuentasBancarias' };
 
   if(firebaseReady){
     try{
@@ -3200,8 +3227,14 @@
   // ---------- pedidos ----------
   const ORDERS_KEY = 'calc3d_orders';
   let orders = loadJSON(ORDERS_KEY, []);
-  const CUENTA_KEY = 'calc3d_cuenta_bancaria';
-  let cuentaBancaria = loadJSON(CUENTA_KEY, '');
+  const CUENTAS_KEY = 'calc3d_cuentas_bancarias';
+  let cuentasBancarias = loadJSON(CUENTAS_KEY, []);
+  // Migra la versión anterior (una sola cuenta, en texto plano) si existe
+  // y todavía no se pasó a la lista nueva.
+  if(cuentasBancarias.length === 0){
+    const cuentaVieja = loadJSON('calc3d_cuenta_bancaria', '');
+    if(cuentaVieja) cuentasBancarias = [{ nombre: '', datos: cuentaVieja }];
+  }
   let editingOrderIndex = null;
   let openOrderRows = new Set(); // índices de pedidos expandidos, para que no se cierren al re-renderizar
   const orderClient = document.getElementById('orderClient');
@@ -3220,26 +3253,12 @@
   const editClientNameBtn = document.getElementById('editClientNameBtn');
   const ordersSummary = document.getElementById('ordersSummary');
   const financeSummary = document.getElementById('financeSummary');
-  const cuentaBancariaInput = document.getElementById('cuentaBancariaInput');
-  const shareCuentaWhatsappBtn = document.getElementById('shareCuentaWhatsappBtn');
+  const cuentasBancariasList = document.getElementById('cuentasBancariasList');
+  const cuentasBancariasEmpty = document.getElementById('cuentasBancariasEmpty');
+  const addCuentaBancariaBtn = document.getElementById('addCuentaBancariaBtn');
 
-  function renderCuentaBancaria(){
-    cuentaBancariaInput.value = cuentaBancaria;
-  }
-  renderCuentaBancaria();
-  // Se guarda solo, sin botón aparte — igual que el resto de los campos
-  // de esta app. Un pequeño debounce evita escribir a Firestore en cada
-  // tecla.
-  let cuentaBancariaGuardarTimeout = null;
-  cuentaBancariaInput.addEventListener('input', () => {
-    cuentaBancaria = cuentaBancariaInput.value;
-    clearTimeout(cuentaBancariaGuardarTimeout);
-    cuentaBancariaGuardarTimeout = setTimeout(() => saveJSON(CUENTA_KEY, cuentaBancaria), 500);
-  });
-  shareCuentaWhatsappBtn.addEventListener('click', () => {
-    const datos = cuentaBancaria.trim();
-    if(!datos){ showToast('Primero pon los datos de tu cuenta bancaria'); return; }
-    const encoded = encodeURIComponent(datos);
+  function compartirPorWhatsapp(texto){
+    const encoded = encodeURIComponent(texto);
     if(enAppNativa()){
       // Dentro de la app empaquetada, un link https normal se queda
       // cargando DENTRO del propio WebView; el esquema whatsapp:// en
@@ -3249,6 +3268,50 @@
     } else {
       window.open('https://wa.me/?text=' + encoded, '_blank');
     }
+  }
+
+  function renderCuentasBancarias(){
+    cuentasBancariasEmpty.classList.toggle('hidden', cuentasBancarias.length > 0);
+    cuentasBancariasList.innerHTML = cuentasBancarias.map(() =>
+      '<div class="cuenta-bancaria-row">' +
+        '<input type="text" class="cuenta-bancaria-nombre" data-f="nombre" placeholder="Nombre (ej: BCP, Interbank, Banco XYZ...)">' +
+        '<textarea class="cuenta-bancaria-input" rows="3" data-f="datos" placeholder="Cuenta, alias, titular... lo que necesites"></textarea>' +
+        '<div class="btn-row" style="margin-top:8px;">' +
+          '<button type="button" class="btn small primary" data-guardar>💾 Guardar</button>' +
+          '<button type="button" class="btn small" data-whatsapp>📱 WhatsApp</button>' +
+          '<button type="button" class="btn small danger" data-eliminar>✕ Eliminar</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+    Array.from(cuentasBancariasList.children).forEach((row, i) => {
+      const nombreInput = row.querySelector('[data-f="nombre"]');
+      const datosInput = row.querySelector('[data-f="datos"]');
+      nombreInput.value = cuentasBancarias[i].nombre || '';
+      datosInput.value = cuentasBancarias[i].datos || '';
+      row.querySelector('[data-guardar]').addEventListener('click', () => {
+        cuentasBancarias[i].nombre = nombreInput.value.trim();
+        cuentasBancarias[i].datos = datosInput.value;
+        saveJSON(CUENTAS_KEY, cuentasBancarias);
+        showToast('✓ Cuenta guardada');
+      });
+      row.querySelector('[data-whatsapp]').addEventListener('click', () => {
+        const datos = datosInput.value.trim();
+        if(!datos){ showToast('Pon los datos de esta cuenta antes de compartir'); return; }
+        compartirPorWhatsapp(datos);
+      });
+      row.querySelector('[data-eliminar]').addEventListener('click', async () => {
+        if(!(await showConfirm('¿Eliminar esta cuenta?', 'Eliminar cuenta'))) return;
+        cuentasBancarias.splice(i, 1);
+        saveJSON(CUENTAS_KEY, cuentasBancarias);
+        renderCuentasBancarias();
+      });
+    });
+  }
+  renderCuentasBancarias();
+  addCuentaBancariaBtn.addEventListener('click', () => {
+    cuentasBancarias.push({ nombre: '', datos: '' });
+    saveJSON(CUENTAS_KEY, cuentasBancarias);
+    renderCuentasBancarias();
   });
   const greetingText = document.getElementById('greetingText');
   const pendingToMakeList = document.getElementById('pendingToMakeList');
@@ -4338,10 +4401,10 @@
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
-        if(typeof data.cuentaBancaria === 'string'){ cuentaBancaria = data.cuentaBancaria; localStorage.setItem(CUENTA_KEY, JSON.stringify(cuentaBancaria)); renderCuentaBancaria(); }
+        if(Array.isArray(data.cuentasBancarias)){ cuentasBancarias = data.cuentasBancarias; localStorage.setItem(CUENTAS_KEY, JSON.stringify(cuentasBancarias)); renderCuentasBancarias(); }
       } else {
         // Primera vez con esta cuenta: sube lo que ya tenías guardado en este dispositivo.
-        await ref.set({ profiles, history, orders, cuentaBancaria }, { merge: true });
+        await ref.set({ profiles, history, orders, cuentasBancarias }, { merge: true });
       }
       cloudDataLoaded = true;
       if(notify) showToast('Sesión iniciada — datos sincronizados');
@@ -4368,7 +4431,7 @@
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
-        if(typeof data.cuentaBancaria === 'string'){ cuentaBancaria = data.cuentaBancaria; localStorage.setItem(CUENTA_KEY, JSON.stringify(cuentaBancaria)); renderCuentaBancaria(); }
+        if(Array.isArray(data.cuentasBancarias)){ cuentasBancarias = data.cuentasBancarias; localStorage.setItem(CUENTAS_KEY, JSON.stringify(cuentasBancarias)); renderCuentasBancarias(); }
       },
       err => { console.error('Error en la escucha de Firestore:', err); }
     );
