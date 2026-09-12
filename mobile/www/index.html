@@ -4195,18 +4195,40 @@
   const tabBarBtns = document.querySelectorAll('.tab-bar-btn');
   const tabPanels = document.querySelectorAll('.tab-panel');
 
-  function setActiveTab(tab){
-    let found = false;
-    tabPanels.forEach(p => {
-      const isActive = p.dataset.tab === tab;
-      p.classList.toggle('hidden', !isActive);
-      if(isActive) found = true;
-    });
-    if(!found) tab = 'inicio';
+  function applyActiveTab(tab){
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     if(tab === 'inicio') renderGreeting();
     window.scrollTo(0, 0);
+  }
+
+  // Las pestañas también cuentan para el botón/gesto de "atrás": alejarse
+  // de Inicio (a la que sea de las demás pestañas) empuja UNA sola capa
+  // "tab" — cambiar entre las demás pestañas sin pasar por Inicio no
+  // apila más, solo cambia cuál se ve. Así, estando en cualquier pestaña
+  // que no sea Inicio, "atrás" manda derecho a Inicio (sin importar por
+  // cuántas pestañas hayas pasado), y solo desde Inicio "atrás" cierra la
+  // app. Si había algo abierto encima (perfil de un cliente, un modal...)
+  // se cierra primero, para no dejarlo apilado debajo de la pestaña nueva.
+  function setActiveTab(tab){
+    let found = false;
+    tabPanels.forEach(p => { if(p.dataset.tab === tab) found = true; });
+    if(!found) tab = 'inicio';
+
+    const keepTabLayer = tab !== 'inicio';
+    let popped = 0;
+    while(backLayerStack.length && !(keepTabLayer && backLayerStack[backLayerStack.length - 1].name === 'tab')){
+      backLayerStack.pop().onClose();
+      popped++;
+    }
+    if(popped > 0){
+      suppressNextPopstate = true;
+      window.history.go(-popped);
+    }
+    if(keepTabLayer && (!backLayerStack.length || backLayerStack[backLayerStack.length - 1].name !== 'tab')){
+      pushBackLayer('tab', () => applyActiveTab('inicio'));
+    }
+    applyActiveTab(tab);
   }
 
   tabBarBtns.forEach(btn => {
