@@ -308,10 +308,9 @@
     border-radius: 14px;
     padding: 14px 56px 14px 14px;
     margin-bottom: 10px;
-    cursor: pointer;
-    transition: border-color .15s;
+    min-height: 96px;
+    box-sizing: border-box;
   }
-  .cuenta-bancaria-card:hover{ border-color: var(--orange); }
   .cuenta-bancaria-card:last-child{ margin-bottom: 0; }
   .cuenta-bancaria-card-title{
     margin: 0 0 4px;
@@ -334,13 +333,22 @@
     font-size: 11px; line-height: 1; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
-  .cuenta-bancaria-card-whatsapp{
+  .cuenta-bancaria-card-actions-right{
     position: absolute; right: 10px; bottom: 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .cuenta-bancaria-card-whatsapp,
+  .cuenta-bancaria-card-edit{
     width: 36px; height: 36px; border-radius: 50%;
-    border: none; background: #25D366; color: #fff;
-    font-size: 16px; cursor: pointer;
+    border: none; font-size: 15px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+  }
+  .cuenta-bancaria-card-whatsapp{
+    background: #25D366; color: #fff;
     box-shadow: 0 4px 10px -2px rgba(37,211,102,.55);
+  }
+  .cuenta-bancaria-card-edit{
+    background: var(--surface-2); color: var(--text-dim);
   }
 
   select{
@@ -3313,8 +3321,8 @@
 
   // Índice de la cuenta que se está editando ahora mismo (null = ninguna,
   // todas se ven como tarjeta). Es solo de la sesión actual, no se guarda:
-  // una cuenta ya guardada se ve como tarjeta de lectura; tocarla la
-  // vuelve a abrir para editarla.
+  // una cuenta ya guardada se ve como tarjeta de lectura; el botón "✎"
+  // la vuelve a abrir para editarla.
   let cuentaBancariaEditIndex = null;
 
   function renderCuentasBancarias(){
@@ -3336,7 +3344,10 @@
           '<button type="button" class="cuenta-bancaria-card-delete" data-eliminar title="Eliminar">✕</button>' +
           '<p class="cuenta-bancaria-card-title">' + escapeHTML(c.nombre || 'Sin nombre') + '</p>' +
           '<p class="cuenta-bancaria-card-datos">' + escapeHTML(c.datos || '') + '</p>' +
-          '<button type="button" class="cuenta-bancaria-card-whatsapp" data-whatsapp title="Compartir por WhatsApp">📱</button>' +
+          '<div class="cuenta-bancaria-card-actions-right">' +
+            '<button type="button" class="cuenta-bancaria-card-whatsapp" data-whatsapp title="Compartir por WhatsApp">📱</button>' +
+            '<button type="button" class="cuenta-bancaria-card-edit" data-editar title="Editar">✎</button>' +
+          '</div>' +
         '</div>'
       );
     }).join('');
@@ -3359,18 +3370,16 @@
           showToast('✓ Cuenta guardada');
         });
       } else {
-        el.addEventListener('click', () => {
+        el.querySelector('[data-editar]').addEventListener('click', () => {
           cuentaBancariaEditIndex = i;
           renderCuentasBancarias();
         });
-        el.querySelector('[data-whatsapp]').addEventListener('click', (e) => {
-          e.stopPropagation();
+        el.querySelector('[data-whatsapp]').addEventListener('click', () => {
           const datos = (cuentasBancarias[i].datos || '').trim();
           if(!datos){ showToast('Esta cuenta no tiene datos para compartir'); return; }
           compartirPorWhatsapp(datos);
         });
-        el.querySelector('[data-eliminar]').addEventListener('click', async (e) => {
-          e.stopPropagation();
+        el.querySelector('[data-eliminar]').addEventListener('click', async () => {
           if(!(await showConfirm('¿Eliminar esta cuenta?', 'Eliminar cuenta'))) return;
           cuentasBancarias.splice(i, 1);
           saveJSON(CUENTAS_KEY, cuentasBancarias);
