@@ -4358,6 +4358,23 @@
     return typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
   }
 
+  // El botón FÍSICO de "atrás" en Android no está conectado al historial
+  // del navegador por defecto dentro de una app empaquetada con
+  // Capacitor — sin este listener, cualquier toque en él cierra la app
+  // de inmediato sin pasar por nuestra pila de "atrás" (la que sí
+  // funciona con el gesto/botón de atrás del navegador en la web). Acá
+  // se conecta uno con el plugin nativo "App": si queda algo abierto en
+  // nuestra pila (una ventana, o habernos alejado de Inicio), se
+  // retrocede el historial y el popstate de siempre se encarga de
+  // cerrarlo; si no queda nada (estamos en Inicio sin nada más abierto),
+  // recién ahí se cierra la app de verdad.
+  if(enAppNativa() && Capacitor.Plugins && Capacitor.Plugins.App){
+    Capacitor.Plugins.App.addListener('backButton', () => {
+      if(backLayerStack.length > 0) window.history.back();
+      else Capacitor.Plugins.App.exitApp();
+    });
+  }
+
   // Guarda un archivo generado en el momento (PDF, PNG) y se lo ofrece a la
   // persona. En el navegador, el truco de siempre (un <a download> con la
   // URL de datos) funciona solo. Pero dentro de la app empaquetada, ese
