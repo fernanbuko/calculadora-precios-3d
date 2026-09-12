@@ -302,16 +302,22 @@
     box-shadow: 0 0 0 3px var(--orange-dim);
   }
 
+  .cuenta-bancaria-item{
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .cuenta-bancaria-item:last-child{ margin-bottom: 0; }
   .cuenta-bancaria-card{
     position: relative;
+    flex: 1;
+    min-width: 0;
     border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 14px 56px 14px 14px;
-    margin-bottom: 10px;
-    min-height: 96px;
+    padding: 14px 34px 14px 14px;
     box-sizing: border-box;
   }
-  .cuenta-bancaria-card:last-child{ margin-bottom: 0; }
   .cuenta-bancaria-card-title{
     margin: 0 0 4px;
     font-size: 14px;
@@ -333,15 +339,19 @@
     font-size: 11px; line-height: 1; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
-  .cuenta-bancaria-card-actions-right{
-    position: absolute; right: 10px; bottom: 10px;
-    display: flex; flex-direction: column; gap: 8px;
+  .cuenta-bancaria-actions-outside{
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
   }
   .cuenta-bancaria-card-whatsapp,
   .cuenta-bancaria-card-edit{
     width: 36px; height: 36px; border-radius: 50%;
     border: none; font-size: 15px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
   .cuenta-bancaria-card-whatsapp{
     background: #25D366; color: #fff;
@@ -3340,11 +3350,13 @@
         );
       }
       return (
-        '<div class="cuenta-bancaria-card" data-i="' + i + '">' +
-          '<button type="button" class="cuenta-bancaria-card-delete" data-eliminar title="Eliminar">✕</button>' +
-          '<p class="cuenta-bancaria-card-title">' + escapeHTML(c.nombre || 'Sin nombre') + '</p>' +
-          '<p class="cuenta-bancaria-card-datos">' + escapeHTML(c.datos || '') + '</p>' +
-          '<div class="cuenta-bancaria-card-actions-right">' +
+        '<div class="cuenta-bancaria-item" data-i="' + i + '">' +
+          '<div class="cuenta-bancaria-card">' +
+            '<button type="button" class="cuenta-bancaria-card-delete" data-eliminar title="Eliminar">✕</button>' +
+            '<p class="cuenta-bancaria-card-title">' + escapeHTML(c.nombre || 'Sin nombre') + '</p>' +
+            '<p class="cuenta-bancaria-card-datos">' + escapeHTML(c.datos || '') + '</p>' +
+          '</div>' +
+          '<div class="cuenta-bancaria-actions-outside">' +
             '<button type="button" class="cuenta-bancaria-card-whatsapp" data-whatsapp title="Compartir por WhatsApp">📱</button>' +
             '<button type="button" class="cuenta-bancaria-card-edit" data-editar title="Editar">✎</button>' +
           '</div>' +
