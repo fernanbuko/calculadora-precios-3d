@@ -302,6 +302,47 @@
     box-shadow: 0 0 0 3px var(--orange-dim);
   }
 
+  .cuenta-bancaria-card{
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 56px 14px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .cuenta-bancaria-card:hover{ border-color: var(--orange); }
+  .cuenta-bancaria-card:last-child{ margin-bottom: 0; }
+  .cuenta-bancaria-card-title{
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .cuenta-bancaria-card-datos{
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  .cuenta-bancaria-card-delete{
+    position: absolute; top: 10px; right: 10px;
+    width: 24px; height: 24px; border-radius: 50%;
+    border: none; background: var(--surface-2); color: var(--text-dim);
+    font-size: 11px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cuenta-bancaria-card-whatsapp{
+    position: absolute; right: 10px; bottom: 10px;
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: #25D366; color: #fff;
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px -2px rgba(37,211,102,.55);
+  }
+
   select{
     background: var(--surface-2);
     border: 1.5px solid transparent;
@@ -3270,47 +3311,84 @@
     }
   }
 
+  // Índice de la cuenta que se está editando ahora mismo (null = ninguna,
+  // todas se ven como tarjeta). Es solo de la sesión actual, no se guarda:
+  // una cuenta ya guardada se ve como tarjeta de lectura; tocarla la
+  // vuelve a abrir para editarla.
+  let cuentaBancariaEditIndex = null;
+
   function renderCuentasBancarias(){
     cuentasBancariasEmpty.classList.toggle('hidden', cuentasBancarias.length > 0);
-    cuentasBancariasList.innerHTML = cuentasBancarias.map(() =>
-      '<div class="cuenta-bancaria-row">' +
-        '<input type="text" class="cuenta-bancaria-nombre" data-f="nombre" placeholder="Nombre (ej: BCP, Interbank, Banco XYZ...)">' +
-        '<textarea class="cuenta-bancaria-input" rows="3" data-f="datos" placeholder="Cuenta, alias, titular... lo que necesites"></textarea>' +
-        '<div class="btn-row" style="margin-top:8px;">' +
-          '<button type="button" class="btn small primary" data-guardar>💾 Guardar</button>' +
-          '<button type="button" class="btn small" data-whatsapp>📱 WhatsApp</button>' +
-          '<button type="button" class="btn small danger" data-eliminar>✕ Eliminar</button>' +
-        '</div>' +
-      '</div>'
-    ).join('');
-    Array.from(cuentasBancariasList.children).forEach((row, i) => {
-      const nombreInput = row.querySelector('[data-f="nombre"]');
-      const datosInput = row.querySelector('[data-f="datos"]');
-      nombreInput.value = cuentasBancarias[i].nombre || '';
-      datosInput.value = cuentasBancarias[i].datos || '';
-      row.querySelector('[data-guardar]').addEventListener('click', () => {
-        cuentasBancarias[i].nombre = nombreInput.value.trim();
-        cuentasBancarias[i].datos = datosInput.value;
-        saveJSON(CUENTAS_KEY, cuentasBancarias);
-        showToast('✓ Cuenta guardada');
-      });
-      row.querySelector('[data-whatsapp]').addEventListener('click', () => {
-        const datos = datosInput.value.trim();
-        if(!datos){ showToast('Pon los datos de esta cuenta antes de compartir'); return; }
-        compartirPorWhatsapp(datos);
-      });
-      row.querySelector('[data-eliminar]').addEventListener('click', async () => {
-        if(!(await showConfirm('¿Eliminar esta cuenta?', 'Eliminar cuenta'))) return;
-        cuentasBancarias.splice(i, 1);
-        saveJSON(CUENTAS_KEY, cuentasBancarias);
-        renderCuentasBancarias();
-      });
+    cuentasBancariasList.innerHTML = cuentasBancarias.map((c, i) => {
+      if(i === cuentaBancariaEditIndex){
+        return (
+          '<div class="cuenta-bancaria-row" data-i="' + i + '">' +
+            '<input type="text" class="cuenta-bancaria-nombre" data-f="nombre" placeholder="Nombre (ej: BCP, Interbank, Banco XYZ...)">' +
+            '<textarea class="cuenta-bancaria-input" rows="3" data-f="datos" placeholder="Cuenta, alias, titular... lo que necesites"></textarea>' +
+            '<div class="btn-row" style="margin-top:8px;">' +
+              '<button type="button" class="btn small primary" data-guardar>💾 Guardar</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      return (
+        '<div class="cuenta-bancaria-card" data-i="' + i + '">' +
+          '<button type="button" class="cuenta-bancaria-card-delete" data-eliminar title="Eliminar">✕</button>' +
+          '<p class="cuenta-bancaria-card-title">' + escapeHTML(c.nombre || 'Sin nombre') + '</p>' +
+          '<p class="cuenta-bancaria-card-datos">' + escapeHTML(c.datos || '') + '</p>' +
+          '<button type="button" class="cuenta-bancaria-card-whatsapp" data-whatsapp title="Compartir por WhatsApp">📱</button>' +
+        '</div>'
+      );
+    }).join('');
+
+    Array.from(cuentasBancariasList.children).forEach((el) => {
+      const i = parseInt(el.dataset.i, 10);
+      if(el.classList.contains('cuenta-bancaria-row')){
+        const nombreInput = el.querySelector('[data-f="nombre"]');
+        const datosInput = el.querySelector('[data-f="datos"]');
+        nombreInput.value = cuentasBancarias[i].nombre || '';
+        datosInput.value = cuentasBancarias[i].datos || '';
+        el.querySelector('[data-guardar]').addEventListener('click', () => {
+          const nombre = nombreInput.value.trim();
+          const datos = datosInput.value.trim();
+          if(!nombre && !datos) cuentasBancarias.splice(i, 1); // se dejó vacía: se descarta
+          else{ cuentasBancarias[i].nombre = nombre; cuentasBancarias[i].datos = datos; }
+          saveJSON(CUENTAS_KEY, cuentasBancarias);
+          cuentaBancariaEditIndex = null;
+          renderCuentasBancarias();
+          showToast('✓ Cuenta guardada');
+        });
+      } else {
+        el.addEventListener('click', () => {
+          cuentaBancariaEditIndex = i;
+          renderCuentasBancarias();
+        });
+        el.querySelector('[data-whatsapp]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const datos = (cuentasBancarias[i].datos || '').trim();
+          if(!datos){ showToast('Esta cuenta no tiene datos para compartir'); return; }
+          compartirPorWhatsapp(datos);
+        });
+        el.querySelector('[data-eliminar]').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if(!(await showConfirm('¿Eliminar esta cuenta?', 'Eliminar cuenta'))) return;
+          cuentasBancarias.splice(i, 1);
+          saveJSON(CUENTAS_KEY, cuentasBancarias);
+          renderCuentasBancarias();
+        });
+      }
     });
   }
   renderCuentasBancarias();
   addCuentaBancariaBtn.addEventListener('click', () => {
+    // Si ya hay un borrador vacío abierto, no se apila otro: se sigue
+    // editando ese mismo.
+    if(cuentaBancariaEditIndex !== null){
+      const draft = cuentasBancarias[cuentaBancariaEditIndex];
+      if(draft && !draft.nombre && !draft.datos) return;
+    }
     cuentasBancarias.push({ nombre: '', datos: '' });
-    saveJSON(CUENTAS_KEY, cuentasBancarias);
+    cuentaBancariaEditIndex = cuentasBancarias.length - 1;
     renderCuentasBancarias();
   });
   const greetingText = document.getElementById('greetingText');
