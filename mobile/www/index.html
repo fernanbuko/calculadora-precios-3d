@@ -854,6 +854,11 @@
     touch-action: none;
   }
   #photoEditCanvas{ display: block; max-width: 100%; }
+  .photo-edit-canvas-wrap{
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+  }
   .photo-edit-crop{
     position: absolute;
     border: 2px solid #fff;
@@ -1907,9 +1912,11 @@
     </div>
     <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 10px;">Arrastra el recuadro para moverlo, o el punto de la esquina para cambiar su tamaño.</p>
     <div class="photo-edit-stage" id="photoEditStage">
-      <canvas id="photoEditCanvas"></canvas>
-      <div class="photo-edit-crop" id="photoEditCrop">
-        <div class="photo-edit-crop-handle" id="photoEditCropHandle"></div>
+      <div class="photo-edit-canvas-wrap" id="photoEditCanvasWrap">
+        <canvas id="photoEditCanvas"></canvas>
+        <div class="photo-edit-crop" id="photoEditCrop">
+          <div class="photo-edit-crop-handle" id="photoEditCropHandle"></div>
+        </div>
       </div>
     </div>
     <div class="btn-row" style="margin:12px 0;">
