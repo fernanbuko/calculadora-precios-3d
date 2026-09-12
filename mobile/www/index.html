@@ -2495,7 +2495,7 @@
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          photoEditState = { img, rotation: 0, crop: { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }, resolve };
+          photoEditState = { img, rotation: 0, crop: { x: 0, y: 0, w: 1, h: 1 }, resolve };
           renderPhotoEditPreview();
           photoEditOverlay.classList.remove('hidden');
           // Reemplaza la capa del selector (misma profundidad): "atrás"
@@ -2562,12 +2562,12 @@
   }
   photoEditRotateLeftBtn.addEventListener('click', () => {
     photoEditState.rotation = (photoEditState.rotation + 270) % 360;
-    photoEditState.crop = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+    photoEditState.crop = { x: 0, y: 0, w: 1, h: 1 };
     renderPhotoEditPreview();
   });
   photoEditRotateRightBtn.addEventListener('click', () => {
     photoEditState.rotation = (photoEditState.rotation + 90) % 360;
-    photoEditState.crop = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+    photoEditState.crop = { x: 0, y: 0, w: 1, h: 1 };
     renderPhotoEditPreview();
   });
   function clampCrop(v, min, max){ return Math.min(max, Math.max(min, v)); }
