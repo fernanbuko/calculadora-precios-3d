@@ -3239,8 +3239,7 @@
   shareCuentaWhatsappBtn.addEventListener('click', () => {
     const datos = cuentaBancaria.trim();
     if(!datos){ showToast('Primero pon los datos de tu cuenta bancaria'); return; }
-    const texto = 'Puedes pagarme a esta cuenta:\n' + datos;
-    const encoded = encodeURIComponent(texto);
+    const encoded = encodeURIComponent(datos);
     if(enAppNativa()){
       // Dentro de la app empaquetada, un link https normal se queda
       // cargando DENTRO del propio WebView; el esquema whatsapp:// en
