@@ -721,14 +721,52 @@
     max-height: 260px;
     overflow-y: auto;
   }
-  .photo-picker-grid img{
+  .photo-picker-item{ position: relative; }
+  .photo-picker-item img{
     width: 100%; aspect-ratio: 1;
     object-fit: cover;
     border-radius: 10px;
     border: 1px solid var(--line);
     cursor: pointer;
+    display: block;
   }
-  .photo-picker-grid img:hover{ border-color: var(--orange); }
+  .photo-picker-item img:hover{ border-color: var(--orange); }
+  .photo-picker-item-delete{
+    position: absolute; top: -6px; right: -6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid #fff; background: #e5533d; color: #fff;
+    font-size: 12px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .photo-edit-stage{
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--surface-2);
+    border-radius: 12px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #photoEditCanvas{ display: block; max-width: 100%; }
+  .photo-edit-crop{
+    position: absolute;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,.5);
+    cursor: move;
+    touch-action: none;
+  }
+  .photo-edit-crop-handle{
+    position: absolute;
+    right: -9px; bottom: -9px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--orange);
+    border: 2px solid #fff;
+    cursor: nwse-resize;
+    touch-action: none;
+  }
 
   .toast{
     position: fixed;
@@ -1742,6 +1780,30 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="photoEditOverlay">
+  <div class="modal-card">
+    <div class="modal-header-row">
+      <p class="card-title" style="margin:0;">Ajustar foto</p>
+      <button type="button" class="icon-btn small" id="photoEditCloseBtn" title="Cancelar">✕</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 10px;">Arrastra el recuadro para moverlo, o el punto de la esquina para cambiar su tamaño.</p>
+    <div class="photo-edit-stage" id="photoEditStage">
+      <canvas id="photoEditCanvas"></canvas>
+      <div class="photo-edit-crop" id="photoEditCrop">
+        <div class="photo-edit-crop-handle" id="photoEditCropHandle"></div>
+      </div>
+    </div>
+    <div class="btn-row" style="margin:12px 0;">
+      <button type="button" class="btn small" id="photoEditRotateLeftBtn">↺ Girar izquierda</button>
+      <button type="button" class="btn small" id="photoEditRotateRightBtn">↻ Girar derecha</button>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn" id="photoEditCancelBtn">Cancelar</button>
+      <button type="button" class="btn primary" id="photoEditConfirmBtn">✓ Usar foto</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -2155,14 +2217,45 @@
     delete it[legacyKey];
   }
 
+  // Borra una foto reusada de TODOS los artículos que la tengan (no solo
+  // del que se estaba editando) y la encola para borrarse de Cloudinary,
+  // ya que después de esto ningún artículo la sigue usando.
+  function eliminarFotoReusadaDeTodosLados(url){
+    orders.forEach(o => (o.items || []).forEach(it => {
+      ['referencia', 'resultado'].forEach(tipo => {
+        const arrKey = tipo === 'referencia' ? 'fotosReferencia' : 'fotosResultado';
+        const legacyKey = tipo === 'referencia' ? 'fotoReferencia' : 'fotoResultado';
+        const arr = getFotosArray(it, tipo);
+        if(arr.includes(url)) it[arrKey] = arr.filter(u => u !== url);
+        if(it[legacyKey] === url) delete it[legacyKey];
+      });
+    }));
+    saveJSON(ORDERS_KEY, orders);
+    marcarCloudinariaParaBorrar(url);
+    renderOrders();
+  }
+
   function openPhotoPicker(orderIndex, itemIndex, tipo){
     photoPickerContext = { orderIndex, itemIndex, tipo };
     const urls = collectExistingPhotoUrls();
     photoPickerRecentLabel.classList.toggle('hidden', urls.length === 0);
     photoPickerGrid.classList.toggle('hidden', urls.length === 0);
-    photoPickerGrid.innerHTML = urls.map(u => '<img src="' + escapeHTML(u) + '" alt="Foto ya subida">').join('');
-    Array.from(photoPickerGrid.children).forEach((img, idx) => {
-      img.addEventListener('click', () => applyPhotoSelection(urls[idx]));
+    photoPickerGrid.innerHTML = urls.map(u =>
+      '<div class="photo-picker-item">' +
+        '<img src="' + escapeHTML(u) + '" alt="Foto ya subida">' +
+        '<button type="button" class="photo-picker-item-delete" title="Borrar esta foto">✕</button>' +
+      '</div>'
+    ).join('');
+    Array.from(photoPickerGrid.children).forEach((cell, idx) => {
+      cell.querySelector('img').addEventListener('click', () => applyPhotoSelection(urls[idx]));
+      cell.querySelector('.photo-picker-item-delete').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        photoPickerOverlay.classList.add('hidden'); // el modal de confirmar queda detrás si no ocultamos este
+        const ok = await showConfirm('¿Borrar esta foto de todos los artículos que la usan? No se puede deshacer.', 'Borrar foto');
+        if(!ok){ photoPickerOverlay.classList.remove('hidden'); return; }
+        eliminarFotoReusadaDeTodosLados(urls[idx]);
+        openPhotoPicker(orderIndex, itemIndex, tipo);
+      });
     });
     photoPickerOverlay.classList.remove('hidden');
   }
@@ -2188,9 +2281,12 @@
     input.value = '';
     if(!file || !photoPickerContext) return;
     const { orderIndex, itemIndex, tipo } = photoPickerContext;
+    closePhotoPicker();
+    const editedBlob = await openPhotoEditor(file);
+    if(!editedBlob) return; // usuario canceló el ajuste
     showToast('Subiendo foto…');
     try{
-      const url = await uploadPhotoToCloudinary(file, orders[orderIndex].cliente, orders[orderIndex].items[itemIndex].nombre);
+      const url = await uploadPhotoToCloudinary(editedBlob, orders[orderIndex].cliente, orders[orderIndex].items[itemIndex].nombre);
       agregarFotoAItem(orders[orderIndex].items[itemIndex], tipo, url);
       saveJSON(ORDERS_KEY, orders);
       renderOrders();
@@ -2198,10 +2294,144 @@
     }catch(err){
       showToast('No se pudo subir la foto: ' + (err.message || 'intenta de nuevo'));
     }
-    closePhotoPicker();
   }
   photoPickerCameraInput.addEventListener('change', () => subirFotoDesdeInput(photoPickerCameraInput));
   photoPickerFileInput.addEventListener('change', () => subirFotoDesdeInput(photoPickerFileInput));
+
+  // ---------- editor de fotos: recortar y rotar antes de subir ----------
+  const photoEditOverlay = document.getElementById('photoEditOverlay');
+  const photoEditCanvas = document.getElementById('photoEditCanvas');
+  const photoEditCrop = document.getElementById('photoEditCrop');
+  const photoEditCropHandle = document.getElementById('photoEditCropHandle');
+  const photoEditCloseBtn = document.getElementById('photoEditCloseBtn');
+  const photoEditRotateLeftBtn = document.getElementById('photoEditRotateLeftBtn');
+  const photoEditRotateRightBtn = document.getElementById('photoEditRotateRightBtn');
+  const photoEditCancelBtn = document.getElementById('photoEditCancelBtn');
+  const photoEditConfirmBtn = document.getElementById('photoEditConfirmBtn');
+  let photoEditState = null; // { img, rotatedCanvas, rotation, crop:{x,y,w,h} (fracciones 0-1), dispW, dispH, resolve }
+
+  function openPhotoEditor(file){
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          photoEditState = { img, rotation: 0, crop: { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }, resolve };
+          renderPhotoEditPreview();
+          photoEditOverlay.classList.remove('hidden');
+        };
+        img.onerror = () => resolve(null);
+        img.src = reader.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }
+  function getRotatedDims(img, rotation){
+    return (rotation % 180 === 0)
+      ? { w: img.naturalWidth, h: img.naturalHeight }
+      : { w: img.naturalHeight, h: img.naturalWidth };
+  }
+  function buildRotatedCanvas(img, rotation){
+    const { w, h } = getRotatedDims(img, rotation);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(rotation * Math.PI / 180);
+    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    ctx.restore();
+    return canvas;
+  }
+  function renderPhotoEditPreview(){
+    const st = photoEditState;
+    if(!st) return;
+    const rotated = buildRotatedCanvas(st.img, st.rotation);
+    const maxW = 300, maxH = 380;
+    const scale = Math.min(maxW / rotated.width, maxH / rotated.height, 1);
+    const dispW = rotated.width * scale, dispH = rotated.height * scale;
+    photoEditCanvas.width = dispW; photoEditCanvas.height = dispH;
+    photoEditCanvas.getContext('2d').drawImage(rotated, 0, 0, dispW, dispH);
+    st.rotatedCanvas = rotated;
+    st.dispW = dispW; st.dispH = dispH;
+    updateCropBoxUI();
+  }
+  function updateCropBoxUI(){
+    const st = photoEditState;
+    photoEditCrop.style.left = (st.crop.x * st.dispW) + 'px';
+    photoEditCrop.style.top = (st.crop.y * st.dispH) + 'px';
+    photoEditCrop.style.width = (st.crop.w * st.dispW) + 'px';
+    photoEditCrop.style.height = (st.crop.h * st.dispH) + 'px';
+  }
+  photoEditRotateLeftBtn.addEventListener('click', () => {
+    photoEditState.rotation = (photoEditState.rotation + 270) % 360;
+    photoEditState.crop = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+    renderPhotoEditPreview();
+  });
+  photoEditRotateRightBtn.addEventListener('click', () => {
+    photoEditState.rotation = (photoEditState.rotation + 90) % 360;
+    photoEditState.crop = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+    renderPhotoEditPreview();
+  });
+  function clampCrop(v, min, max){ return Math.min(max, Math.max(min, v)); }
+  let photoEditDragMode = null, photoEditDragStart = null;
+  photoEditCrop.addEventListener('pointerdown', (e) => {
+    if(e.target === photoEditCropHandle) return;
+    e.stopPropagation();
+    photoEditDragMode = 'move';
+    photoEditDragStart = { x: e.clientX, y: e.clientY, crop: { ...photoEditState.crop } };
+    photoEditCrop.setPointerCapture(e.pointerId);
+  });
+  photoEditCropHandle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    photoEditDragMode = 'resize';
+    photoEditDragStart = { x: e.clientX, y: e.clientY, crop: { ...photoEditState.crop } };
+    photoEditCropHandle.setPointerCapture(e.pointerId);
+  });
+  function onPhotoEditPointerMove(e){
+    if(!photoEditDragMode || !photoEditState) return;
+    const st = photoEditState;
+    const dxFrac = (e.clientX - photoEditDragStart.x) / st.dispW;
+    const dyFrac = (e.clientY - photoEditDragStart.y) / st.dispH;
+    if(photoEditDragMode === 'move'){
+      st.crop.x = clampCrop(photoEditDragStart.crop.x + dxFrac, 0, 1 - st.crop.w);
+      st.crop.y = clampCrop(photoEditDragStart.crop.y + dyFrac, 0, 1 - st.crop.h);
+    } else if(photoEditDragMode === 'resize'){
+      st.crop.w = clampCrop(photoEditDragStart.crop.w + dxFrac, 0.1, 1 - st.crop.x);
+      st.crop.h = clampCrop(photoEditDragStart.crop.h + dyFrac, 0.1, 1 - st.crop.y);
+    }
+    updateCropBoxUI();
+  }
+  photoEditCrop.addEventListener('pointermove', onPhotoEditPointerMove);
+  photoEditCropHandle.addEventListener('pointermove', onPhotoEditPointerMove);
+  function endPhotoEditDrag(){ photoEditDragMode = null; photoEditDragStart = null; }
+  [photoEditCrop, photoEditCropHandle].forEach(el => {
+    el.addEventListener('pointerup', endPhotoEditDrag);
+    el.addEventListener('pointercancel', endPhotoEditDrag);
+  });
+  photoEditConfirmBtn.addEventListener('click', () => {
+    const st = photoEditState;
+    const rotated = st.rotatedCanvas;
+    const sx = st.crop.x * rotated.width, sy = st.crop.y * rotated.height;
+    const sw = st.crop.w * rotated.width, sh = st.crop.h * rotated.height;
+    const out = document.createElement('canvas');
+    out.width = sw; out.height = sh;
+    out.getContext('2d').drawImage(rotated, sx, sy, sw, sh, 0, 0, sw, sh);
+    out.toBlob(blob => {
+      const resolve = st.resolve;
+      photoEditOverlay.classList.add('hidden');
+      photoEditState = null;
+      resolve(blob);
+    }, 'image/jpeg', 0.9);
+  });
+  photoEditCancelBtn.addEventListener('click', () => {
+    const resolve = photoEditState.resolve;
+    photoEditOverlay.classList.add('hidden');
+    photoEditState = null;
+    resolve(null);
+  });
+  photoEditCloseBtn.addEventListener('click', () => photoEditCancelBtn.click());
 
   function loadJSON(key, fallback){
     try{
