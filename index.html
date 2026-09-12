@@ -257,6 +257,25 @@
     -webkit-appearance: none; margin: 0;
   }
 
+  .cuenta-bancaria-input{
+    width: 100%;
+    background: var(--surface-2);
+    border: 1.5px solid transparent;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13.5px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    outline: none;
+    resize: vertical;
+    transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+  }
+  .cuenta-bancaria-input:focus{
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-dim);
+  }
+
   select{
     background: var(--surface-2);
     border: 1.5px solid transparent;
@@ -1616,6 +1635,14 @@
     <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Cuánto has generado (artículos ya pagados, pagos parciales incluidos) y cuánto tienes todavía por cobrar, sumando todos tus pedidos.</p>
     <div class="orders-summary" id="financeSummary"></div>
   </div>
+  <div class="card">
+    <p class="card-title">Cuenta bancaria <span class="tag">PARA QUE TE PAGUEN</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 8px;">Banco, tipo de cuenta, número, alias, titular... lo que necesites que tus clientes tengan a mano para pagarte. Se guarda solo en este dispositivo (y en tu cuenta, si iniciaste sesión).</p>
+    <textarea id="cuentaBancariaInput" class="cuenta-bancaria-input" rows="4" placeholder="Ej: Banco XYZ, cuenta de ahorros N.º 0000-0000, alias miNegocio, a nombre de..."></textarea>
+    <div class="btn-row" style="margin-top:10px;">
+      <button type="button" class="btn primary" id="shareCuentaWhatsappBtn">📱 Compartir por WhatsApp</button>
+    </div>
+  </div>
   </div><!-- /tab-panel finanzas -->
 
   <button type="button" class="fab" id="addOrderFab" title="Agregar pedido">+</button>
@@ -1899,7 +1926,7 @@
   let currentUser = null;
   let firestoreDb = null;
   let cloudDataLoaded = false;
-  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders' };
+  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders', calc3d_cuenta_bancaria: 'cuentaBancaria' };
 
   if(firebaseReady){
     try{
@@ -3173,6 +3200,8 @@
   // ---------- pedidos ----------
   const ORDERS_KEY = 'calc3d_orders';
   let orders = loadJSON(ORDERS_KEY, []);
+  const CUENTA_KEY = 'calc3d_cuenta_bancaria';
+  let cuentaBancaria = loadJSON(CUENTA_KEY, '');
   let editingOrderIndex = null;
   let openOrderRows = new Set(); // índices de pedidos expandidos, para que no se cierren al re-renderizar
   const orderClient = document.getElementById('orderClient');
@@ -3191,6 +3220,37 @@
   const editClientNameBtn = document.getElementById('editClientNameBtn');
   const ordersSummary = document.getElementById('ordersSummary');
   const financeSummary = document.getElementById('financeSummary');
+  const cuentaBancariaInput = document.getElementById('cuentaBancariaInput');
+  const shareCuentaWhatsappBtn = document.getElementById('shareCuentaWhatsappBtn');
+
+  function renderCuentaBancaria(){
+    cuentaBancariaInput.value = cuentaBancaria;
+  }
+  renderCuentaBancaria();
+  // Se guarda solo, sin botón aparte — igual que el resto de los campos
+  // de esta app. Un pequeño debounce evita escribir a Firestore en cada
+  // tecla.
+  let cuentaBancariaGuardarTimeout = null;
+  cuentaBancariaInput.addEventListener('input', () => {
+    cuentaBancaria = cuentaBancariaInput.value;
+    clearTimeout(cuentaBancariaGuardarTimeout);
+    cuentaBancariaGuardarTimeout = setTimeout(() => saveJSON(CUENTA_KEY, cuentaBancaria), 500);
+  });
+  shareCuentaWhatsappBtn.addEventListener('click', () => {
+    const datos = cuentaBancaria.trim();
+    if(!datos){ showToast('Primero pon los datos de tu cuenta bancaria'); return; }
+    const texto = 'Puedes pagarme a esta cuenta:\n' + datos;
+    const encoded = encodeURIComponent(texto);
+    if(enAppNativa()){
+      // Dentro de la app empaquetada, un link https normal se queda
+      // cargando DENTRO del propio WebView; el esquema whatsapp:// en
+      // cambio lo delega el sistema a la app de WhatsApp (si está
+      // instalada) sin necesitar plugins ni configuración extra.
+      window.location.href = 'whatsapp://send?text=' + encoded;
+    } else {
+      window.open('https://wa.me/?text=' + encoded, '_blank');
+    }
+  });
   const greetingText = document.getElementById('greetingText');
   const pendingToMakeList = document.getElementById('pendingToMakeList');
   const pendingSwipeArea = document.getElementById('pendingSwipeArea');
@@ -4279,9 +4339,10 @@
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
+        if(typeof data.cuentaBancaria === 'string'){ cuentaBancaria = data.cuentaBancaria; localStorage.setItem(CUENTA_KEY, JSON.stringify(cuentaBancaria)); renderCuentaBancaria(); }
       } else {
         // Primera vez con esta cuenta: sube lo que ya tenías guardado en este dispositivo.
-        await ref.set({ profiles, history, orders }, { merge: true });
+        await ref.set({ profiles, history, orders, cuentaBancaria }, { merge: true });
       }
       cloudDataLoaded = true;
       if(notify) showToast('Sesión iniciada — datos sincronizados');
@@ -4308,6 +4369,7 @@
         if(Array.isArray(data.profiles)){ profiles = data.profiles; localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); renderProfiles(); }
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
+        if(typeof data.cuentaBancaria === 'string'){ cuentaBancaria = data.cuentaBancaria; localStorage.setItem(CUENTA_KEY, JSON.stringify(cuentaBancaria)); renderCuentaBancaria(); }
       },
       err => { console.error('Error en la escucha de Firestore:', err); }
     );
