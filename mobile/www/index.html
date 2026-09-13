@@ -4247,11 +4247,10 @@
       if(refs.length === 0 && resultados.length === 0) return;
       const key = refs.join(',') + '|' + resultados.join(',');
       if(!map.has(key)){
-        map.set(key, { nombre: it.nombre || '(sin nombre)', fotosReferencia: refs, fotosResultado: resultados, clientes: new Set(), veces: 0 });
+        map.set(key, { nombre: it.nombre || '(sin nombre)', fotosReferencia: refs, fotosResultado: resultados, veces: 0 });
       }
       const job = map.get(key);
       job.veces++;
-      if(o.cliente) job.clientes.add(o.cliente);
     }));
     return Array.from(map.values());
   }
@@ -4322,10 +4321,7 @@
       doc.text(job.nombre, margin, y);
       doc.setFontSize(9);
       doc.setTextColor(130);
-      const metaParts = [];
-      if(job.veces > 1) metaParts.push('Pedido ' + job.veces + ' veces');
-      if(job.clientes.size > 0) metaParts.push(Array.from(job.clientes).slice(0, 3).join(', ') + (job.clientes.size > 3 ? '…' : ''));
-      if(metaParts.length) doc.text(metaParts.join(' · '), margin, y + 5);
+      if(job.veces > 1) doc.text('Pedido ' + job.veces + ' veces', margin, y + 5);
       doc.setTextColor(20);
       y += 10;
 
