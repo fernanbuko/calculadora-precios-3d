@@ -642,6 +642,7 @@
   }
   .item-row input[type="text"]{ text-align: left; }
   .item-row input[type="number"]{ padding: 8px 6px; }
+  .part-row{ grid-template-columns: 1fr 52px 52px 52px 28px; }
   .item-row-header{
     font-family: 'Inter', sans-serif;
     font-size: 10.5px;
@@ -1781,6 +1782,7 @@
       <div class="btn-row" style="margin: 8px 0;">
         <button type="button" class="btn small" id="addOrderItemBtn">+ Agregar artículo</button>
         <button type="button" class="btn small" id="useCalculatedPriceBtn">↑ Agregar precio calculado</button>
+        <button type="button" class="btn small" id="openMultiPartBtn">🧩 Pieza con varias partes</button>
       </div>
       <div class="items-subtotal-row" id="itemsSubtotalRow">
         <span>Total a cobrar</span><span id="orderItemsSubtotal">$ 0.00</span>
@@ -1797,6 +1799,36 @@
       <div class="btn-row">
         <button type="button" class="btn primary" id="addOrderBtn">+ Agregar pedido</button>
         <button type="button" class="btn hidden" id="cancelEditOrderBtn">Cancelar edición</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="multiPartOverlay">
+    <div class="modal-card">
+      <div class="modal-header-row">
+        <p class="card-title" style="margin:0;">Pieza con varias partes</p>
+        <button type="button" class="icon-btn small" id="multiPartCloseBtn" title="Cerrar">✕</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 10px;">Para cuando un mismo archivo trae varias partes que el laminador corta por separado (ej. una máscara en piezas) — pon el peso y tiempo de cada una tal como los muestra, y se suman en un solo artículo con el precio ya calculado.</p>
+      <div class="item-row part-row item-row-header">
+        <span>Peso (g)</span><span>h</span><span>m</span><span>s</span><span></span>
+      </div>
+      <div id="multiPartList"></div>
+      <div class="btn-row" style="margin: 8px 0;">
+        <button type="button" class="btn small" id="addMultiPartBtn">+ Agregar parte</button>
+      </div>
+      <div class="items-subtotal-row" id="multiPartSubtotalRow">
+        <span>Precio de esta pieza</span><span id="multiPartSubtotal">$ 0.00</span>
+      </div>
+      <div class="field field-wide">
+        <div>
+          <label for="multiPartName">Nombre del artículo</label>
+        </div>
+        <div class="input-box"><input type="text" id="multiPartName" placeholder="Ej: Máscara"></div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="multiPartConfirmBtn">+ Agregar al pedido</button>
+        <button type="button" class="btn" id="multiPartCancelBtn">Cancelar</button>
       </div>
     </div>
   </div>
@@ -4098,6 +4130,100 @@
     currentOrderItems.push({ nombre: 'Pieza (calculadora)', cantidad: 1, precio: lastResult.finalPrice || 0 });
     renderOrderItems();
     showToast('Precio calculado agregado como artículo');
+  });
+
+  // ---------- pieza con varias partes (ej. un archivo que el laminador corta en varios pedazos) ----------
+  const openMultiPartBtn = document.getElementById('openMultiPartBtn');
+  const multiPartOverlay = document.getElementById('multiPartOverlay');
+  const multiPartCloseBtn = document.getElementById('multiPartCloseBtn');
+  const multiPartCancelBtn = document.getElementById('multiPartCancelBtn');
+  const multiPartConfirmBtn = document.getElementById('multiPartConfirmBtn');
+  const multiPartList = document.getElementById('multiPartList');
+  const multiPartSubtotal = document.getElementById('multiPartSubtotal');
+  const multiPartName = document.getElementById('multiPartName');
+  const addMultiPartBtn = document.getElementById('addMultiPartBtn');
+  let multiParts = []; // [{peso, h, m, s}]
+
+  // Suma peso y horas de todas las partes y reusa calculate() con esos
+  // totales (cantidad forzada a 1) para sacar el precio con la MISMA
+  // fórmula completa del calculador (material, luz, desgaste, mano de
+  // obra, fallos, margen...) — después deja todo como estaba, para no
+  // pisar lo que el usuario tenía puesto en la calculadora.
+  function calcularPrecioMultiParte(){
+    const pesoTotal = multiParts.reduce((sum, p) => sum + (parseFloat(p.peso) || 0), 0);
+    const horasTotal = multiParts.reduce((sum, p) =>
+      sum + (parseFloat(p.h) || 0) + (parseFloat(p.m) || 0) / 60 + (parseFloat(p.s) || 0) / 3600, 0);
+    const prev = { peso: el.pieceWeight.value, horas: el.hours.value, cantidad: el.quantity.value };
+    el.pieceWeight.value = pesoTotal;
+    el.hours.value = horasTotal;
+    el.quantity.value = 1;
+    calculate();
+    const price = lastResult.finalPrice || 0;
+    el.pieceWeight.value = prev.peso;
+    el.hours.value = prev.horas;
+    el.quantity.value = prev.cantidad;
+    calculate();
+    return price;
+  }
+
+  function renderMultiParts(){
+    multiPartList.innerHTML = multiParts.map((p, i) =>
+      '<div class="item-row part-row" data-i="' + i + '">' +
+        '<input type="number" min="0" step="1" placeholder="0" data-f="peso">' +
+        '<input type="number" min="0" step="1" placeholder="0" data-f="h">' +
+        '<input type="number" min="0" max="59" step="1" placeholder="0" data-f="m">' +
+        '<input type="number" min="0" max="59" step="1" placeholder="0" data-f="s">' +
+        '<button type="button" class="btn small danger" data-eliminar title="Quitar">✕</button>' +
+      '</div>'
+    ).join('');
+    Array.from(multiPartList.children).forEach((row, i) => {
+      ['peso', 'h', 'm', 's'].forEach(f => {
+        const input = row.querySelector('[data-f="' + f + '"]');
+        input.value = multiParts[i][f] || '';
+        input.addEventListener('input', () => {
+          multiParts[i][f] = input.value;
+          multiPartSubtotal.textContent = fmt(calcularPrecioMultiParte());
+        });
+      });
+      row.querySelector('[data-eliminar]').addEventListener('click', () => {
+        multiParts.splice(i, 1);
+        renderMultiParts();
+        multiPartSubtotal.textContent = fmt(calcularPrecioMultiParte());
+      });
+    });
+  }
+
+  function openMultiPartModal(){
+    multiParts = [{ peso: '', h: '', m: '', s: '' }, { peso: '', h: '', m: '', s: '' }];
+    multiPartName.value = '';
+    renderMultiParts();
+    multiPartSubtotal.textContent = fmt(0);
+    multiPartOverlay.classList.remove('hidden');
+    pushBackLayer('multiPart', closeMultiPartModal);
+  }
+  function closeMultiPartModal(){
+    multiPartOverlay.classList.add('hidden');
+  }
+  function dismissMultiPartModal(){
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'multiPart') closeTopBackLayer(false);
+    else closeMultiPartModal();
+  }
+  openMultiPartBtn.addEventListener('click', openMultiPartModal);
+  multiPartCloseBtn.addEventListener('click', dismissMultiPartModal);
+  multiPartCancelBtn.addEventListener('click', dismissMultiPartModal);
+  multiPartOverlay.addEventListener('click', (e) => { if(e.target === multiPartOverlay) dismissMultiPartModal(); });
+  addMultiPartBtn.addEventListener('click', () => {
+    multiParts.push({ peso: '', h: '', m: '', s: '' });
+    renderMultiParts();
+  });
+  multiPartConfirmBtn.addEventListener('click', () => {
+    const price = calcularPrecioMultiParte();
+    const nombre = multiPartName.value.trim() || 'Pieza (' + multiParts.length + ' partes)';
+    currentOrderItems.push({ nombre, cantidad: 1, precio: price });
+    renderOrderItems();
+    dismissMultiPartModal();
+    showToast('Artículo agregado con el precio de las ' + multiParts.length + ' partes');
   });
 
   addOrderBtn.addEventListener('click', () => {
