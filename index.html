@@ -1341,12 +1341,16 @@
       </div>
     </div>
 
-    <div class="field">
+    <div class="field field-wide">
       <div>
-        <label for="advHeight">Altura de la pieza (opcional)</label>
-        <small>En cm, parada como se imprime — si no conoces el peso, ponla aquí y calculamos el de abajo por ti</small>
+        <label for="advSizeWidth">Tamaño de la pieza (opcional)</label>
+        <small>Ancho × alto × profundo en mm, parada como se imprime — copia acá los mismos 3 números que te muestra tu slicer en "Tamaño" (ej. Creality Print); si no conoces el peso, lo calculamos abajo por ti a partir del lado más largo</small>
       </div>
-      <div class="input-box"><input type="number" id="advHeight" min="0" step="0.5" placeholder="Auto"></div>
+      <div class="hms-row">
+        <div class="input-box"><input type="number" id="advSizeWidth" min="0" step="1" placeholder="Auto"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="advSizeHeight" min="0" step="1" placeholder="Auto"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="advSizeDepth" min="0" step="1" placeholder="Auto"><span class="hms-unit">mm</span></div>
+      </div>
     </div>
 
     <div class="field">
@@ -2128,16 +2132,24 @@
   // se sigue guardando como decimal — estas tres casillas visibles de
   // horas/minutos/segundos son solo una forma más cómoda de escribirlo.
 
-  // Ayuda rápida en modo avanzado: si pones una altura, estimamos el peso
-  // con la misma lógica de modo simple (escala al cubo) — sigue siendo
-  // editable a mano después, esto solo llena un punto de partida.
-  const advHeight = document.getElementById('advHeight');
-  advHeight.addEventListener('input', () => {
-    const cm = Math.max(0, parseFloat(advHeight.value) || 0);
-    if(advHeight.value.trim() === '') return;
+  // Ayuda rápida en modo avanzado: si pones un tamaño (ancho/alto/profundo
+  // en mm, como los muestra el slicer en "Tamaño"), estimamos el peso con
+  // la misma lógica de modo simple (escala al cubo, usando el lado más
+  // largo) — sigue siendo editable a mano después, esto solo llena un
+  // punto de partida.
+  const advSizeWidth = document.getElementById('advSizeWidth');
+  const advSizeHeight = document.getElementById('advSizeHeight');
+  const advSizeDepth = document.getElementById('advSizeDepth');
+  function applyAdvSizeToWeight(){
+    const w = Math.max(0, parseFloat(advSizeWidth.value) || 0);
+    const h = Math.max(0, parseFloat(advSizeHeight.value) || 0);
+    const d = Math.max(0, parseFloat(advSizeDepth.value) || 0);
+    if(w === 0 && h === 0 && d === 0) return;
+    const cm = Math.max(w, h, d) / 10;
     el.pieceWeight.value = (SIMPLE_WEIGHT_PER_CM3 * Math.pow(cm, 3)).toFixed(1);
     calculate();
-  });
+  }
+  [advSizeWidth, advSizeHeight, advSizeDepth].forEach(input => input.addEventListener('input', applyAdvSizeToWeight));
 
   const flatToggle = document.getElementById('flatToggle');
   const flatFields = document.getElementById('flatFields');

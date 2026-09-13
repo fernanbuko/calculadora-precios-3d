@@ -18,7 +18,7 @@ En celular y tablet la navegación es una barra fija abajo (como una app móvil)
 
 - **Material**: costo por gramo según el precio y peso del rollo, multiplicado por el peso de la pieza y la cantidad. Incluye soportes descartables.
 - **Tipo de pieza**: igual que en modo simple, un selector "Pieza 3D / 🔑 Llavero" — al elegir Llavero aparecen unas casillas de ancho × alto × grosor (mm) solo de referencia; el peso que se usa en el cálculo sigue siendo el campo de peso de abajo.
-- **Altura de la pieza (opcional)**: si no conoces el peso exacto, pon una altura en cm ahí mismo y calculamos el peso por ti (misma lógica de modo simple, escala al cubo) — se llena el campo de peso de abajo, que sigues pudiendo editar a mano después si quieres ajustarlo.
+- **Tamaño de la pieza (opcional)**: si no conoces el peso exacto, pon ahí mismo ancho × alto × profundo en milímetros (los mismos 3 números que muestra tu slicer en "Tamaño", como Creality Print, sin convertir nada) y calculamos el peso por ti con el lado más largo (misma lógica de modo simple, escala al cubo) — se llena el campo de peso de abajo, que sigues pudiendo editar a mano después si quieres ajustarlo.
 - **Tiempo de impresión en horas/minutos/segundos**: como lo muestra tu slicer, en vez de una sola cifra decimal — el campo interno sigue siendo un decimal para guardarlo/compartirlo, pero se ve y se llena en h/m/s.
 - **Electricidad**: consumo de la impresora (W) durante las horas de impresión, al precio del kWh.
 - **Desgaste de máquina**: precio de la impresora ÷ vida útil estimada (horas), por las horas usadas.
