@@ -620,6 +620,8 @@
   .list-item .info .name{ font-size: 13.5px; color: var(--text); font-weight: 600; }
   .list-item .info .name[data-client-link]{ cursor: pointer; }
   .list-item .info .name[data-client-link]:hover{ text-decoration: underline; }
+  #historyList .list-item .info[data-load]{ cursor: pointer; }
+  #historyList .list-item .info[data-load]:active{ opacity: 0.6; }
   .list-item .info .meta{ font-family:'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--text-faint); margin-top: 3px; }
   .list-item .actions{ display:flex; gap: 6px; flex-shrink: 0; }
   .empty-note{ color: var(--text-faint); font-size: 12.5px; font-style: italic; }
@@ -3270,10 +3272,9 @@
       row.className = 'list-item';
       const date = new Date(h.savedAt);
       row.innerHTML =
-        '<div class="info"><div class="name">' + escapeHTML(h.name) + '</div>' +
+        '<div class="info" data-load="' + i + '"><div class="name">' + escapeHTML(h.name) + '</div>' +
         '<div class="meta">' + h.finalPriceLabel + (h.client ? ' · ' + escapeHTML(h.client) : '') + ' · ' + date.toLocaleDateString() + '</div></div>' +
         '<div class="actions">' +
-        '<button type="button" class="btn small" data-load="' + i + '">Cargar</button>' +
         '<button type="button" class="btn small" data-dup="' + i + '">Duplicar</button>' +
         '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
         '</div>';
