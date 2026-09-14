@@ -1746,7 +1746,10 @@
       <button type="button" class="btn small" id="backToOrdersBtn">← Volver a todos los pedidos</button>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;">
         <p class="card-title" style="margin:0;" id="clientProfileTitle"></p>
-        <button type="button" class="btn small" id="editClientNameBtn" title="Editar nombre del cliente">✎ Editar</button>
+        <div class="btn-row" style="margin:0;">
+          <button type="button" class="btn small" id="editClientNameBtn" title="Editar nombre del cliente">✎ Editar</button>
+          <button type="button" class="btn small danger" id="deleteClientBtn" title="Eliminar cliente y todos sus pedidos">🗑 Eliminar</button>
+        </div>
       </div>
     </div>
     <div class="list" id="ordersList"></div>
@@ -3478,6 +3481,7 @@
   const clientProfileTitle = document.getElementById('clientProfileTitle');
   const backToOrdersBtn = document.getElementById('backToOrdersBtn');
   const editClientNameBtn = document.getElementById('editClientNameBtn');
+  const deleteClientBtn = document.getElementById('deleteClientBtn');
   const ordersSummary = document.getElementById('ordersSummary');
   const financeSummary = document.getElementById('financeSummary');
   const cuentasBancariasList = document.getElementById('cuentasBancariasList');
@@ -4143,6 +4147,21 @@
     openClientProfile = newName;
     renderOrders();
     showToast('Cliente actualizado');
+  });
+
+  deleteClientBtn.addEventListener('click', async () => {
+    const current = openClientProfile;
+    if(current === null) return;
+    const count = orders.filter(o => clientKeyOf(o) === current).length;
+    const ok = await showConfirm(
+      '¿Eliminar a "' + current + '" y ' + (count === 1 ? 'su pedido' : 'sus ' + count + ' pedidos') + '? No se puede deshacer.',
+      'Eliminar cliente'
+    );
+    if(!ok) return;
+    orders = orders.filter(o => clientKeyOf(o) !== current);
+    saveJSON(ORDERS_KEY, orders);
+    dismissClientProfile();
+    showToast('Cliente eliminado');
   });
 
   function renderClientProfile(clientName){
