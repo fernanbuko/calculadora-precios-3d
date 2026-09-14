@@ -1152,9 +1152,9 @@
         <small>En milímetros, parada como se imprime — copia acá mismo los 3 números que te muestra tu slicer en "Tamaño" (ej. Creality Print), sin convertir nada</small>
       </div>
       <div class="hms-row">
-        <div class="input-box"><input type="number" id="simpleSizeWidth" value="100" min="1" step="1"><span class="hms-unit">mm</span></div>
-        <div class="input-box"><input type="number" id="simpleSizeHeight" value="100" min="1" step="1"><span class="hms-unit">mm</span></div>
-        <div class="input-box"><input type="number" id="simpleSizeDepth" value="100" min="1" step="1"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="simpleSizeWidth" min="1" step="1" placeholder="Ancho"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="simpleSizeHeight" min="1" step="1" placeholder="Alto"><span class="hms-unit">mm</span></div>
+        <div class="input-box"><input type="number" id="simpleSizeDepth" min="1" step="1" placeholder="Prof."><span class="hms-unit">mm</span></div>
       </div>
     </div>
 
@@ -1223,10 +1223,23 @@
 
     <div class="field">
       <div>
+        <label for="simpleMultiToggle">¿Es impresión multicolor?</label>
+        <small>Activa esto si la pieza usa más de un filamento</small>
+      </div>
+      <div class="input-box">
+        <label class="switch">
+          <input type="checkbox" id="simpleMultiToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field hidden" id="simpleColorsField">
+      <div>
         <label for="simpleColors">Colores de la pieza</label>
         <small>Cuántos filamentos distintos usa</small>
       </div>
-      <div class="input-box"><input type="number" id="simpleColors" value="4" min="1" max="12" step="1"></div>
+      <div class="input-box"><input type="number" id="simpleColors" min="2" max="12" step="1" placeholder="2"></div>
     </div>
 
     <div class="field">
@@ -2800,6 +2813,8 @@
     el.profit.disabled = false;
     profitField.style.opacity = '1';
     SIMPLE_DEFAULTS_LIST.forEach(([id, val]) => { document.getElementById(id).value = val; });
+    document.getElementById('simpleMultiToggle').checked = false;
+    document.getElementById('simpleColorsField').classList.add('hidden');
     document.getElementById('simpleSpeedCustomField').classList.add('hidden');
     flatToggle.value = '0';
     flatFields.classList.add('hidden');
@@ -2818,7 +2833,7 @@
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
-    ['simpleSizeWidth', '100'], ['simpleSizeHeight', '100'], ['simpleSizeDepth', '100'], ['simpleWeight', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', '4'],
+    ['simpleSizeWidth', ''], ['simpleSizeHeight', ''], ['simpleSizeDepth', ''], ['simpleWeight', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', ''],
     ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5'],
     ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', '']
   ];
@@ -2831,7 +2846,8 @@
   const simpleFlatFields = document.getElementById('simpleFlatFields');
   const simpleWeightLabel = document.getElementById('simpleWeightLabel');
   const simpleWeightHint = document.getElementById('simpleWeightHint');
-  const simpleFieldIds = ['simpleSizeWidth', 'simpleSizeHeight', 'simpleSizeDepth', 'simpleWeight', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
+  const simpleColorsField = document.getElementById('simpleColorsField');
+  const simpleFieldIds = ['simpleSizeWidth', 'simpleSizeHeight', 'simpleSizeDepth', 'simpleWeight', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleMultiToggle', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
                           'simpleFlatWidth', 'simpleFlatHeight', 'simpleFlatThickness'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
@@ -2847,15 +2863,25 @@
     applySimpleToAdvanced();
   });
 
-  simpleEl.simplePrinterSpeed.addEventListener('change', () => {
+  function syncPrinterSpeedUI(){
     simpleSpeedCustomField.classList.toggle('hidden', simpleEl.simplePrinterSpeed.value !== 'custom');
     const opt = simpleEl.simplePrinterSpeed.selectedOptions[0];
     sparkxNote.classList.toggle('hidden', !(opt && opt.value === '0.4'));
+  }
+  simpleEl.simplePrinterSpeed.addEventListener('change', () => {
+    syncPrinterSpeedUI();
+    // Al elegir a mano una impresora con colores conocidos (ej. SparkX
+    // i7 Combo, CFS Lite), sugerimos esos colores y prendemos el
+    // interruptor de multicolor — pero solo cuando la persona la elige,
+    // no al cargar la app la primera vez (por eso esto no está en
+    // syncPrinterSpeedUI, que sí corre al cargar).
+    const opt = simpleEl.simplePrinterSpeed.selectedOptions[0];
     if(opt && opt.dataset.colors){
       simpleEl.simpleColors.value = opt.dataset.colors;
+      simpleEl.simpleMultiToggle.checked = true;
     }
   });
-  simpleEl.simplePrinterSpeed.dispatchEvent(new Event('change'));
+  syncPrinterSpeedUI(); // solo sincroniza visibilidad al cargar, sin tocar colores
 
   function applySimpleToAdvanced(){
     const isFlat = simpleFlatToggle.value === '1';
@@ -2894,8 +2920,10 @@
     el.pieceWeight.value = manualWeight !== '' ? manualWeight : autoWeight.toFixed(1);
     el.hours.value = hasManualHours ? manualHoursDecimal.toFixed(4) : (SIMPLE_HOURS_PER_CM3 * cm3 * speedFactor).toFixed(2);
 
-    const colors = Math.max(1, parseInt(simpleEl.simpleColors.value, 10) || 1);
-    if(colors >= 2){
+    const multiOn = simpleEl.simpleMultiToggle.checked;
+    simpleColorsField.classList.toggle('hidden', !multiOn);
+    if(multiOn){
+      const colors = Math.max(2, parseInt(simpleEl.simpleColors.value, 10) || 2);
       el.multiToggle.checked = true;
       el.numColors.value = colors;
       el.colorChanges.value = Math.max(0, colors - 1);
