@@ -931,6 +931,12 @@
     max-height: 90vh;
     overflow-y: auto;
   }
+  .history-edit-modal-card{
+    max-width: 480px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  #historyEditOverlay{ z-index: 81; }
   .modal-header-row{
     display: flex;
     justify-content: space-between;
@@ -1095,6 +1101,7 @@
   </div><!-- /tab-panel inicio -->
 
   <div class="tab-panel hidden" data-tab="calc" id="tabPanelCalc">
+  <div id="calcTabInner">
 
   <!-- MODO SIMPLE -->
   <div class="card mode-banner">
@@ -1665,6 +1672,7 @@
     PRECIO = COSTO × (1 + % FALLOS) × (1 + % GANANCIA)
   </footer>
 
+  </div><!-- /calcTabInner -->
   </div><!-- /tab-panel calc -->
 
   <div class="tab-panel hidden" data-tab="perfiles" id="tabPanelPerfiles">
@@ -1848,6 +1856,19 @@
         <button type="button" class="btn primary" id="multiPartConfirmBtn">+ Agregar al pedido</button>
         <button type="button" class="btn" id="multiPartCancelBtn">Cancelar</button>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="historyEditOverlay">
+    <div class="modal-card history-edit-modal-card">
+      <div class="modal-header-row">
+        <p class="card-title" style="margin:0;" id="historyEditTitle">Cotización</p>
+        <button type="button" class="icon-btn small" id="historyEditCloseBtn" title="Cerrar">✕</button>
+      </div>
+      <div class="btn-row" style="margin-bottom:12px;">
+        <button type="button" class="btn primary" id="historyEditSaveBtn">💾 Guardar cambios</button>
+      </div>
+      <div id="historyEditBody"></div>
     </div>
   </div>
 
@@ -3279,10 +3300,7 @@
         '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
         '</div>';
       row.querySelector('[data-load]').addEventListener('click', () => {
-        applyState(history[i].state);
-        activePieceNameInput().value = history[i].name || '';
-        activeClientNameInput().value = history[i].client || '';
-        showToast('Cotización "' + history[i].name + '" cargada');
+        openHistoryEditModal(i);
       });
       row.querySelector('[data-dup]').addEventListener('click', () => {
         const copy = JSON.parse(JSON.stringify(history[i]));
@@ -3346,6 +3364,85 @@
       if(!name){ showToast('Ponle un nombre a la pieza'); return; }
     }
     saveQuote(name, client);
+  });
+
+  // ---------- ver/editar una cotización del historial ----------
+  // Al tocar una cotización guardada, se mueve la calculadora completa
+  // (campos + desglose) dentro de una ventana ahí mismo en Historial, ya
+  // cargada con esos valores, para verla y editarla sin perder el
+  // trabajo que tuvieras a medias en la pestaña Calculadora. Al cerrar
+  // (con o sin guardar) la calculadora vuelve a su lugar con lo que
+  // tenías antes de abrir la ventana.
+  const calcTabInner = document.getElementById('calcTabInner');
+  const tabPanelCalc = document.getElementById('tabPanelCalc');
+  const historyEditOverlay = document.getElementById('historyEditOverlay');
+  const historyEditBody = document.getElementById('historyEditBody');
+  const historyEditTitle = document.getElementById('historyEditTitle');
+  const historyEditCloseBtn = document.getElementById('historyEditCloseBtn');
+  const historyEditSaveBtn = document.getElementById('historyEditSaveBtn');
+  let editingHistoryIndex = null;
+  let preEditLiveState = null;
+  let preEditPieceName = '';
+  let preEditClientName = '';
+  let preEditSimpleMode = true;
+
+  function openHistoryEditModal(i){
+    editingHistoryIndex = i;
+    preEditLiveState = captureState();
+    preEditPieceName = activePieceNameInput().value;
+    preEditClientName = activeClientNameInput().value;
+    preEditSimpleMode = simpleModeToggle.checked;
+    historyEditBody.appendChild(calcTabInner);
+    // Se muestra siempre en modo avanzado: la cotización guardada solo
+    // trae los valores "de fondo" (peso, horas, precios...), y esos son
+    // justo los campos que modo avanzado deja ver y editar todos a la vez.
+    simpleModeToggle.checked = false;
+    syncSimpleMode(false);
+    applyState(history[i].state);
+    activePieceNameInput().value = history[i].name || '';
+    activeClientNameInput().value = history[i].client || '';
+    historyEditTitle.textContent = history[i].name || 'Cotización';
+    historyEditOverlay.classList.remove('hidden');
+    pushBackLayer('historyEdit', closeHistoryEditModal);
+  }
+  function closeHistoryEditModal(){
+    historyEditOverlay.classList.add('hidden');
+    tabPanelCalc.appendChild(calcTabInner);
+    if(preEditLiveState){
+      applyState(preEditLiveState);
+      simpleModeToggle.checked = preEditSimpleMode;
+      syncSimpleMode(false);
+      activePieceNameInput().value = preEditPieceName || '';
+      activeClientNameInput().value = preEditClientName || '';
+    }
+    preEditLiveState = null;
+    editingHistoryIndex = null;
+  }
+  function dismissHistoryEditModal(){
+    const top = backLayerStack[backLayerStack.length - 1];
+    if(top && top.name === 'historyEdit') closeTopBackLayer(false);
+    else closeHistoryEditModal();
+  }
+  historyEditCloseBtn.addEventListener('click', dismissHistoryEditModal);
+  historyEditOverlay.addEventListener('click', (e) => { if(e.target === historyEditOverlay) dismissHistoryEditModal(); });
+  historyEditSaveBtn.addEventListener('click', () => {
+    if(editingHistoryIndex === null) return;
+    const i = editingHistoryIndex;
+    calculate();
+    const name = activePieceNameInput().value.trim() || history[i].name;
+    const client = activeClientNameInput().value.trim();
+    history[i] = {
+      ...history[i],
+      name,
+      client,
+      savedAt: Date.now(),
+      finalPriceLabel: fmt(lastResult.finalPrice),
+      state: captureState()
+    };
+    saveJSON(HISTORY_KEY, history);
+    renderHistory();
+    showToast('Cambios guardados en "' + name + '"');
+    dismissHistoryEditModal();
   });
 
   function escapeHTML(str){
