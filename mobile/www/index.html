@@ -1108,6 +1108,9 @@
         </label>
       </div>
     </div>
+    <div class="btn-row" style="margin-top:10px;">
+      <button type="button" class="btn small" id="openMultiPartCalcBtn">🧩 Pieza con varias partes</button>
+    </div>
   </div>
 
   <div class="card hidden" id="simpleCard">
@@ -1820,7 +1823,7 @@
       <div class="items-subtotal-row" id="multiPartSubtotalRow">
         <span>Precio de esta pieza</span><span id="multiPartSubtotal">$ 0.00</span>
       </div>
-      <div class="field field-wide">
+      <div class="field field-wide" id="multiPartNameField">
         <div>
           <label for="multiPartName">Nombre del artículo</label>
         </div>
@@ -4134,6 +4137,7 @@
 
   // ---------- pieza con varias partes (ej. un archivo que el laminador corta en varios pedazos) ----------
   const openMultiPartBtn = document.getElementById('openMultiPartBtn');
+  const openMultiPartCalcBtn = document.getElementById('openMultiPartCalcBtn');
   const multiPartOverlay = document.getElementById('multiPartOverlay');
   const multiPartCloseBtn = document.getElementById('multiPartCloseBtn');
   const multiPartCancelBtn = document.getElementById('multiPartCancelBtn');
@@ -4141,8 +4145,17 @@
   const multiPartList = document.getElementById('multiPartList');
   const multiPartSubtotal = document.getElementById('multiPartSubtotal');
   const multiPartName = document.getElementById('multiPartName');
+  const multiPartNameField = document.getElementById('multiPartNameField');
   const addMultiPartBtn = document.getElementById('addMultiPartBtn');
   let multiParts = []; // [{peso, h, m, s}]
+  let multiPartContext = 'pedido'; // 'pedido' | 'calculadora' — desde dónde se abrió
+
+  function sumarPartes(){
+    const pesoTotal = multiParts.reduce((sum, p) => sum + (parseFloat(p.peso) || 0), 0);
+    const horasTotal = multiParts.reduce((sum, p) =>
+      sum + (parseFloat(p.h) || 0) + (parseFloat(p.m) || 0) / 60 + (parseFloat(p.s) || 0) / 3600, 0);
+    return { pesoTotal, horasTotal };
+  }
 
   // Suma peso y horas de todas las partes y reusa calculate() con esos
   // totales (cantidad forzada a 1) para sacar el precio con la MISMA
@@ -4150,9 +4163,7 @@
   // obra, fallos, margen...) — después deja todo como estaba, para no
   // pisar lo que el usuario tenía puesto en la calculadora.
   function calcularPrecioMultiParte(){
-    const pesoTotal = multiParts.reduce((sum, p) => sum + (parseFloat(p.peso) || 0), 0);
-    const horasTotal = multiParts.reduce((sum, p) =>
-      sum + (parseFloat(p.h) || 0) + (parseFloat(p.m) || 0) / 60 + (parseFloat(p.s) || 0) / 3600, 0);
+    const { pesoTotal, horasTotal } = sumarPartes();
     const prev = { peso: el.pieceWeight.value, horas: el.hours.value, cantidad: el.quantity.value };
     el.pieceWeight.value = pesoTotal;
     el.hours.value = horasTotal;
@@ -4193,9 +4204,12 @@
     });
   }
 
-  function openMultiPartModal(){
+  function openMultiPartModal(context){
+    multiPartContext = context || 'pedido';
     multiParts = [{ peso: '', h: '', m: '', s: '' }, { peso: '', h: '', m: '', s: '' }];
     multiPartName.value = '';
+    multiPartNameField.classList.toggle('hidden', multiPartContext === 'calculadora');
+    multiPartConfirmBtn.textContent = multiPartContext === 'calculadora' ? '✓ Usar en la calculadora' : '+ Agregar al pedido';
     renderMultiParts();
     multiPartSubtotal.textContent = fmt(0);
     multiPartOverlay.classList.remove('hidden');
@@ -4209,7 +4223,8 @@
     if(top && top.name === 'multiPart') closeTopBackLayer(false);
     else closeMultiPartModal();
   }
-  openMultiPartBtn.addEventListener('click', openMultiPartModal);
+  openMultiPartBtn.addEventListener('click', () => openMultiPartModal('pedido'));
+  openMultiPartCalcBtn.addEventListener('click', () => openMultiPartModal('calculadora'));
   multiPartCloseBtn.addEventListener('click', dismissMultiPartModal);
   multiPartCancelBtn.addEventListener('click', dismissMultiPartModal);
   multiPartOverlay.addEventListener('click', (e) => { if(e.target === multiPartOverlay) dismissMultiPartModal(); });
@@ -4217,7 +4232,36 @@
     multiParts.push({ peso: '', h: '', m: '', s: '' });
     renderMultiParts();
   });
+  // Llena el peso/tiempo sumado como si el usuario lo hubiera puesto a
+  // mano — en modo simple, en los campos opcionales (para que no se
+  // pisen con el cálculo automático por tamaño); en modo avanzado,
+  // directo en los campos de peso y horas/minutos/segundos.
+  function aplicarPartesACalculadora(){
+    const { pesoTotal, horasTotal } = sumarPartes();
+    const h = Math.floor(horasTotal);
+    const remainMin = (horasTotal - h) * 60;
+    const m = Math.floor(remainMin);
+    const s = Math.round((remainMin - m) * 60);
+    if(simpleModeToggle.checked){
+      simpleEl.simpleWeight.value = pesoTotal.toFixed(1);
+      simpleEl.simpleHoursH.value = h;
+      simpleEl.simpleHoursM.value = m;
+      simpleEl.simpleHoursS.value = s;
+      applySimpleToAdvanced();
+    } else {
+      el.pieceWeight.value = pesoTotal.toFixed(1);
+      hoursH.value = h; hoursM.value = m; hoursS.value = s;
+      syncHoursToDecimal();
+    }
+    calculate();
+  }
   multiPartConfirmBtn.addEventListener('click', () => {
+    if(multiPartContext === 'calculadora'){
+      aplicarPartesACalculadora();
+      dismissMultiPartModal();
+      showToast('Peso y tiempo de las ' + multiParts.length + ' partes aplicados');
+      return;
+    }
     const price = calcularPrecioMultiParte();
     const nombre = multiPartName.value.trim() || 'Pieza (' + multiParts.length + ' partes)';
     currentOrderItems.push({ nombre, cantidad: 1, precio: price });
