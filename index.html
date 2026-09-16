@@ -101,6 +101,25 @@
   }
   .tab-bar-btn .tab-icon{ font-size: 20px; line-height: 1; }
   .tab-bar-btn .tab-label{ font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
+  .top-ajustes-btn{
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 14px);
+    right: 16px;
+    z-index: 41;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text-faint);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 16px -8px rgba(0,0,0,.3);
+  }
+  .top-ajustes-btn.active{ color: var(--orange); background: var(--orange-dim); }
   .tab-bar-btn.active{ color: var(--orange); background: var(--orange-dim); }
 
   header{ margin-bottom: 24px; display:flex; justify-content: space-between; align-items:flex-start; gap: 12px; }
@@ -622,6 +641,9 @@
   .list-item .info .name[data-client-link]:hover{ text-decoration: underline; }
   #historyList .list-item .info[data-load]{ cursor: pointer; }
   #historyList .list-item .info[data-load]:active{ opacity: 0.6; }
+  #notesList .list-item .info[data-edit]{ cursor: pointer; }
+  #notesList .list-item .info[data-edit]:active{ opacity: 0.6; }
+  #notesList .name.note-done{ text-decoration: line-through; color: var(--text-faint); }
   .list-item .info .meta{ font-family:'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--text-faint); margin-top: 3px; }
   .list-item .actions{ display:flex; gap: 6px; flex-shrink: 0; }
   .empty-note{ color: var(--text-faint); font-size: 12.5px; font-style: italic; }
@@ -1875,6 +1897,24 @@
     </div>
   </div>
 
+  <div class="tab-panel hidden" data-tab="notas" id="tabPanelNotas">
+  <!-- NOTAS -->
+  <div class="card">
+    <p class="card-title">Notas <span class="tag">PENDIENTES Y APUNTES</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Anota cualquier cosa que tengas que hacer o recordar — sin que tenga que estar ligada a un pedido o cliente.</p>
+    <div class="field field-wide">
+      <div class="input-box"><textarea class="cuenta-bancaria-input" id="newNoteText" rows="2" placeholder="Ej: Comprar filamento rojo, darle mantenimiento a la impresora..."></textarea></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="addNoteBtn">+ Agregar nota</button>
+    </div>
+  </div>
+  <div class="card">
+    <p class="card-title">Tus notas</p>
+    <div class="list" id="notesList"></div>
+  </div>
+  </div><!-- /tab-panel notas -->
+
   <div class="tab-panel hidden" data-tab="ajustes" id="tabPanelAjustes">
   <!-- AJUSTES -->
   <div class="card account-banner">
@@ -1945,10 +1985,12 @@
   <button type="button" class="tab-bar-btn" data-tab="finanzas">
     <span class="tab-icon">💰</span><span class="tab-label">Finanzas</span>
   </button>
-  <button type="button" class="tab-bar-btn" data-tab="ajustes">
-    <span class="tab-icon">⚙️</span><span class="tab-label">Ajustes</span>
+  <button type="button" class="tab-bar-btn" data-tab="notas">
+    <span class="tab-icon">📝</span><span class="tab-label">Notas</span>
   </button>
 </nav>
+
+<button type="button" class="top-ajustes-btn" id="topAjustesBtn" title="Ajustes">⚙️</button>
 
 <div class="toast" id="toast"></div>
 
@@ -2101,7 +2143,7 @@
   let currentUser = null;
   let firestoreDb = null;
   let cloudDataLoaded = false;
-  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders', calc3d_cuentas_bancarias: 'cuentasBancarias' };
+  const CLOUD_SYNC_KEYS = { calc3d_profiles: 'profiles', calc3d_history: 'history', calc3d_orders: 'orders', calc3d_cuentas_bancarias: 'cuentasBancarias', calc3d_notas: 'notas' };
 
   if(firebaseReady){
     try{
@@ -3454,6 +3496,72 @@
     return div.innerHTML;
   }
 
+  // ---------- notas ----------
+  // Notas sueltas, sin relación con ningún pedido o cliente — para
+  // apuntar cualquier cosa que haya que hacer (comprar filamento, dar
+  // mantenimiento a la impresora, responder un mensaje...).
+  const NOTES_KEY = 'calc3d_notas';
+  let notas = loadJSON(NOTES_KEY, []); // [{text, done, createdAt}]
+  const notesList = document.getElementById('notesList');
+  const newNoteText = document.getElementById('newNoteText');
+  const addNoteBtn = document.getElementById('addNoteBtn');
+
+  function renderNotes(){
+    notesList.innerHTML = '';
+    if(notas.length === 0){
+      notesList.innerHTML = '<p class="empty-note">Aún no tienes notas.</p>';
+      return;
+    }
+    notas.slice().reverse().forEach((n) => {
+      const i = notas.indexOf(n);
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      const date = new Date(n.createdAt);
+      row.innerHTML =
+        '<div class="info" data-edit="' + i + '"><div class="name' + (n.done ? ' note-done' : '') + '">' + escapeHTML(n.text) + '</div>' +
+        '<div class="meta">' + date.toLocaleDateString() + '</div></div>' +
+        '<div class="actions">' +
+        '<button type="button" class="badge ' + (n.done ? 'on' : 'warn-off') + '" data-toggle="' + i + '">' + (n.done ? '✓ Hecho' : '○ Pendiente') + '</button>' +
+        '<button type="button" class="btn small danger" data-del="' + i + '">✕</button>' +
+        '</div>';
+      row.querySelector('[data-edit]').addEventListener('click', async () => {
+        const input = await showPrompt('Editar nota', notas[i].text, 'Guardar nota');
+        if(input === null) return;
+        const text = input.trim();
+        if(!text) return;
+        notas[i].text = text;
+        saveJSON(NOTES_KEY, notas);
+        renderNotes();
+      });
+      row.querySelector('[data-toggle]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        notas[i].done = !notas[i].done;
+        saveJSON(NOTES_KEY, notas);
+        renderNotes();
+      });
+      row.querySelector('[data-del]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        notas.splice(i, 1);
+        saveJSON(NOTES_KEY, notas);
+        renderNotes();
+      });
+      notesList.appendChild(row);
+    });
+  }
+
+  function addNote(){
+    const text = newNoteText.value.trim();
+    if(!text) return;
+    notas.push({ text, done: false, createdAt: Date.now() });
+    saveJSON(NOTES_KEY, notas);
+    newNoteText.value = '';
+    renderNotes();
+  }
+  addNoteBtn.addEventListener('click', addNote);
+  newNoteText.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); addNote(); }
+  });
+
   // ---------- pedidos ----------
   const ORDERS_KEY = 'calc3d_orders';
   let orders = loadJSON(ORDERS_KEY, []);
@@ -4737,6 +4845,7 @@
   function applyActiveTab(tab){
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    topAjustesBtn.classList.toggle('active', tab === 'ajustes');
     if(tab === 'inicio') renderGreeting();
     window.scrollTo(0, 0);
   }
@@ -4773,6 +4882,8 @@
   tabBarBtns.forEach(btn => {
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
   });
+  const topAjustesBtn = document.getElementById('topAjustesBtn');
+  topAjustesBtn.addEventListener('click', () => setActiveTab('ajustes'));
 
   // ---------- cuenta de Google / Firestore ----------
   const accountLabel = document.getElementById('accountLabel');
@@ -4819,9 +4930,10 @@
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
         if(Array.isArray(data.cuentasBancarias)){ cuentasBancarias = data.cuentasBancarias; localStorage.setItem(CUENTAS_KEY, JSON.stringify(cuentasBancarias)); renderCuentasBancarias(); }
+        if(Array.isArray(data.notas)){ notas = data.notas; localStorage.setItem(NOTES_KEY, JSON.stringify(notas)); renderNotes(); }
       } else {
         // Primera vez con esta cuenta: sube lo que ya tenías guardado en este dispositivo.
-        await ref.set({ profiles, history, orders, cuentasBancarias }, { merge: true });
+        await ref.set({ profiles, history, orders, cuentasBancarias, notas }, { merge: true });
       }
       cloudDataLoaded = true;
       if(notify) showToast('Sesión iniciada — datos sincronizados');
@@ -4849,6 +4961,7 @@
         if(Array.isArray(data.history)){ history = data.history; localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); renderHistory(); }
         if(Array.isArray(data.orders)){ orders = data.orders; localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); renderOrders(); }
         if(Array.isArray(data.cuentasBancarias)){ cuentasBancarias = data.cuentasBancarias; localStorage.setItem(CUENTAS_KEY, JSON.stringify(cuentasBancarias)); renderCuentasBancarias(); }
+        if(Array.isArray(data.notas)){ notas = data.notas; localStorage.setItem(NOTES_KEY, JSON.stringify(notas)); renderNotes(); }
       },
       err => { console.error('Error en la escucha de Firestore:', err); }
     );
@@ -5045,6 +5158,7 @@
   renderProfiles();
   renderHistory();
   renderOrders();
+  renderNotes();
   const hasSharedQuery = new URLSearchParams(location.search).toString().length > 0;
   loadFromQuery();
   // Un link compartido trae valores precisos de modo avanzado — no lo
