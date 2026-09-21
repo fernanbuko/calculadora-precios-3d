@@ -667,6 +667,9 @@
   .item-row input[type="text"]{ text-align: left; }
   .item-row input[type="number"]{ padding: 8px 6px; }
   .part-row{ grid-template-columns: 1fr 52px 52px 52px 28px; }
+  .item-row-wrap{ padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .item-row-wrap:last-child{ border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .item-row-wrap .item-photos{ margin-top: 2px; margin-bottom: 4px; }
   .item-row-header{
     font-family: 'Inter', sans-serif;
     font-size: 10.5px;
@@ -2487,7 +2490,7 @@
   const photoPickerCameraInput = document.getElementById('photoPickerCameraInput');
   const photoPickerUploadBtn = document.getElementById('photoPickerUploadBtn');
   const photoPickerFileInput = document.getElementById('photoPickerFileInput');
-  let photoPickerContext = null; // { orderIndex, itemIndex, tipo }
+  let photoPickerContext = null; // { getItem, onChange, getClienteNombre, tipo }
 
   function collectExistingPhotoUrls(){
     const set = new Set();
@@ -2539,8 +2542,13 @@
     renderOrders();
   }
 
-  function openPhotoPicker(orderIndex, itemIndex, tipo){
-    photoPickerContext = { orderIndex, itemIndex, tipo };
+  // getItem/onChange/getClienteNombre se pasan como funciones (no valores
+  // fijos) para que este mismo selector sirva tanto para un artículo ya
+  // guardado en un pedido (orders[i].items[ii]) como para uno todavía en
+  // borrador dentro de la ventana de "Agregar pedido" (currentOrderItems),
+  // que aún no tiene índice dentro de "orders".
+  function openPhotoPicker(getItem, onChange, getClienteNombre, tipo){
+    photoPickerContext = { getItem, onChange, getClienteNombre, tipo };
     const urls = collectExistingPhotoUrls();
     photoPickerRecentLabel.classList.toggle('hidden', urls.length === 0);
     photoPickerGrid.classList.toggle('hidden', urls.length === 0);
@@ -2557,7 +2565,7 @@
         const ok = await showConfirm('¿Borrar esta foto de todos los artículos que la usan? No se puede deshacer.', 'Borrar foto');
         if(!ok) return;
         eliminarFotoReusadaDeTodosLados(urls[idx]);
-        openPhotoPicker(orderIndex, itemIndex, tipo); // refresca la grilla; sigue siendo la misma capa de "atrás"
+        openPhotoPicker(getItem, onChange, getClienteNombre, tipo); // refresca la grilla; sigue siendo la misma capa de "atrás"
       });
     });
     photoPickerOverlay.classList.remove('hidden');
@@ -2575,10 +2583,9 @@
   }
   function applyPhotoSelection(url){
     if(!photoPickerContext) return;
-    const { orderIndex, itemIndex, tipo } = photoPickerContext;
-    agregarFotoAItem(orders[orderIndex].items[itemIndex], tipo, url);
-    saveJSON(ORDERS_KEY, orders);
-    renderOrders();
+    const { getItem, onChange, tipo } = photoPickerContext;
+    agregarFotoAItem(getItem(), tipo, url);
+    onChange();
     dismissPhotoPicker();
   }
   photoPickerCloseBtn.addEventListener('click', dismissPhotoPicker);
@@ -2590,16 +2597,15 @@
     const file = input.files && input.files[0];
     input.value = '';
     if(!file || !photoPickerContext) return;
-    const { orderIndex, itemIndex, tipo } = photoPickerContext;
+    const { getItem, onChange, getClienteNombre, tipo } = photoPickerContext;
     closePhotoPicker(); // oculta el selector; el editor reemplaza esta misma capa de "atrás" (ver openPhotoEditor)
     const editedBlob = await openPhotoEditor(file);
     if(!editedBlob) return; // usuario canceló el ajuste
     showToast('Subiendo foto…');
     try{
-      const url = await uploadPhotoToCloudinary(editedBlob, orders[orderIndex].cliente, orders[orderIndex].items[itemIndex].nombre);
-      agregarFotoAItem(orders[orderIndex].items[itemIndex], tipo, url);
-      saveJSON(ORDERS_KEY, orders);
-      renderOrders();
+      const url = await uploadPhotoToCloudinary(editedBlob, getClienteNombre(), getItem().nombre);
+      agregarFotoAItem(getItem(), tipo, url);
+      onChange();
       showToast('✓ Foto subida');
     }catch(err){
       showToast('No se pudo subir la foto: ' + (err.message || 'intenta de nuevo'));
@@ -3746,6 +3752,9 @@
   function renderOrderItems(){
     orderItemsList.innerHTML = '';
     currentOrderItems.forEach((item, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'item-row-wrap';
+
       const row = document.createElement('div');
       row.className = 'item-row';
       row.innerHTML =
@@ -3766,7 +3775,43 @@
         currentOrderItems.splice(idx, 1);
         renderOrderItems();
       });
-      orderItemsList.appendChild(row);
+      wrap.appendChild(row);
+
+      // Foto de referencia desde ya, al crear el artículo — sin tener que
+      // guardar el pedido primero y volver después a agregarla.
+      const photos = document.createElement('div');
+      photos.className = 'item-photos';
+      photos.innerHTML = buildPhotoGroupHTML(getFotosArray(item, 'referencia'), 'referencia', 'Foto de referencia');
+      photos.querySelectorAll('[data-photo-add]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openPhotoPicker(
+            () => currentOrderItems[idx],
+            () => renderOrderItems(),
+            () => currentClientName(),
+            btn.dataset.photoAdd
+          );
+        });
+      });
+      photos.querySelectorAll('[data-photo-remove]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tipo = btn.dataset.photoRemove;
+          const photoIdx = parseInt(btn.dataset.photoRemoveIdx, 10);
+          const it = currentOrderItems[idx];
+          const arrKey = tipo === 'referencia' ? 'fotosReferencia' : 'fotosResultado';
+          const arr = getFotosArray(it, tipo).slice();
+          const url = arr[photoIdx];
+          arr.splice(photoIdx, 1);
+          it[arrKey] = arr;
+          if(!urlSigueUsadaEnOtroArticulo(url, -1, -1)) marcarCloudinariaParaBorrar(url);
+          renderOrderItems();
+        });
+      });
+      photos.querySelectorAll('[data-photo-view]').forEach(el => {
+        el.addEventListener('click', () => openPhotoViewer(el.querySelector('img').src));
+      });
+      wrap.appendChild(photos);
+
+      orderItemsList.appendChild(wrap);
     });
     updateItemsSubtotal();
   }
@@ -4111,7 +4156,12 @@
         line.querySelectorAll('[data-photo-add]').forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            openPhotoPicker(i, ii, btn.dataset.photoAdd);
+            openPhotoPicker(
+              () => orders[i].items[ii],
+              () => { saveJSON(ORDERS_KEY, orders); renderOrders(); },
+              () => orders[i].cliente,
+              btn.dataset.photoAdd
+            );
           });
         });
         line.querySelectorAll('[data-photo-remove]').forEach(btn => {
