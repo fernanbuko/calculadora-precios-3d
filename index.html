@@ -1144,6 +1144,8 @@
     </div>
     <div class="btn-row" style="margin-top:10px;">
       <button type="button" class="btn small" id="openMultiPartCalcBtn">🧩 Pieza con varias partes</button>
+      <button type="button" class="btn small" id="importGcodeCalcBtn">📄 Importar G-code</button>
+      <input type="file" id="importGcodeCalcInput" accept=".gcode,.g,.gco,text/plain" class="hidden">
     </div>
   </div>
 
@@ -1837,6 +1839,8 @@
         <button type="button" class="btn small" id="addOrderItemBtn">+ Agregar artículo</button>
         <button type="button" class="btn small" id="useCalculatedPriceBtn">↑ Agregar precio calculado</button>
         <button type="button" class="btn small" id="openMultiPartBtn">🧩 Pieza con varias partes</button>
+        <button type="button" class="btn small" id="importGcodeOrderBtn">📄 Importar G-code(s)</button>
+        <input type="file" id="importGcodeOrderInput" accept=".gcode,.g,.gco,text/plain" multiple class="hidden">
       </div>
       <div class="items-subtotal-row" id="itemsSubtotalRow">
         <span>Total a cobrar</span><span id="orderItemsSubtotal">$ 0.00</span>
@@ -4571,12 +4575,11 @@
     multiParts.push({ peso: '', h: '', m: '', s: '' });
     renderMultiParts();
   });
-  // Llena el peso/tiempo sumado como si el usuario lo hubiera puesto a
-  // mano — en modo simple, en los campos opcionales (para que no se
-  // pisen con el cálculo automático por tamaño); en modo avanzado,
-  // directo en los campos de peso y horas/minutos/segundos.
-  function aplicarPartesACalculadora(){
-    const { pesoTotal, horasTotal } = sumarPartes();
+  // Llena el peso/tiempo dado como si el usuario lo hubiera puesto a mano
+  // — en modo simple, en los campos opcionales (para que no se pisen con
+  // el cálculo automático por tamaño); en modo avanzado, directo en los
+  // campos de peso y horas/minutos/segundos.
+  function aplicarPesoHorasACalculadora(pesoTotal, horasTotal){
     const h = Math.floor(horasTotal);
     const remainMin = (horasTotal - h) * 60;
     const m = Math.floor(remainMin);
@@ -4594,6 +4597,10 @@
     }
     calculate();
   }
+  function aplicarPartesACalculadora(){
+    const { pesoTotal, horasTotal } = sumarPartes();
+    aplicarPesoHorasACalculadora(pesoTotal, horasTotal);
+  }
   multiPartConfirmBtn.addEventListener('click', () => {
     if(multiPartContext === 'calculadora'){
       aplicarPartesACalculadora();
@@ -4607,6 +4614,140 @@
     renderOrderItems();
     dismissMultiPartModal();
     showToast('Artículo agregado con el precio de las ' + multiParts.length + ' partes');
+  });
+
+  // ---------- importar peso/tiempo desde un G-code ya laminado ----------
+  // Lee los comentarios que dejan los slicers más comunes (Bambu Studio,
+  // OrcaSlicer, PrusaSlicer/SuperSlicer, Cura) al final del archivo con el
+  // peso de filamento y el tiempo estimado de impresión — así no hay que
+  // copiarlos a mano desde el slicer. Es lectura de texto plano (no
+  // interpreta el G-code real recorriendo cada línea de movimiento), así
+  // que si tu slicer usa un formato distinto puede que no encuentre nada;
+  // en ese caso simplemente avisa y no autocompleta nada.
+  function parsearDuracionAHoras(str){
+    if(!str) return null;
+    const s = String(str);
+    const d = /(\d+)\s*d\b/i.exec(s);
+    const h = /(\d+)\s*h\b/i.exec(s);
+    const m = /(\d+)\s*m\b/i.exec(s);
+    const sec = /(\d+)\s*s\b/i.exec(s);
+    if(!d && !h && !m && !sec) return null;
+    let total = 0;
+    if(d) total += parseInt(d[1], 10) * 24;
+    if(h) total += parseInt(h[1], 10);
+    if(m) total += parseInt(m[1], 10) / 60;
+    if(sec) total += parseInt(sec[1], 10) / 3600;
+    return total > 0 ? total : null;
+  }
+  function parsearGcode(texto){
+    let pesoTotal = null;
+    let colores = 1;
+    const totalPesoMatch = /;\s*total filament (?:used|weight)\s*\[g\]\s*[:=]\s*([\d.]+)/i.exec(texto);
+    if(totalPesoMatch) pesoTotal = parseFloat(totalPesoMatch[1]);
+    const porColorMatch = /;\s*filament used\s*\[g\]\s*[:=]\s*([\d.,\s]+)/i.exec(texto);
+    if(porColorMatch){
+      const valores = porColorMatch[1].split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v >= 0);
+      if(valores.length){
+        colores = valores.length;
+        if(pesoTotal === null) pesoTotal = valores.reduce((a, b) => a + b, 0);
+      }
+    }
+    let horasTotal = null;
+    const patronesTiempo = [
+      /;\s*total estimated time\s*[:=]\s*([^\r\n;]+)/i,
+      /;\s*model printing time\s*[:=]\s*([^\r\n;]+)/i,
+      /;\s*estimated printing time \(normal mode\)\s*[:=]\s*([^\r\n;]+)/i,
+      /;\s*estimated printing time\s*[:=]\s*([^\r\n;]+)/i
+    ];
+    for(const patron of patronesTiempo){
+      const m = patron.exec(texto);
+      if(m){
+        const horas = parsearDuracionAHoras(m[1]);
+        if(horas !== null){ horasTotal = horas; break; }
+      }
+    }
+    if(horasTotal === null){
+      const curaTime = /;TIME:(\d+)/i.exec(texto); // Cura deja el tiempo en segundos, sin letras
+      if(curaTime) horasTotal = parseInt(curaTime[1], 10) / 3600;
+    }
+    if(pesoTotal === null && horasTotal === null) return null;
+    return { pesoTotal: pesoTotal || 0, horasTotal: horasTotal || 0, colores };
+  }
+  function formatearHorasParaToast(horas){
+    if(horas <= 0) return '0min';
+    if(horas < 1) return Math.round(horas * 60) + 'min';
+    const h = Math.floor(horas);
+    const min = Math.round((horas - h) * 60);
+    return h + 'h' + (min > 0 ? ' ' + min + 'min' : '');
+  }
+
+  const importGcodeCalcBtn = document.getElementById('importGcodeCalcBtn');
+  const importGcodeCalcInput = document.getElementById('importGcodeCalcInput');
+  importGcodeCalcBtn.addEventListener('click', () => importGcodeCalcInput.click());
+  importGcodeCalcInput.addEventListener('change', async () => {
+    const file = importGcodeCalcInput.files && importGcodeCalcInput.files[0];
+    importGcodeCalcInput.value = '';
+    if(!file) return;
+    const texto = await file.text();
+    const datos = parsearGcode(texto);
+    if(!datos){
+      showToast('No se pudo leer el peso/tiempo de este G-code');
+      return;
+    }
+    aplicarPesoHorasACalculadora(datos.pesoTotal, datos.horasTotal);
+    if(datos.colores > 1){
+      if(simpleModeToggle.checked){
+        simpleEl.simpleMultiToggle.checked = true;
+        simpleEl.simpleColors.value = datos.colores;
+        applySimpleToAdvanced();
+      } else {
+        el.multiToggle.checked = true;
+        el.numColors.value = datos.colores;
+        el.colorChanges.value = Math.max(0, datos.colores - 1);
+        multiFields.classList.remove('hidden');
+      }
+      calculate();
+    }
+    showToast('Leído del G-code: ' + formatearHorasParaToast(datos.horasTotal) + ' · ' + datos.pesoTotal.toFixed(1) + 'g' + (datos.colores > 1 ? ' · ' + datos.colores + ' colores' : ''));
+  });
+
+  // Uno o varios archivos a la vez: cada G-code se agrega como un
+  // artículo aparte del pedido, con su propio precio ya calculado — para
+  // cuando exportas varias piezas/placas juntas y quieres subirlas todas
+  // de un jalón en vez de una por una.
+  const importGcodeOrderBtn = document.getElementById('importGcodeOrderBtn');
+  const importGcodeOrderInput = document.getElementById('importGcodeOrderInput');
+  importGcodeOrderBtn.addEventListener('click', () => importGcodeOrderInput.click());
+  importGcodeOrderInput.addEventListener('change', async () => {
+    const files = Array.from(importGcodeOrderInput.files || []);
+    importGcodeOrderInput.value = '';
+    if(!files.length) return;
+    const prev = { peso: el.pieceWeight.value, horas: el.hours.value, cantidad: el.quantity.value };
+    let agregados = 0;
+    for(const file of files){
+      const texto = await file.text();
+      const datos = parsearGcode(texto);
+      if(!datos) continue;
+      el.pieceWeight.value = datos.pesoTotal;
+      el.hours.value = datos.horasTotal;
+      el.quantity.value = 1;
+      calculate();
+      const nombre = file.name.replace(/\.(gcode|g|gco)$/i, '');
+      currentOrderItems.push({ nombre, cantidad: 1, precio: Math.round((lastResult.finalPrice || 0) * 100) / 100 });
+      agregados++;
+    }
+    el.pieceWeight.value = prev.peso;
+    el.hours.value = prev.horas;
+    el.quantity.value = prev.cantidad;
+    calculate();
+    renderOrderItems();
+    if(agregados === 0){
+      showToast('No se pudo leer ningún archivo');
+    } else if(agregados < files.length){
+      showToast(agregados + ' de ' + files.length + ' artículos agregados — el resto no se pudo leer');
+    } else {
+      showToast(agregados + (agregados === 1 ? ' artículo agregado' : ' artículos agregados') + ' desde G-code');
+    }
   });
 
   addOrderBtn.addEventListener('click', () => {
