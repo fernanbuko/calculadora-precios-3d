@@ -4131,7 +4131,8 @@
       visibleItems.forEach(({ it, ii }) => {
         const line = document.createElement('div');
         line.className = 'order-item-line';
-        const itemTotal = (parseFloat(it.cantidad) || 1) * (parseFloat(it.precio) || 0);
+        const cantidad = parseFloat(it.cantidad) || 1;
+        const itemTotal = cantidad * (parseFloat(it.precio) || 0);
         const paidSoFar = Math.min(parseFloat(it.montoPagado) || 0, itemTotal);
         let pagoBadge;
         if(itemTotal > 0 && paidSoFar >= itemTotal){
@@ -4141,12 +4142,27 @@
         } else {
           pagoBadge = '<button type="button" class="badge warn-off" data-item-field="pagado">💰 Por cobrar</button>';
         }
+        // Los pedidos de antes de esta función solo tenían "entregado" como
+        // sí/no, sin cantidadEntregada — se leen como "todo" o "nada"
+        // entregado para no mostrarlos de golpe como pendientes.
+        const entregadaSoFar = it.cantidadEntregada !== undefined
+          ? Math.min(parseFloat(it.cantidadEntregada) || 0, cantidad)
+          : (it.entregado ? cantidad : 0);
+        const fmtCant = (n) => (Number.isInteger(n) ? n : n.toFixed(2));
+        let entregaBadge;
+        if(cantidad > 0 && entregadaSoFar >= cantidad){
+          entregaBadge = '<button type="button" class="badge on" data-item-field="entregado">✓ Entregado</button>';
+        } else if(entregadaSoFar > 0){
+          entregaBadge = '<button type="button" class="badge partial" data-item-field="entregado">◐ ' + fmtCant(entregadaSoFar) + '/' + fmtCant(cantidad) + ' entregado</button>';
+        } else {
+          entregaBadge = '<button type="button" class="badge warn-off" data-item-field="entregado">📦 Por entregar</button>';
+        }
         line.innerHTML =
-          '<div class="item-line-text">' + (parseFloat(it.cantidad) || 1) + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + '</div>' +
+          '<div class="item-line-text">' + cantidad + 'x ' + escapeHTML(it.nombre || '') + ' — ' + fmt(parseFloat(it.precio) || 0) + '</div>' +
           '<div class="badges">' +
             '<button type="button" class="badge ' + (it.disenado ? 'on' : 'warn-off') + '" data-item-field="disenado">' + (it.disenado ? '✓ Diseñado' : '🎨 Por diseñar') + '</button>' +
             '<button type="button" class="badge ' + (it.hecho ? 'on' : 'warn-off') + '" data-item-field="hecho">' + (it.hecho ? '✓ Hecho' : '🖨️ Por hacer') + '</button>' +
-            '<button type="button" class="badge ' + (it.entregado ? 'on' : 'warn-off') + '" data-item-field="entregado">' + (it.entregado ? '✓ Entregado' : '📦 Por entregar') + '</button>' +
+            entregaBadge +
             pagoBadge +
           '</div>' +
           '<div class="item-photos">' +
@@ -4203,6 +4219,26 @@
                 const newPaid = Math.min(paid + amount, total);
                 item.montoPagado = newPaid;
                 item.pagado = total > 0 && newPaid >= total;
+              }
+            } else if(field === 'entregado'){
+              const cantidad = parseFloat(item.cantidad) || 1;
+              const entregada = item.cantidadEntregada !== undefined
+                ? Math.min(parseFloat(item.cantidadEntregada) || 0, cantidad)
+                : (item.entregado ? cantidad : 0);
+              if(cantidad > 0 && entregada >= cantidad){
+                // Ya estaba entregado del todo — un toque más lo deshace.
+                item.cantidadEntregada = 0;
+                item.entregado = false;
+              } else {
+                const remaining = cantidad - entregada;
+                const remainingLabel = Number.isInteger(remaining) ? String(remaining) : remaining.toFixed(2);
+                const input = await showPrompt('¿Cuántos entregaste ahora? (faltan ' + remainingLabel + ')', remainingLabel, 'Registrar entrega', 'decimal');
+                if(input === null) return;
+                const amount = parseFloat(String(input).replace(',', '.'));
+                if(!(amount > 0)) return;
+                const newEntregada = Math.min(entregada + amount, cantidad);
+                item.cantidadEntregada = newEntregada;
+                item.entregado = cantidad > 0 && newEntregada >= cantidad;
               }
             } else {
               item[field] = !item[field];
@@ -4577,11 +4613,21 @@
     const cliente = currentClientName();
     const items = currentOrderItems
       .filter(it => (it.nombre || '').trim())
-      .map(it => ({
-        nombre: it.nombre.trim(), cantidad: parseFloat(it.cantidad) || 1, precio: parseFloat(it.precio) || 0,
-        disenado: !!it.disenado, hecho: !!it.hecho, entregado: !!it.entregado, pagado: !!it.pagado, montoPagado: parseFloat(it.montoPagado) || 0,
-        fotosReferencia: getFotosArray(it, 'referencia'), fotosResultado: getFotosArray(it, 'resultado')
-      }));
+      .map(it => {
+        const cantidad = parseFloat(it.cantidad) || 1;
+        // Si nunca se tocó el detalle de cantidad entregada (pedidos de
+        // antes de esta función, o un artículo nuevo), se completa a
+        // partir del "entregado" sí/no de siempre en vez de resetear a 0.
+        const cantidadEntregada = it.cantidadEntregada !== undefined
+          ? (parseFloat(it.cantidadEntregada) || 0)
+          : (it.entregado ? cantidad : 0);
+        return {
+          nombre: it.nombre.trim(), cantidad, precio: parseFloat(it.precio) || 0,
+          disenado: !!it.disenado, hecho: !!it.hecho, entregado: !!it.entregado, cantidadEntregada,
+          pagado: !!it.pagado, montoPagado: parseFloat(it.montoPagado) || 0,
+          fotosReferencia: getFotosArray(it, 'referencia'), fotosResultado: getFotosArray(it, 'resultado')
+        };
+      });
     if(!cliente && items.length === 0){ showToast('Pon al menos el cliente o un artículo'); return; }
     const data = {
       cliente, items,
