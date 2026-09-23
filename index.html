@@ -1144,8 +1144,8 @@
     </div>
     <div class="btn-row" style="margin-top:10px;">
       <button type="button" class="btn small" id="openMultiPartCalcBtn">🧩 Pieza con varias partes</button>
-      <button type="button" class="btn small" id="importGcodeCalcBtn">📄 Importar G-code</button>
-      <input type="file" id="importGcodeCalcInput" accept=".gcode,.g,.gco,text/plain" class="hidden">
+      <button type="button" class="btn small" id="importGcodeCalcBtn">📄 Importar G-code / 3mf</button>
+      <input type="file" id="importGcodeCalcInput" accept=".gcode,.g,.gco,.3mf,text/plain" class="hidden">
     </div>
   </div>
 
@@ -1839,8 +1839,8 @@
         <button type="button" class="btn small" id="addOrderItemBtn">+ Agregar artículo</button>
         <button type="button" class="btn small" id="useCalculatedPriceBtn">↑ Agregar precio calculado</button>
         <button type="button" class="btn small" id="openMultiPartBtn">🧩 Pieza con varias partes</button>
-        <button type="button" class="btn small" id="importGcodeOrderBtn">📄 Importar G-code(s)</button>
-        <input type="file" id="importGcodeOrderInput" accept=".gcode,.g,.gco,text/plain" multiple class="hidden">
+        <button type="button" class="btn small" id="importGcodeOrderBtn">📄 Importar G-code(s) / 3mf</button>
+        <input type="file" id="importGcodeOrderInput" accept=".gcode,.g,.gco,.3mf,text/plain" multiple class="hidden">
       </div>
       <div class="items-subtotal-row" id="itemsSubtotalRow">
         <span>Total a cobrar</span><span id="orderItemsSubtotal">$ 0.00</span>
@@ -2064,6 +2064,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -4681,6 +4682,60 @@
     return h + 'h' + (min > 0 ? ' ' + min + 'min' : '');
   }
 
+  // Un .3mf ya laminado (Bambu Studio, OrcaSlicer, Creality Print...) es
+  // en realidad un ZIP — adentro trae "Metadata/slice_info.config", un XML
+  // con el peso y tiempo YA calculados por placa (y, si tiene varias
+  // piezas/placas, un bloque <plate> por cada una — así un solo archivo
+  // puede devolver VARIAS piezas, como el "multiplaca → grupo" del video
+  // que lo inspiró). Si ese archivo no está (ej. es solo el proyecto sin
+  // laminar, sin datos de impresión todavía) se intenta con algún .gcode
+  // que a veces también queda incrustado adentro.
+  function parsearSliceInfoConfig(xml){
+    const bloques = xml.match(/<plate\b[\s\S]*?<\/plate>/gi);
+    if(!bloques) return null;
+    const resultados = [];
+    bloques.forEach(bloque => {
+      const pesoMatch = /\bweight\s*=\s*"([\d.]+)"/i.exec(bloque) || /<metadata\s+key="weight"\s+value="([\d.]+)"/i.exec(bloque);
+      const pesoTotal = pesoMatch ? parseFloat(pesoMatch[1]) : null;
+      const predMatch = /\bprediction\s*=\s*"([\d.]+)"/i.exec(bloque) || /<metadata\s+key="prediction"\s+value="([\d.]+)"/i.exec(bloque);
+      const horasTotal = predMatch ? parseFloat(predMatch[1]) / 3600 : null;
+      const coloresMatch = bloque.match(/\bused_g\s*=\s*"[\d.]+"/gi);
+      const colores = coloresMatch ? coloresMatch.length : 1;
+      if(pesoTotal !== null || horasTotal !== null){
+        resultados.push({ pesoTotal: pesoTotal || 0, horasTotal: horasTotal || 0, colores });
+      }
+    });
+    return resultados.length ? resultados : null;
+  }
+  async function parsear3mfArchivo(file){
+    if(typeof JSZip === 'undefined') return null; // sin internet no se pudo cargar la librería del zip
+    let zip;
+    try{ zip = await JSZip.loadAsync(file); }catch(e){ return null; } // no era un zip válido
+    const rutaSliceInfo = Object.keys(zip.files).find(p => /metadata\/slice_info\.config$/i.test(p));
+    if(rutaSliceInfo){
+      const xml = await zip.files[rutaSliceInfo].async('text');
+      const resultados = parsearSliceInfoConfig(xml);
+      if(resultados) return resultados;
+    }
+    const rutaGcode = Object.keys(zip.files).find(p => /\.gcode$/i.test(p));
+    if(rutaGcode){
+      const texto = await zip.files[rutaGcode].async('text');
+      const datos = parsearGcode(texto);
+      if(datos) return [datos];
+    }
+    return null; // probablemente el proyecto sin laminar (sin metadata de impresión adentro)
+  }
+  // Punto de entrada único: según la extensión, decide si leerlo como
+  // texto plano (G-code) o como ZIP (3mf). Siempre devuelve un ARRAY de
+  // piezas (1 elemento lo normal; más de 1 si el archivo traía varias
+  // placas), o null si no se encontró nada útil.
+  async function leerArchivoPieza(file){
+    if(/\.3mf$/i.test(file.name)) return await parsear3mfArchivo(file);
+    const texto = await file.text();
+    const datos = parsearGcode(texto);
+    return datos ? [datos] : null;
+  }
+
   const importGcodeCalcBtn = document.getElementById('importGcodeCalcBtn');
   const importGcodeCalcInput = document.getElementById('importGcodeCalcInput');
   importGcodeCalcBtn.addEventListener('click', () => importGcodeCalcInput.click());
@@ -4688,33 +4743,39 @@
     const file = importGcodeCalcInput.files && importGcodeCalcInput.files[0];
     importGcodeCalcInput.value = '';
     if(!file) return;
-    const texto = await file.text();
-    const datos = parsearGcode(texto);
-    if(!datos){
-      showToast('No se pudo leer el peso/tiempo de este G-code');
+    const resultados = await leerArchivoPieza(file);
+    if(!resultados || !resultados.length){
+      showToast('No se pudo leer el peso/tiempo de este archivo');
       return;
     }
-    aplicarPesoHorasACalculadora(datos.pesoTotal, datos.horasTotal);
-    if(datos.colores > 1){
+    // La calculadora es UNA cotización — si el archivo traía varias
+    // placas, se suman todas (igual que "Pieza con varias partes").
+    const pesoTotal = resultados.reduce((s, r) => s + r.pesoTotal, 0);
+    const horasTotal = resultados.reduce((s, r) => s + r.horasTotal, 0);
+    const colores = Math.max(...resultados.map(r => r.colores));
+    aplicarPesoHorasACalculadora(pesoTotal, horasTotal);
+    if(colores > 1){
       if(simpleModeToggle.checked){
         simpleEl.simpleMultiToggle.checked = true;
-        simpleEl.simpleColors.value = datos.colores;
+        simpleEl.simpleColors.value = colores;
         applySimpleToAdvanced();
       } else {
         el.multiToggle.checked = true;
-        el.numColors.value = datos.colores;
-        el.colorChanges.value = Math.max(0, datos.colores - 1);
+        el.numColors.value = colores;
+        el.colorChanges.value = Math.max(0, colores - 1);
         multiFields.classList.remove('hidden');
       }
       calculate();
     }
-    showToast('Leído del G-code: ' + formatearHorasParaToast(datos.horasTotal) + ' · ' + datos.pesoTotal.toFixed(1) + 'g' + (datos.colores > 1 ? ' · ' + datos.colores + ' colores' : ''));
+    const extra = resultados.length > 1 ? ' (' + resultados.length + ' placas sumadas)' : '';
+    showToast('Leído: ' + formatearHorasParaToast(horasTotal) + ' · ' + pesoTotal.toFixed(1) + 'g' + (colores > 1 ? ' · ' + colores + ' colores' : '') + extra);
   });
 
-  // Uno o varios archivos a la vez: cada G-code se agrega como un
-  // artículo aparte del pedido, con su propio precio ya calculado — para
-  // cuando exportas varias piezas/placas juntas y quieres subirlas todas
-  // de un jalón en vez de una por una.
+  // Uno o varios archivos a la vez: cada pieza detectada (cada G-code, o
+  // cada placa dentro de un .3mf con varias) se agrega como un ARTÍCULO
+  // APARTE del pedido, con su propio precio ya calculado — para cuando
+  // exportas varias piezas/placas juntas y quieres subirlas todas de un
+  // jalón en vez de una por una.
   const importGcodeOrderBtn = document.getElementById('importGcodeOrderBtn');
   const importGcodeOrderInput = document.getElementById('importGcodeOrderInput');
   importGcodeOrderBtn.addEventListener('click', () => importGcodeOrderInput.click());
@@ -4724,17 +4785,21 @@
     if(!files.length) return;
     const prev = { peso: el.pieceWeight.value, horas: el.hours.value, cantidad: el.quantity.value };
     let agregados = 0;
+    let archivosLeidos = 0;
     for(const file of files){
-      const texto = await file.text();
-      const datos = parsearGcode(texto);
-      if(!datos) continue;
-      el.pieceWeight.value = datos.pesoTotal;
-      el.hours.value = datos.horasTotal;
-      el.quantity.value = 1;
-      calculate();
-      const nombre = file.name.replace(/\.(gcode|g|gco)$/i, '');
-      currentOrderItems.push({ nombre, cantidad: 1, precio: Math.round((lastResult.finalPrice || 0) * 100) / 100 });
-      agregados++;
+      const resultados = await leerArchivoPieza(file);
+      if(!resultados || !resultados.length) continue;
+      archivosLeidos++;
+      const nombreBase = file.name.replace(/\.(gcode|g|gco|3mf)$/i, '');
+      resultados.forEach((datos, idx) => {
+        el.pieceWeight.value = datos.pesoTotal;
+        el.hours.value = datos.horasTotal;
+        el.quantity.value = 1;
+        calculate();
+        const nombre = resultados.length > 1 ? nombreBase + ' (placa ' + (idx + 1) + ')' : nombreBase;
+        currentOrderItems.push({ nombre, cantidad: 1, precio: Math.round((lastResult.finalPrice || 0) * 100) / 100 });
+        agregados++;
+      });
     }
     el.pieceWeight.value = prev.peso;
     el.hours.value = prev.horas;
@@ -4743,10 +4808,10 @@
     renderOrderItems();
     if(agregados === 0){
       showToast('No se pudo leer ningún archivo');
-    } else if(agregados < files.length){
-      showToast(agregados + ' de ' + files.length + ' artículos agregados — el resto no se pudo leer');
+    } else if(archivosLeidos < files.length){
+      showToast(agregados + ' artículo' + (agregados === 1 ? '' : 's') + ' agregado' + (agregados === 1 ? '' : 's') + ' — ' + (files.length - archivosLeidos) + ' archivo(s) no se pudo(pudieron) leer');
     } else {
-      showToast(agregados + (agregados === 1 ? ' artículo agregado' : ' artículos agregados') + ' desde G-code');
+      showToast(agregados + (agregados === 1 ? ' artículo agregado' : ' artículos agregados'));
     }
   });
 
