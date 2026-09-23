@@ -4707,14 +4707,22 @@
     });
     return resultados.length ? resultados : null;
   }
+  // Si no se encontró nada, devuelve un string con el motivo (para avisar
+  // algo más útil que "no se pudo leer") en vez de null a secas — por
+  // ejemplo, un .3mf de Creality Print de verdad NO guarda el peso/tiempo
+  // calculado en ningún lado del archivo (se confirmó abriendo uno real:
+  // "Metadata/slice_info.config" solo trae la versión de la app, sin
+  // datos de impresión), así que ahí ni vale la pena seguir intentando —
+  // hay que avisarle al usuario que use el G-code en su lugar.
   async function parsear3mfArchivo(file){
     if(typeof JSZip === 'undefined') return null; // sin internet no se pudo cargar la librería del zip
     let zip;
     try{ zip = await JSZip.loadAsync(file); }catch(e){ return null; } // no era un zip válido
     const rutaSliceInfo = Object.keys(zip.files).find(p => /metadata\/slice_info\.config$/i.test(p));
+    let xmlSliceInfo = null;
     if(rutaSliceInfo){
-      const xml = await zip.files[rutaSliceInfo].async('text');
-      const resultados = parsearSliceInfoConfig(xml);
+      xmlSliceInfo = await zip.files[rutaSliceInfo].async('text');
+      const resultados = parsearSliceInfoConfig(xmlSliceInfo);
       if(resultados) return resultados;
     }
     const rutaGcode = Object.keys(zip.files).find(p => /\.gcode$/i.test(p));
@@ -4723,6 +4731,9 @@
       const datos = parsearGcode(texto);
       if(datos) return [datos];
     }
+    const esCrealityPrint = Object.keys(zip.files).some(p => /metadata\/creality\.config$/i.test(p))
+      || (xmlSliceInfo && /creality_print/i.test(xmlSliceInfo));
+    if(esCrealityPrint) return 'sin_datos_creality';
     return null; // probablemente el proyecto sin laminar (sin metadata de impresión adentro)
   }
   // Punto de entrada único: según la extensión, decide si leerlo como
@@ -4744,6 +4755,10 @@
     importGcodeCalcInput.value = '';
     if(!file) return;
     const resultados = await leerArchivoPieza(file);
+    if(resultados === 'sin_datos_creality'){
+      showToast('Este .3mf es de Creality Print y no trae el peso/tiempo calculado — usa "Export G-code" en su lugar');
+      return;
+    }
     if(!resultados || !resultados.length){
       showToast('No se pudo leer el peso/tiempo de este archivo');
       return;
@@ -4786,8 +4801,10 @@
     const prev = { peso: el.pieceWeight.value, horas: el.hours.value, cantidad: el.quantity.value };
     let agregados = 0;
     let archivosLeidos = 0;
+    let huboCrealitySinDatos = false;
     for(const file of files){
       const resultados = await leerArchivoPieza(file);
+      if(resultados === 'sin_datos_creality'){ huboCrealitySinDatos = true; continue; }
       if(!resultados || !resultados.length) continue;
       archivosLeidos++;
       const nombreBase = file.name.replace(/\.(gcode|g|gco|3mf)$/i, '');
@@ -4806,10 +4823,12 @@
     el.quantity.value = prev.cantidad;
     calculate();
     renderOrderItems();
-    if(agregados === 0){
+    if(agregados === 0 && huboCrealitySinDatos && archivosLeidos === 0){
+      showToast('Ese .3mf es de Creality Print y no trae el peso/tiempo calculado — usa "Export G-code" en su lugar');
+    } else if(agregados === 0){
       showToast('No se pudo leer ningún archivo');
     } else if(archivosLeidos < files.length){
-      showToast(agregados + ' artículo' + (agregados === 1 ? '' : 's') + ' agregado' + (agregados === 1 ? '' : 's') + ' — ' + (files.length - archivosLeidos) + ' archivo(s) no se pudo(pudieron) leer');
+      showToast(agregados + ' artículo' + (agregados === 1 ? '' : 's') + ' agregado' + (agregados === 1 ? '' : 's') + ' — ' + (files.length - archivosLeidos) + ' archivo(s) no se pudo(pudieron) leer' + (huboCrealitySinDatos ? ' (el .3mf de Creality Print no trae esos datos — usa G-code)' : ''));
     } else {
       showToast(agregados + (agregados === 1 ? ' artículo agregado' : ' artículos agregados'));
     }
