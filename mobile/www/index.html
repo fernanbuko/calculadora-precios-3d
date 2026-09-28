@@ -1141,31 +1141,15 @@
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
   .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
   .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
-  /* Placa para mascotas: forma de hueso — un cuerpo central rectangular
-     con dos "lóbulos" redondeados en cada punta (cada lóbulo hecho de dos
-     círculos, arriba y abajo, del mismo color de la placa) para armar la
-     silueta clásica de hueso sin depender de ningún recorte/imagen. */
+  /* Placa para mascotas: forma de hueso — se recorta con un clip-path
+     poligonal calculado en JS a partir del tamaño real de la capa (dos
+     círculos grandes en las puntas conectados por una cintura angosta),
+     en vez del truco de pseudo-elementos/box-shadow (que no se leía
+     como hueso de verdad). El padding solo da el margen necesario para
+     que quepan las puntas redondeadas. */
   .nombre3d-forma-hueso{
-    border-radius: 999px;
-    padding: 4px 50px;
-  }
-  .nombre3d-forma-hueso::before,
-  .nombre3d-forma-hueso::after{
-    content: '';
-    position: absolute;
-    top: 50%;
-    width: 36px; height: 36px;
-    background: inherit;
-    border-radius: 50%;
-    transform: translateY(-50%);
-  }
-  .nombre3d-forma-hueso::before{
-    left: -10px;
-    box-shadow: 0 -19px 0 0 var(--n3d-bg, currentColor), 0 19px 0 0 var(--n3d-bg, currentColor);
-  }
-  .nombre3d-forma-hueso::after{
-    right: -10px;
-    box-shadow: 0 -19px 0 0 var(--n3d-bg, currentColor), 0 19px 0 0 var(--n3d-bg, currentColor);
+    border-radius: 0;
+    padding: 20px 48px;
   }
   /* "Contorno de letras": en vez de una placa rectangular con el nombre
      encima, el contorno de la pieza sigue la forma de las propias letras
@@ -5850,6 +5834,42 @@
     return sombras.join(', ');
   }
 
+  // Recorte de "Placa para mascotas": dos círculos grandes en las puntas
+  // (tan altos como toda la capa) unidos por una cintura angosta en el
+  // medio — la silueta clásica de un hueso de perro. Se calcula con el
+  // ancho/alto real ya medidos, en vez de un truco con porcentajes, para
+  // que las puntas midan siempre lo mismo sin importar qué tan largo sea
+  // el nombre (solo la cintura se alarga).
+  function nombre3dHuesoClipPath(w, h){
+    const cy = h / 2;
+    const R = h / 2; // las puntas tocan el borde de arriba y de abajo
+    const cinturaMitad = Math.min(h * 0.13, 11);
+    const medioAngulo = Math.asin(Math.min(1, cinturaMitad / R));
+    const PASOS = 16;
+    const puntos = [];
+    // Punta izquierda: del punto de unión de arriba, dando toda la vuelta
+    // por la izquierda (por atrás del círculo), hasta el punto de unión
+    // de abajo.
+    const cxIzq = R;
+    const inicioIzq = -medioAngulo;
+    const finIzq = medioAngulo - Math.PI * 2;
+    for(let i = 0; i <= PASOS; i++){
+      const t = inicioIzq + (finIzq - inicioIzq) * (i / PASOS);
+      puntos.push([cxIzq + R * Math.cos(t), cy + R * Math.sin(t)]);
+    }
+    // Punta derecha: del punto de unión de abajo, dando toda la vuelta
+    // por la derecha (por delante del círculo, pasando por su punto más
+    // a la derecha), hasta el punto de unión de arriba.
+    const cxDer = w - R;
+    const inicioDer = Math.PI * 3 - medioAngulo;
+    const finDer = Math.PI + medioAngulo;
+    for(let i = 0; i <= PASOS; i++){
+      const t = inicioDer + (finDer - inicioDer) * (i / PASOS);
+      puntos.push([cxDer + R * Math.cos(t), cy + R * Math.sin(t)]);
+    }
+    return 'polygon(' + puntos.map(p => p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px').join(', ') + ')';
+  }
+
   function renderNombre3D(){
     const nombre = nombre3dNombreInput.value.trim();
     const emoji = nombre3dEmojiInput.value.trim();
@@ -5977,6 +5997,16 @@
     }
     plate.appendChild(head);
     nombre3dStage.appendChild(plate);
+    if(nombre3dForma === 'hueso'){
+      // Recién ahora la capa está en el documento y tiene tamaño real —
+      // se mide una sola vez (todas las capas miden lo mismo, mismo
+      // texto) y se aplica el mismo recorte a todas.
+      const frente = head.querySelector('.nombre3d-front');
+      if(frente){
+        const clip = nombre3dHuesoClipPath(frente.offsetWidth, frente.offsetHeight);
+        head.querySelectorAll('.nombre3d-forma-hueso').forEach(el => { el.style.clipPath = clip; });
+      }
+    }
   }
   [nombre3dNombreInput, nombre3dEmojiInput].forEach(input => {
     input.addEventListener('input', renderNombre3D);
