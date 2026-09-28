@@ -5755,6 +5755,16 @@
     }
     resize();
     window.addEventListener('resize', resize);
+    // El motor se inicializa apenas se escribe el primer nombre, que puede
+    // pasar mientras la pestaña de Nombre 3D todavía está oculta (display:
+    // none) — ahí clientWidth/Height dan 0 y "resize" no hace nada, dejando
+    // el lienzo pegado en su tamaño por defecto (300x150) para siempre, ya
+    // que el evento "resize" de la ventana nunca se dispara solo por
+    // cambiar de pestaña. Un ResizeObserver sobre el contenedor sí avisa en
+    // cuanto pasa de 0 a su tamaño real al mostrarse.
+    if(window.ResizeObserver){
+      new ResizeObserver(resize).observe(nombre3dStage);
+    }
     function animar(){
       requestAnimationFrame(animar);
       group.rotation.y = nombre3dRotY;
