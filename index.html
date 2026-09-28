@@ -1092,7 +1092,7 @@
     .tab-bar-btn .tab-label{ font-size: 13.5px; }
   }
 
-  /* ---- Nombre 3D: placa con relieve falso-3D, sin motor 3D real ---- */
+  /* ---- Nombre 3D: motor 3D real con Three.js ---- */
   .nombre3d-color-swatch{
     width: 30px; height: 30px;
     border-radius: 50%;
@@ -1103,146 +1103,18 @@
   }
   .nombre3d-color-swatch.active{ border-color: var(--text); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
   #nombre3dPreviewCard{ overflow: hidden; }
+  /* Motor 3D real (Three.js) — el canvas del renderer llena este
+     contenedor; el arrastre para girar se maneja en JS sobre el propio
+     canvas. */
   .nombre3d-stage{
-    perspective: 1000px;
-    min-height: 240px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 30px 16px;
+    position: relative;
+    height: 300px;
     touch-action: none;
     user-select: none;
-  }
-  .nombre3d-plate{
-    position: relative;
-    transform-style: preserve-3d;
     cursor: grab;
   }
-  .nombre3d-plate.nombre3d-dragging{ cursor: grabbing; }
-  .nombre3d-head{ position: relative; transform-style: preserve-3d; }
-  .nombre3d-layer{
-    font-weight: 800;
-    font-size: 34px;
-    padding: 16px 28px;
-    white-space: nowrap;
-    position: absolute;
-    top: 0; left: 0;
-    backface-visibility: hidden;
-    box-sizing: border-box;
-  }
-  .nombre3d-layer.nombre3d-front{ position: relative; }
-  /* Cara trasera de la placa: mismo texto (para que mida igual) pero con
-     las letras transparentes, para que al girar no se vea un hueco vacío
-     sino una placa lisa por detrás, como una pieza real. Los colores y el
-     contorno exactos se calculan en JS según la forma (caja vs. contorno
-     de letras). */
-  /* Forma de la placa detrás del nombre — se aplica a cada capa apilada. */
-  .nombre3d-forma-redonda{ border-radius: 999px; }
-  .nombre3d-forma-cuadrada{ border-radius: 12px; }
-  .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
-  .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
-  /* Placa para mascotas: forma de hueso — se recorta con una máscara
-     (mini-SVG armado en JS a partir del tamaño real de la capa: 4
-     círculos, dos por punta superpuestos entre sí para el "nudillo"
-     doble, más una barra central) en vez de un clip-path a mano. El
-     padding solo da el margen necesario para que quepan las puntas
-     redondeadas. */
-  .nombre3d-forma-hueso{
-    border-radius: 0;
-    padding: 22px 50px;
-  }
-  /* Relieve interior de la placa de hueso: mismo color aclarado, recortado
-     con la misma máscara pero un poco más chico (se aplica en JS) — deja
-     ver un borde del color de fondo alrededor, como el esmalte + centro
-     grabado de una placa real. */
-  .nombre3d-hueso-relieve{
-    position: absolute;
-    top: 8px; left: 8px; right: 8px; bottom: 8px;
-  }
-  .nombre3d-hueso-texto{ position: relative; z-index: 1; }
-  /* "Contorno de letras": en vez de una placa rectangular con el nombre
-     encima, el contorno de la pieza sigue la forma de las propias letras
-     (como un llavero cortado con la silueta del nombre) — se logra sin
-     ningún recorte real, con un halo de sombras borrosas alrededor del
-     texto (calculado en JS) del color de fondo detrás del relleno, así
-     el "borde" de cada letra hace de plástico y queda redondeado en las
-     puntas/esquinas (un simple text-stroke se ve picudo ahí), y el
-     relleno hace de hueco/letra. */
-  .nombre3d-forma-contorno{
-    background: transparent !important;
-    border-radius: 0;
-    padding: 10px 14px;
-  }
-  /* Identificador de lápiz: un bloque bien más grueso que el llavero (más
-     capas apiladas, más separadas), con un hueco ovalado atravesándolo
-     donde entraría el lápiz — para que se vea distinto de verdad, en vez
-     de solo quitarle el arito a la misma placa delgada. */
-  .nombre3d-hueco-lapiz{
-    position: absolute;
-    top: 50%; left: 15px;
-    width: 16px; height: 24px;
-    transform: translateY(-50%) translateZ(3px);
-    border-radius: 50%;
-    background: radial-gradient(ellipse at 35% 35%, #555 0%, #000 75%);
-    box-shadow: inset 0 2px 5px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
-  }
-  /* Identificador de lápiz + "Contorno de letras": ahí no hay caja de
-     material alrededor del nombre donde perforar sin partir una letra —
-     así que en vez del hueco metido en el texto, se le agrega al costado
-     una pestañita sólida del mismo color (igual idea que la de la
-     argolla) y el hueco va dentro de esa pestaña, nunca sobre el nombre. */
-  .nombre3d-lapiz-mount-contorno{
-    position: absolute;
-    top: 50%; left: -14px;
-    width: 18px; height: 30px;
-    border-radius: 8px;
-    transform: translateY(-50%) translateZ(3px);
-  }
-  .nombre3d-hueco-lapiz-contorno{ left: -13px; }
-  /* Argolla: la base ("mount") es una pestañita del mismo color de la
-     pieza que sobresale del borde de arriba, y la argolla metálica se
-     apoya encima de esa pestaña — así queda fundida a la pieza en vez de
-     verse flotando sola en el aire sin nada que la sostenga. */
-  .nombre3d-ring-mount{
-    position: absolute;
-    top: -8px; left: 13px;
-    width: 16px; height: 14px;
-    border-radius: 5px 5px 2px 2px;
-    transform: translateZ(3px);
-  }
-  .nombre3d-ring{
-    position: absolute;
-    top: -19px; left: 15px;
-    width: 20px; height: 20px;
-    box-sizing: border-box;
-    border-radius: 50%;
-    border: 5px solid #9a9a9a;
-    background: transparent;
-    box-shadow: 0 2px 3px rgba(0,0,0,.35);
-    transform: translateZ(5px);
-  }
-  /* Agujero: en vez de una argolla aparte, un hueco redondo atraviesa una
-     pestañita sólida del mismo color pegada al costado izquierdo, a la
-     mitad de la altura del nombre — así nunca cae encima de una letra, sin
-     importar el nombre o la forma elegida (incluido "Contorno de letras",
-     donde no hay material alrededor del texto donde perforar sin partir
-     una letra). */
-  .nombre3d-agujero-mount{
-    position: absolute;
-    top: 50%; left: -15px;
-    width: 18px; height: 28px;
-    border-radius: 8px;
-    transform: translateY(-50%) translateZ(3px);
-  }
-  .nombre3d-agujero-llavero{
-    position: absolute;
-    top: 50%; left: -12px;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    transform: translateY(-50%) translateZ(4px);
-    background: radial-gradient(circle at 35% 35%, #555 0%, #000 75%);
-    box-shadow: inset 0 2px 4px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
-  }
+  .nombre3d-stage.nombre3d-dragging{ cursor: grabbing; }
+  .nombre3d-stage canvas{ display: block; width: 100%; height: 100%; }
   /* Modo cliente: se abrió con ?vista3d=1 — se esconde todo lo que no sea
      esta herramienta, para poder mandarle el link solo de esto a un
      cliente sin que vea nada de la calculadora de precios. */
@@ -2286,6 +2158,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.128.0/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -5698,12 +5571,13 @@
     if(firebaseReady) firebase.auth().signOut();
   });
 
-  // ---------- Nombre 3D: vista previa (falso 3D con CSS) para el cliente ----------
-  // No es un motor 3D real (Three.js) — es una placa armada con varias capas
-  // de texto apiladas en el eje Z (más oscuras hacia atrás, para simular las
-  // paredes del relieve) dentro de un contenedor con "perspective", que se
-  // puede girar arrastrando. Se ve como una pieza sólida sin cargar ninguna
-  // librería 3D pesada.
+  // ---------- Nombre 3D: vista previa con motor 3D real (Three.js) para el cliente ----------
+  // La placa es geometría 3D real (THREE.Shape recortado y extruido con
+  // THREE.ExtrudeGeometry), no una simulación con capas de CSS — así que
+  // siempre hay una cara sólida visible sin importar el ángulo. El nombre
+  // se pega encima como una calcomanía (textura de canvas sobre un plano),
+  // salvo en "Contorno de letras", donde la propia geometría recortada ES
+  // el nombre.
   // Mismos 9 colores para fondo y letras: rojo, amarillo, azul, verde
   // claro, gris, negro, blanco, beige y café.
   const NOMBRE3D_COLORS = ['#d62828', '#ffd60a', '#1c77c3', '#8ac926', '#868e96', '#1a1a1a', '#ffffff', '#d9c3a3', '#6f4e37'];
@@ -5750,8 +5624,8 @@
   let nombre3dFont = NOMBRE3D_FONTS[0].id;
   let nombre3dForma = NOMBRE3D_FORMAS[0].id;
   let nombre3dArgolla = NOMBRE3D_ARGOLLAS[0].id; // 'argolla' | 'agujero' — solo aplica al llavero
-  let nombre3dRotX = -10, nombre3dRotY = 18;
-  let nombre3dRenderGen = 0; // ver comentario junto al recorte de "hueso" más abajo
+  let nombre3dRotX = -0.17, nombre3dRotY = 0.32; // radianes (motor 3D real: Three.js)
+  let nombre3dRenderGen = 0;
 
   nombre3dArgollaRow.innerHTML = NOMBRE3D_ARGOLLAS.map((a, i) =>
     '<button type="button" class="btn small filter-btn' + (i === 0 ? ' active' : '') + '" data-argolla="' + a.id + '">' + a.label + '</button>'
@@ -5830,57 +5704,406 @@
   }
   renderFormaRow();
 
-  // "Contorno de letras" arma el borde alrededor de cada letra con muchas
-  // copias borrosas del texto (text-shadow) puestas en círculo alrededor
-  // del original, en vez de un simple -webkit-text-stroke — el stroke da
-  // esquinas filosas/picudas en las uniones, mientras que el desenfoque de
-  // cada copia redondea las puntas y esquinas, como un corte real.
-  function nombre3dContornoSombra(color){
-    const radio = 9, borroso = 3, pasos = 14;
-    const sombras = [];
-    for(let i = 0; i < pasos; i++){
-      const angulo = (i / pasos) * Math.PI * 2;
-      const x = (Math.cos(angulo) * radio).toFixed(2);
-      const y = (Math.sin(angulo) * radio).toFixed(2);
-      sombras.push(x + 'px ' + y + 'px ' + borroso + 'px ' + color);
+  // ---------- Nombre 3D: motor 3D real con Three.js ----------
+  // La pieza es geometría 3D de verdad (un THREE.Shape 2D recortado con la
+  // forma elegida, extruido con profundidad real), no capas de CSS
+  // apiladas — así el giro es completamente libre en cualquier ángulo sin
+  // que el grosor "desaparezca" de canto ni haya distorsión de
+  // perspectiva, y el reverso es automáticamente la otra cara sólida de
+  // la misma pieza.
+  const N3D_ALTO = 3.0; // alto de referencia ("mundo") de la placa
+  const N3D_PROF_FINA = 0.42; // llavero / placa para mascotas
+  const N3D_PROF_GRUESA = 1.05; // identificador de lápiz — bloque bien más grueso
+
+  const nombre3dCanvasMedidor = document.createElement('canvas');
+  const nombre3dMedirCtx = nombre3dCanvasMedidor.getContext('2d');
+
+  const nombre3dEmptyNote = document.createElement('p');
+  nombre3dEmptyNote.className = 'empty-note';
+  nombre3dEmptyNote.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;text-align:center;padding:0 20px;';
+  nombre3dEmptyNote.textContent = 'Escribe un nombre para verlo aquí';
+  nombre3dStage.appendChild(nombre3dEmptyNote);
+
+  const n3d = { renderer: null, scene: null, camera: null, group: null };
+  function nombre3dInitEngine(){
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+    camera.position.set(0, 0, 13);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    nombre3dStage.insertBefore(renderer.domElement, nombre3dEmptyNote);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const luz1 = new THREE.DirectionalLight(0xffffff, 0.75);
+    luz1.position.set(3, 6, 9);
+    scene.add(luz1);
+    const luz2 = new THREE.DirectionalLight(0xffffff, 0.3);
+    luz2.position.set(-4, -3, -6);
+    scene.add(luz2);
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    n3d.scene = scene; n3d.camera = camera; n3d.renderer = renderer; n3d.group = group;
+
+    function resize(){
+      const w = nombre3dStage.clientWidth, h = nombre3dStage.clientHeight;
+      if(w <= 0 || h <= 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
     }
-    return sombras.join(', ');
+    resize();
+    window.addEventListener('resize', resize);
+    function animar(){
+      requestAnimationFrame(animar);
+      group.rotation.y = nombre3dRotY;
+      group.rotation.x = nombre3dRotX;
+      renderer.render(scene, camera);
+    }
+    animar();
   }
 
-  // Recorte de "Placa para mascotas": la silueta clásica de un hueso de
-  // perro es la UNIÓN de 4 círculos (uno en cada esquina — los dos de
-  // cada punta se superponen entre sí y arman ese "nudillo" doble
-  // redondeado) más una barra central que los conecta. Calcular a mano
-  // el contorno de esa unión (con arcos que se cortan) es un dolor de
-  // cabeza con clip-path; en vez de eso se arma un mini-SVG con esas 5
-  // formas (más fácil de tener bien seguro) y se usa como máscara — todo
-  // lo blanco queda visible, todo lo demás se recorta. Con el ancho/alto
-  // real ya medido, para que las puntas midan siempre lo mismo sin
-  // importar qué tan largo sea el nombre (solo la barra central se
-  // alarga).
-  function nombre3dHuesoMascara(w, h){
-    const r = h * 0.4; // radio de cada uno de los 4 círculos de las puntas
-    const barraMitad = h * 0.24; // grosor de la barra central (menos que 2r: ahí está el "pellizco" de la cintura)
-    const cy = h / 2;
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
-      '<rect x="' + r.toFixed(1) + '" y="' + (cy - barraMitad).toFixed(1) + '" width="' + Math.max(0, w - 2 * r).toFixed(1) + '" height="' + (barraMitad * 2).toFixed(1) + '" fill="#fff"/>' +
-      '<circle cx="' + r.toFixed(1) + '" cy="' + r.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
-      '<circle cx="' + r.toFixed(1) + '" cy="' + (h - r).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
-      '<circle cx="' + (w - r).toFixed(1) + '" cy="' + r.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
-      '<circle cx="' + (w - r).toFixed(1) + '" cy="' + (h - r).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
-      '</svg>';
-    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+  function nombre3dAnchoTextoPx(texto, fontFamily, fontPx){
+    nombre3dMedirCtx.font = '800 ' + fontPx + 'px ' + fontFamily;
+    return nombre3dMedirCtx.measureText(texto).width;
   }
 
-  // Aclara un color hex mezclándolo con blanco — para el "relieve" interior
-  // más claro de la placa de hueso (borde de esmalte + centro grabado más
-  // claro, como en una placa real, en vez de un color plano de punta a
-  // punta).
-  function nombre3dClarear(hex, factor){
-    const n = parseInt(hex.replace('#', ''), 16);
-    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-    const mezclar = (c) => Math.round(c + (255 - c) * factor);
-    return 'rgb(' + mezclar(r) + ',' + mezclar(g) + ',' + mezclar(b) + ')';
+  // Textura del nombre (con emoji) para pegar como calcomanía en la cara
+  // de adelante de la placa — el color de las letras es independiente del
+  // color de la placa.
+  function nombre3dTexturaTexto(texto, fontFamily, color){
+    const H = 220;
+    const fontPx = Math.round(H * 0.6);
+    nombre3dMedirCtx.font = '800 ' + fontPx + 'px ' + fontFamily;
+    const w = Math.max(10, nombre3dMedirCtx.measureText(texto).width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(w + H * 0.4);
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.font = '800 ' + fontPx + 'px ' + fontFamily;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    ctx.fillText(texto, canvas.width / 2, canvas.height * 0.54);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    texture.anisotropy = 4;
+    // El lienzo no mide potencia de 2 (depende del ancho del nombre) — sin
+    // esto, el filtro con mipmaps que usa Three.js por defecto puede
+    // fallar en silencio con WebGL1 y la calcomanía no se ve.
+    texture.minFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    return { texture, aspecto: canvas.width / canvas.height };
+  }
+
+  // ---- formas "vectoriales" (rectángulo redondeado / óvalo / etiqueta) ----
+  function nombre3dRectRedondeado(w, h, r){
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    const hw = w / 2, hh = h / 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(-hw + r, -hh);
+    shape.lineTo(hw - r, -hh);
+    shape.absarc(hw - r, -hh + r, r, -Math.PI / 2, 0, false);
+    shape.lineTo(hw, hh - r);
+    shape.absarc(hw - r, hh - r, r, 0, Math.PI / 2, false);
+    shape.lineTo(-hw + r, hh);
+    shape.absarc(-hw + r, hh - r, r, Math.PI / 2, Math.PI, false);
+    shape.lineTo(-hw, -hh + r);
+    shape.absarc(-hw + r, -hh + r, r, Math.PI, Math.PI * 1.5, false);
+    return shape;
+  }
+  function nombre3dFormaVector(forma, w, h){
+    if(forma === 'redonda') return nombre3dRectRedondeado(w, h, h / 2);
+    if(forma === 'cuadrada') return nombre3dRectRedondeado(w, h, h * 0.18);
+    if(forma === 'ovalada'){
+      const shape = new THREE.Shape();
+      shape.absellipse(0, 0, w / 2, h / 2, 0, Math.PI * 2, false, 0);
+      return shape;
+    }
+    // etiqueta: rectángulo con la punta derecha cortada en diagonal
+    const hw = w / 2, hh = h / 2, r = h * 0.14, corte = hh * 0.95;
+    const shape = new THREE.Shape();
+    shape.moveTo(-hw + r, -hh);
+    shape.lineTo(hw - corte, -hh);
+    shape.lineTo(hw, 0);
+    shape.lineTo(hw - corte, hh);
+    shape.lineTo(-hw + r, hh);
+    shape.absarc(-hw + r, hh - r, r, Math.PI / 2, Math.PI, false);
+    shape.lineTo(-hw, -hh + r);
+    shape.absarc(-hw + r, -hh + r, r, Math.PI, Math.PI * 1.5, false);
+    return shape;
+  }
+  function nombre3dAgregarHueco(shape, cx, cy, r){
+    const p = new THREE.Path();
+    p.absarc(cx, cy, r, 0, Math.PI * 2, false);
+    shape.holes.push(p);
+  }
+
+  // ---- formas "de trazado" (hueso / contorno de letras): se dibuja la
+  // silueta en un canvas (ahí un union de círculos+rectángulo, o el texto
+  // mismo con la tipografía elegida, es tan fácil como pintar con el
+  // pincel de siempre) y se recorre el borde con marching squares para
+  // convertir esos píxeles en un polígono real — así no hay que calcular
+  // a mano la unión de arcos que se cortan entre sí. ----
+  function nombre3dMarchingSquares(alpha, W, H){
+    const v = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : alpha[y * W + x];
+    const segmentos = [];
+    const casos = {
+      1: [['left', 'bottom']], 2: [['bottom', 'right']], 3: [['left', 'right']],
+      4: [['top', 'right']], 5: [['top', 'left'], ['bottom', 'right']], 6: [['top', 'bottom']],
+      7: [['top', 'left']], 8: [['top', 'left']], 9: [['top', 'bottom']],
+      10: [['top', 'right'], ['left', 'bottom']], 11: [['top', 'right']],
+      12: [['left', 'right']], 13: [['bottom', 'right']], 14: [['left', 'bottom']]
+    };
+    for(let y = 0; y < H - 1; y++){
+      for(let x = 0; x < W - 1; x++){
+        const tl = v(x, y), tr = v(x + 1, y), br = v(x + 1, y + 1), bl = v(x, y + 1);
+        const code = tl * 8 + tr * 4 + br * 2 + bl * 1;
+        if(code === 0 || code === 15) continue;
+        const pts = { top: [x + 0.5, y], bottom: [x + 0.5, y + 1], left: [x, y + 0.5], right: [x + 1, y + 0.5] };
+        (casos[code] || []).forEach(([a, b]) => segmentos.push([pts[a], pts[b]]));
+      }
+    }
+    return segmentos;
+  }
+  function nombre3dEncadenarSegmentos(segmentos){
+    const key = (p) => Math.round(p[0] * 2) + ',' + Math.round(p[1] * 2);
+    const adj = new Map(), porClave = new Map();
+    function addArista(a, b){
+      const ka = key(a), kb = key(b);
+      porClave.set(ka, a); porClave.set(kb, b);
+      if(!adj.has(ka)) adj.set(ka, []);
+      if(!adj.has(kb)) adj.set(kb, []);
+      adj.get(ka).push(kb);
+      adj.get(kb).push(ka);
+    }
+    segmentos.forEach(([a, b]) => addArista(a, b));
+    const usada = new Set();
+    const arKey = (a, b) => (a < b) ? a + '|' + b : b + '|' + a;
+    const bucles = [];
+    for(const inicio of adj.keys()){
+      for(const vecino of adj.get(inicio)){
+        const ek = arKey(inicio, vecino);
+        if(usada.has(ek)) continue;
+        const clavesBucle = [inicio];
+        usada.add(ek);
+        let actual = vecino;
+        let guardia = 0;
+        while(actual !== inicio && guardia < 200000){
+          clavesBucle.push(actual);
+          const opciones = adj.get(actual) || [];
+          let siguiente = null;
+          for(const o of opciones){
+            const ek2 = arKey(actual, o);
+            if(usada.has(ek2)) continue;
+            siguiente = o; break;
+          }
+          if(siguiente === null) break;
+          usada.add(arKey(actual, siguiente));
+          actual = siguiente;
+          guardia++;
+        }
+        if(actual === inicio) bucles.push(clavesBucle.map(k => porClave.get(k)));
+        break;
+      }
+    }
+    return bucles;
+  }
+  function nombre3dSuavizarChaikin(pts, iter){
+    let p = pts;
+    for(let it = 0; it < iter; it++){
+      const q = [];
+      const n = p.length;
+      for(let i = 0; i < n; i++){
+        const a = p[i], b = p[(i + 1) % n];
+        q.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+        q.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+      }
+      p = q;
+    }
+    return p;
+  }
+  function nombre3dPuntoDentro(pt, poligono){
+    let dentro = false;
+    for(let i = 0, j = poligono.length - 1; i < poligono.length; j = i++){
+      const xi = poligono[i][0], yi = poligono[i][1], xj = poligono[j][0], yj = poligono[j][1];
+      const cruza = ((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
+      if(cruza) dentro = !dentro;
+    }
+    return dentro;
+  }
+  function nombre3dSiluetaDesdeCanvas(canvas, worldH){
+    const W = canvas.width, H = canvas.height;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.getImageData(0, 0, W, H).data;
+    const alpha = new Uint8Array(W * H);
+    for(let i = 0; i < W * H; i++) alpha[i] = img[i * 4 + 3] > 128 ? 1 : 0;
+    const alphaEn = (x, y) => {
+      const xi = Math.max(0, Math.min(W - 1, Math.round(x)));
+      const yi = Math.max(0, Math.min(H - 1, Math.round(y)));
+      return alpha[yi * W + xi];
+    };
+    const segmentos = nombre3dMarchingSquares(alpha, W, H);
+    const bucles = nombre3dEncadenarSegmentos(segmentos).filter(b => b.length >= 6);
+    // Un punto garantizado DENTRO del polígono (el promedio simple de los
+    // vértices falla en formas cóncavas — la "L" o la "C" caen fuera de su
+    // propio trazo): se corta con una línea horizontal y se toma el punto
+    // entre el primer y el segundo cruce con el borde. Para formas raras
+    // (como la "L" fundida con la pestañita de la argolla/agujero) una
+    // sola línea a media altura puede caer justo en un "pellizco" entre
+    // las dos partes — se prueban varias alturas y se usa la que da el
+    // hueco más ancho entre cruces, la más confiable.
+    // Clasifica un contorno como "exterior" (material sólido) o "hueco"
+    // (aire) probando varias líneas horizontales y, en cada una, votando
+    // por mayoría entre varios puntos de la primera franja que cruza —
+    // un solo punto (p. ej. el medio exacto) puede caer justo encima de
+    // OTRO hueco perforado dentro de esta misma silueta (como el agujero
+    // de la argolla, centrado justo donde también cae el punto medio del
+    // trazo exterior de esa misma pestañita) y dar un resultado al revés.
+    function clasificarBucle(b){
+      let minY = Infinity, maxY = -Infinity;
+      b.forEach(p => { minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); });
+      function cortarEn(y){
+        const cruces = [];
+        for(let i = 0, j = b.length - 1; i < b.length; j = i++){
+          const yi = b[i][1], yj = b[j][1];
+          if((yi > y) !== (yj > y)){
+            const xi = b[i][0], xj = b[j][0];
+            cruces.push(xi + (xj - xi) * (y - yi) / (yj - yi));
+          }
+        }
+        cruces.sort((a, c) => a - c);
+        return cruces;
+      }
+      const fracciones = [0.5, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9, 0.4, 0.6];
+      for(const f of fracciones){
+        const y = minY + (maxY - minY) * f;
+        const cruces = cortarEn(y);
+        if(cruces.length < 2) continue;
+        const x0 = cruces[0], x1 = cruces[1];
+        let votos1 = 0, votos0 = 0, puntoAlpha1 = null;
+        for(let m = 1; m <= 7; m++){
+          const x = x0 + (x1 - x0) * (m / 8);
+          if(alphaEn(x, y) === 1){ votos1++; if(!puntoAlpha1) puntoAlpha1 = [x, y]; }
+          else votos0++;
+        }
+        if(votos1 !== votos0){
+          return votos1 > votos0
+            ? { exterior: true, punto: puntoAlpha1 || [(x0 + x1) / 2, y] }
+            : { exterior: false, punto: [(x0 + x1) / 2, y] };
+        }
+      }
+      let sx = 0, sy = 0;
+      b.forEach(p => { sx += p[0]; sy += p[1]; });
+      const c = [sx / b.length, sy / b.length];
+      return { exterior: alphaEn(c[0], c[1]) === 1, punto: c };
+    }
+    function puntoInterior(b){
+      return clasificarBucle(b).punto;
+    }
+    const escala = worldH / H;
+    function aMundo(b){
+      let p = b.filter((_, i) => i % 2 === 0);
+      if(p.length < 8) p = b;
+      p = nombre3dSuavizarChaikin(p, 2);
+      return p.map(pt => [(pt[0] - W / 2) * escala, (H / 2 - pt[1]) * escala]);
+    }
+    const exteriores = [], huecos = [];
+    bucles.forEach(b => {
+      const { exterior: esExt } = clasificarBucle(b);
+      (esExt ? exteriores : huecos).push(b);
+    });
+    const exteriorMundo = exteriores.map(aMundo);
+    const shapes = exteriorMundo.map(pts => new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1]))));
+    huecos.forEach(hueco => {
+      const pMundo = (() => { const p = puntoInterior(hueco); return [(p[0] - W / 2) * escala, (H / 2 - p[1]) * escala]; })();
+      const huecoMundo = aMundo(hueco);
+      for(let si = 0; si < exteriorMundo.length; si++){
+        if(nombre3dPuntoDentro(pMundo, exteriorMundo[si])){
+          shapes[si].holes.push(new THREE.Path(huecoMundo.map(p => new THREE.Vector2(p[0], p[1]))));
+          break;
+        }
+      }
+    });
+    return shapes;
+  }
+
+  // Dibuja la silueta de "hueso" (unión de 4 círculos + una barra central —
+  // ver README) o del "contorno de letras" (el propio texto, con la
+  // tipografía elegida) en un canvas, agrega si hace falta una pestañita
+  // sólida (para la argolla o el agujero, siempre en el mismo lugar
+  // relativo sin importar el nombre) y recorta un agujero real perforando
+  // esa pestañita — todo antes de convertirlo en polígono.
+  function nombre3dFormaRaster(forma, texto, fontFamily, necesitaHueco, necesitaArgolla){
+    const H_PX = 320;
+    // El trazador de contornos (marching squares) necesita un borde de
+    // ceros alrededor de toda la silueta para poder cerrar el contorno —
+    // si un círculo u otra forma toca el borde exacto del lienzo (como el
+    // hueso, cuyos círculos son tangentes a los cuatro lados), ese lado
+    // queda "abierto" y no se cierra ningún polígono. Se dibuja todo
+    // desplazado MARGEN píxeles hacia adentro para dejar ese aire.
+    const MARGEN = 8;
+    const esHueso = forma === 'hueso';
+    const fontPx = esHueso ? Math.round(H_PX * 0.34) : Math.round(H_PX * 0.6);
+    const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
+    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.22 : H_PX * 0.08;
+    let W_PX;
+    if(esHueso){
+      const r = H_PX * 0.4;
+      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + r * 2 + H_PX * 0.5));
+    } else {
+      W_PX = Math.max(H_PX * 0.8, Math.ceil(anchoTexto + H_PX * 0.3 + margenTab));
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = W_PX + MARGEN * 2; canvas.height = H_PX + MARGEN * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(MARGEN, MARGEN);
+    ctx.fillStyle = '#fff';
+    let huecoPx = null, argollaPx = null;
+    if(esHueso){
+      const r = H_PX * 0.4, barraMitad = H_PX * 0.24, cy = H_PX / 2;
+      ctx.fillRect(r, cy - barraMitad, Math.max(0, W_PX - 2 * r), barraMitad * 2);
+      [[r, r], [r, H_PX - r], [W_PX - r, r], [W_PX - r, H_PX - r]].forEach(([cx, cyy]) => {
+        ctx.beginPath(); ctx.arc(cx, cyy, r, 0, Math.PI * 2); ctx.fill();
+      });
+      if(necesitaHueco) huecoPx = [r, H_PX / 2, H_PX * 0.11];
+      if(necesitaArgolla) argollaPx = [r, H_PX * 0.05];
+    } else {
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = '800 ' + fontPx + 'px ' + fontFamily;
+      ctx.fillText(texto, margenTab, H_PX * 0.54);
+      // La pestañita (para la argolla o el agujero) se centra bien adentro
+      // del lienzo, nunca pegada al borde — si no, al recortarle el hueco
+      // no queda casi nada de material alrededor y se puede "abrir" hacia
+      // afuera en vez de quedar como un agujero cerrado de verdad.
+      const tabR = H_PX * 0.15;
+      const tabCX = tabR + H_PX * 0.03;
+      if(necesitaArgolla){
+        ctx.beginPath(); ctx.arc(tabCX, H_PX * 0.17, tabR, 0, Math.PI * 2); ctx.fill();
+        argollaPx = [tabCX, H_PX * 0.03];
+      }
+      if(necesitaHueco){
+        ctx.beginPath(); ctx.arc(tabCX, H_PX * 0.5, tabR, 0, Math.PI * 2); ctx.fill();
+        huecoPx = [tabCX, H_PX * 0.5, tabR * 0.45];
+      }
+    }
+    if(huecoPx){
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath(); ctx.arc(huecoPx[0], huecoPx[1], huecoPx[2], 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    const escala = N3D_ALTO / H_PX;
+    // El lienzo real mide H_PX + 2*MARGEN de alto (por el borde de aire),
+    // así que se le pide a nombre3dSiluetaDesdeCanvas una altura de mundo
+    // proporcionalmente mayor para que la escala interna (mundo/alto real)
+    // dé el mismo resultado que "escala" de arriba y la silueta salga del
+    // tamaño correcto — el margen no debe encogerla.
+    const shapes = nombre3dSiluetaDesdeCanvas(canvas, N3D_ALTO * canvas.height / H_PX);
+    const argollaMundo = argollaPx ? [(argollaPx[0] - W_PX / 2) * escala, (H_PX / 2 - argollaPx[1]) * escala] : null;
+    return { shapes, anchoMundo: W_PX * escala, argollaMundo };
   }
 
   function renderNombre3D(){
@@ -5888,216 +6111,140 @@
     const nombre = nombre3dNombreInput.value.trim();
     const emoji = nombre3dEmojiInput.value.trim();
     const texto = nombre + (emoji ? ' ' + emoji : '');
-    nombre3dStage.innerHTML = '';
-    if(!texto){
-      nombre3dStage.innerHTML = '<p class="empty-note">Escribe un nombre para verlo aquí</p>';
-      return;
+    if(!n3d.renderer) nombre3dInitEngine();
+    while(n3d.group.children.length){
+      const hijo = n3d.group.children[0];
+      n3d.group.remove(hijo);
+      hijo.geometry && hijo.geometry.dispose();
+      hijo.material && hijo.material.map && hijo.material.map.dispose();
+      hijo.material && hijo.material.dispose();
     }
-    const plate = document.createElement('div');
-    plate.className = 'nombre3d-plate';
-    plate.style.display = 'flex';
-    plate.style.flexDirection = 'column';
-    plate.style.alignItems = 'center';
-    plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
-    const fontFamily = (NOMBRE3D_FONTS.find(f => f.id === nombre3dFont) || NOMBRE3D_FONTS[0]).family;
+    nombre3dEmptyNote.style.display = texto ? 'none' : 'flex';
+    if(!texto) return;
 
-    // La "cabeza" agrupa las capas apiladas que arman el relieve — necesita
-    // su propio transform-style:preserve-3d para que la profundidad (los
-    // translateZ de cada capa) no se aplaste al meterla dentro de "plate".
-    // El identificador de lápiz es un bloque bien más grueso que el
-    // llavero (más capas, más separadas entre sí), con un hueco ovalado
-    // atravesándolo — no una placa delgada con un simple aro.
+    const fontFamily = (NOMBRE3D_FONTS.find(f => f.id === nombre3dFont) || NOMBRE3D_FONTS[0]).family;
     const esLapiz = nombre3dTipo === 'lapiz';
+    const esMascota = nombre3dTipo === 'mascota';
     const esContorno = nombre3dForma === 'contorno';
-    const head = document.createElement('div');
-    head.className = 'nombre3d-head';
-    const CAPAS = esLapiz ? 22 : 10;
-    const PASO_Z = esLapiz ? 3 : 2;
-    // "Contorno de letras" no es una caja con el nombre encima — el texto
-    // mismo hace de silueta, dibujado con un trazo grueso (text-stroke)
-    // del color de fondo detrás del relleno: así el trazo hace de plástico
-    // alrededor de cada letra y el relleno es el hueco/color de la letra,
-    // igual que un llavero cortado con la forma del nombre.
-    const esHueso = nombre3dForma === 'hueso';
-    for(let i = CAPAS - 1; i >= 0; i--){
-      const capa = document.createElement('div');
-      capa.className = 'nombre3d-layer nombre3d-forma-' + nombre3dForma + (i === 0 ? ' nombre3d-front' : '');
-      capa.style.fontFamily = fontFamily;
-      if(i === 0 && esHueso){
-        // Placa para mascotas: la cara de adelante lleva un "relieve"
-        // interior más claro (mismo color, aclarado) detrás del nombre,
-        // como el borde de esmalte + centro grabado de una placa real —
-        // en vez de un color plano de punta a punta.
-        const relieve = document.createElement('div');
-        relieve.className = 'nombre3d-hueso-relieve';
-        relieve.style.background = nombre3dClarear(nombre3dColor, 0.7);
-        capa.appendChild(relieve);
-        const textoSpan = document.createElement('span');
-        textoSpan.className = 'nombre3d-hueso-texto';
-        textoSpan.textContent = texto;
-        capa.appendChild(textoSpan);
-      } else {
-        capa.textContent = texto;
-      }
-      capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
-      capa.style.transform = 'translateZ(' + (-i * PASO_Z) + 'px)';
-      if(esContorno){
-        capa.style.background = 'transparent';
-        capa.style.textShadow = nombre3dContornoSombra(nombre3dColor);
-        // Las capas de atrás son el "grosor" del corte: mismo color por
-        // fuera y por dentro (silueta sólida), sin distinguir letra/fondo.
-        capa.style.color = i === 0 ? nombre3dTextColor : nombre3dColor;
-      } else {
-        capa.style.background = nombre3dColor;
-        capa.style.color = nombre3dTextColor;
-        capa.style.textShadow = '';
-      }
-      if(i === 0){
-        capa.style.boxShadow = esContorno ? 'none' : '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
-      }
-      head.appendChild(capa);
-    }
-    // Cara trasera: mismo texto (para medir igual) pero con las letras
-    // transparentes, puesta en el fondo del todo y girada 180° sobre sí
-    // misma — así al girar la pieza y "mostrar atrás" se ve una placa
-    // lisa en vez de un hueco vacío (antes desaparecía el diseño). En
-    // "Contorno de letras" no hay caja de fondo que mostrar: la cara
-    // trasera es la misma silueta sólida (mismo truco de trazo+relleno
-    // del color de fondo) en vez de una placa transparente.
-    const back = document.createElement('div');
-    back.className = 'nombre3d-layer nombre3d-back nombre3d-forma-' + nombre3dForma;
-    back.textContent = texto;
-    back.style.fontFamily = fontFamily;
-    back.style.filter = 'brightness(0.4)';
-    back.style.transform = 'translateZ(' + (-(CAPAS) * PASO_Z) + 'px) rotateY(180deg)';
-    if(esContorno){
-      back.style.background = 'transparent';
-      back.style.textShadow = nombre3dContornoSombra(nombre3dColor);
-      back.style.color = nombre3dColor;
+    const forma = esMascota ? 'hueso' : nombre3dForma;
+    const profundidad = esLapiz ? N3D_PROF_GRUESA : N3D_PROF_FINA;
+    // El identificador de lápiz siempre necesita el hueco atravesado (no
+    // hay elección); llavero y placa para mascotas usan lo que se haya
+    // elegido en "Argolla o agujero".
+    const necesitaHueco = esLapiz || nombre3dArgolla === 'agujero';
+    const necesitaArgolla = !esLapiz && nombre3dArgolla === 'argolla';
+
+    const colorPlaca = esContorno ? nombre3dTextColor : nombre3dColor;
+    const materialPlaca = new THREE.MeshStandardMaterial({ color: colorPlaca, roughness: 0.5, metalness: 0.06, side: THREE.DoubleSide });
+    const bevelGrosor = Math.min(0.05, profundidad * 0.18);
+    const extrudeOpts = {
+      depth: profundidad, bevelEnabled: true,
+      bevelThickness: bevelGrosor,
+      bevelSize: Math.min(0.045, profundidad * 0.16),
+      bevelSegments: 2, curveSegments: 16
+    };
+
+    let shapes, anchoMundo, argollaMundo = null;
+    const altoMundo = N3D_ALTO;
+
+    if(forma === 'hueso' || esContorno){
+      const res = nombre3dFormaRaster(forma, texto, fontFamily, necesitaHueco, necesitaArgolla);
+      shapes = res.shapes;
+      anchoMundo = res.anchoMundo;
+      argollaMundo = res.argollaMundo;
     } else {
-      back.style.background = nombre3dColor;
-      back.style.textShadow = '';
-      back.style.color = 'transparent';
+      const fontPxRef = 100;
+      const anchoTextoPx = Math.max(20, nombre3dAnchoTextoPx(texto, fontFamily, fontPxRef));
+      const proporcion = anchoTextoPx / fontPxRef;
+      const padFrac = forma === 'ovalada' ? 0.7 : forma === 'redonda' ? 0.55 : forma === 'etiqueta' ? 0.62 : 0.34;
+      anchoMundo = Math.max(altoMundo * 1.25, proporcion * altoMundo * 0.62 + altoMundo * padFrac);
+      const shape = nombre3dFormaVector(forma, anchoMundo, altoMundo);
+      if(necesitaHueco) nombre3dAgregarHueco(shape, -anchoMundo / 2 + altoMundo * 0.35, 0, altoMundo * 0.09);
+      shapes = [shape];
+      if(necesitaArgolla) argollaMundo = [-anchoMundo / 2 + altoMundo * 0.35, altoMundo / 2];
     }
-    head.appendChild(back);
-    if(nombre3dTipo === 'llavero' || nombre3dTipo === 'mascota'){
-      if(nombre3dArgolla === 'agujero'){
-        // Agujero: la pestañita sólida sale del costado izquierdo, a la
-        // mitad de la altura, y el hueco va perforado dentro de ella —
-        // así nunca cae encima de una letra, sin importar el nombre o la
-        // forma (incluido "Contorno de letras").
-        const mount = document.createElement('div');
-        mount.className = 'nombre3d-agujero-mount';
-        mount.style.background = nombre3dColor;
-        mount.style.filter = 'brightness(0.85)';
-        head.appendChild(mount);
-        const agujero = document.createElement('div');
-        agujero.className = 'nombre3d-agujero-llavero';
-        head.appendChild(agujero);
-      } else {
-        // Argolla: la pestaña ("mount") del mismo color de la pieza sube
-        // desde el borde de arriba y la argolla metálica se apoya justo
-        // encima, fundida a esa pestaña en vez de quedar suelta en el aire.
-        const mount = document.createElement('div');
-        mount.className = 'nombre3d-ring-mount';
-        mount.style.background = nombre3dColor;
-        mount.style.filter = 'brightness(0.85)';
-        head.appendChild(mount);
-        const ring = document.createElement('div');
-        ring.className = 'nombre3d-ring';
-        head.appendChild(ring);
-      }
-    } else if(esContorno){
-      const mount = document.createElement('div');
-      mount.className = 'nombre3d-lapiz-mount-contorno';
-      mount.style.background = nombre3dColor;
-      mount.style.filter = 'brightness(0.85)';
-      head.appendChild(mount);
-      const hueco = document.createElement('div');
-      hueco.className = 'nombre3d-hueco-lapiz nombre3d-hueco-lapiz-contorno';
-      head.appendChild(hueco);
-    } else {
-      const hueco = document.createElement('div');
-      hueco.className = 'nombre3d-hueco-lapiz';
-      head.appendChild(hueco);
+
+    if(!shapes.length) return;
+
+    shapes.forEach(s => {
+      const geo = new THREE.ExtrudeGeometry(s, extrudeOpts);
+      const mesh = new THREE.Mesh(geo, materialPlaca);
+      mesh.position.z = -profundidad / 2;
+      n3d.group.add(mesh);
+    });
+
+    // La placa de hueso lleva un "relieve" interior del mismo color pero
+    // aclarado, detrás del nombre — como el borde de esmalte + centro
+    // grabado más claro de una placa real, en vez de un color plano de
+    // punta a punta. Se arma con una copia de la silueta encogida hacia
+    // su centro (sin la precisión de un verdadero offset de polígono,
+    // pero de sobra para una forma tan redondeada como el hueso) pegada
+    // encima de la cara de adelante.
+    if(forma === 'hueso'){
+      const colorRelieve = new THREE.Color(colorPlaca).lerp(new THREE.Color(0xffffff), 0.32);
+      const materialRelieve = new THREE.MeshStandardMaterial({ color: colorRelieve, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide });
+      shapes.forEach(s => {
+        const pts = s.getPoints();
+        let cx = 0, cy = 0;
+        pts.forEach(p => { cx += p.x; cy += p.y; });
+        cx /= pts.length; cy /= pts.length;
+        const factor = 0.8;
+        const encoger = (p) => new THREE.Vector2(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor);
+        const relieveShape = new THREE.Shape(pts.map(encoger));
+        // Si la silueta tiene un agujero (la pestañita del "Agujero" en vez
+        // de argolla), el relieve también lo respeta — si no, lo taparía.
+        // El agujero real NO se encoge (si no, quedaría desalineado del
+        // agujero de verdad, que sigue en su lugar original).
+        relieveShape.holes = s.holes.map(h => new THREE.Path(h.getPoints()));
+        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(relieveShape), materialRelieve);
+        mesh.position.z = profundidad / 2 + bevelGrosor + 0.006;
+        n3d.group.add(mesh);
+      });
     }
-    plate.appendChild(head);
-    nombre3dStage.appendChild(plate);
-    if(nombre3dForma === 'hueso'){
-      // Se mide y aplica el recorte de hueso ahora (todas las capas miden
-      // lo mismo, mismo texto) — pero la tipografía (Google Fonts) puede
-      // terminar de cargar DESPUÉS de este punto, y al llegar cambia el
-      // ancho real del texto sin que el recorte ya aplicado se entere,
-      // dejando las puntas mal alineadas con la cintura (se vio en un
-      // celular real, aunque no en las pruebas de escritorio, porque ahí
-      // la fuente no cargaba nunca y por eso nunca se movía). Por las
-      // dudas se vuelve a medir y aplicar cuando las fuentes terminan de
-      // cargar, protegido con un número de "generación" para no pisar un
-      // renderizado más nuevo si para entonces ya se volvió a llamar a
-      // esta función (con otro nombre, color, etc).
-      const aplicarRecorteHueso = () => {
-        if(miGen !== nombre3dRenderGen) return;
-        const frente = head.querySelector('.nombre3d-front');
-        if(!frente) return;
-        const mascara = nombre3dHuesoMascara(frente.offsetWidth, frente.offsetHeight);
-        head.querySelectorAll('.nombre3d-forma-hueso').forEach(el => {
-          el.style.webkitMaskImage = mascara;
-          el.style.maskImage = mascara;
-          el.style.webkitMaskSize = '100% 100%';
-          el.style.maskSize = '100% 100%';
-          el.style.webkitMaskRepeat = 'no-repeat';
-          el.style.maskRepeat = 'no-repeat';
-        });
-        const relieve = frente.querySelector('.nombre3d-hueso-relieve');
-        if(relieve){
-          const mascaraRelieve = nombre3dHuesoMascara(relieve.offsetWidth, relieve.offsetHeight);
-          relieve.style.webkitMaskImage = mascaraRelieve;
-          relieve.style.maskImage = mascaraRelieve;
-          relieve.style.webkitMaskSize = '100% 100%';
-          relieve.style.maskSize = '100% 100%';
-          relieve.style.webkitMaskRepeat = 'no-repeat';
-          relieve.style.maskRepeat = 'no-repeat';
-        }
-      };
-      aplicarRecorteHueso();
-      if(document.fonts && document.fonts.ready){
-        document.fonts.ready.then(aplicarRecorteHueso);
-      }
-      setTimeout(aplicarRecorteHueso, 350);
+
+    if(!esContorno){
+      const { texture, aspecto } = nombre3dTexturaTexto(texto, fontFamily, nombre3dTextColor);
+      let decalH = altoMundo * 0.5, decalW = decalH * aspecto;
+      const maxW = anchoMundo * 0.84;
+      if(decalW > maxW){ decalW = maxW; decalH = decalW / aspecto; }
+      const plane = new THREE.Mesh(
+        new THREE.PlaneGeometry(decalW, decalH),
+        new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false })
+      );
+      plane.position.z = profundidad / 2 + bevelGrosor + 0.015;
+      n3d.group.add(plane);
+    }
+
+    if(necesitaArgolla && argollaMundo){
+      const [ax, ay] = argollaMundo;
+      const mount = new THREE.Mesh(
+        new THREE.BoxGeometry(altoMundo * 0.16, altoMundo * 0.24, profundidad * 0.75),
+        materialPlaca
+      );
+      mount.position.set(ax, ay + altoMundo * 0.02, 0);
+      n3d.group.add(mount);
+      const anilloMat = new THREE.MeshStandardMaterial({ color: 0xb7bcc4, metalness: 0.85, roughness: 0.3 });
+      const anillo = new THREE.Mesh(new THREE.TorusGeometry(altoMundo * 0.11, altoMundo * 0.026, 8, 24), anilloMat);
+      anillo.position.set(ax, ay + altoMundo * 0.17, 0);
+      n3d.group.add(anillo);
     }
   }
+
   [nombre3dNombreInput, nombre3dEmojiInput].forEach(input => {
     input.addEventListener('input', renderNombre3D);
   });
 
-  // Arrastrar para girar — sencillo: guarda el ángulo actual y lo mueve
-  // según lo que se desplace el dedo/mouse, sin reconstruir las capas en
-  // cada movimiento (solo cambia el transform de la placa ya armada).
+  // Arrastrar para girar — libre del todo, sin límites: al ser geometría
+  // 3D real (no capas de CSS apiladas) siempre hay una cara sólida que se
+  // ve sin importar el ángulo, así que no hace falta ningún truco para
+  // "saltar" el canto ni limitar el rango como antes.
   let nombre3dArrastrando = false, nombre3dUltimoX = 0, nombre3dUltimoY = 0;
-
-  // El "grosor" son varias capas planas apiladas, no una pieza sólida de
-  // verdad — vista justo de canto (a 90°/270°) esas capas no tienen ancho
-  // y la pieza se reduce a una rayita casi invisible. En vez de dejar que
-  // el giro se quede ahí mostrando esa rayita mientras arrastras despacio,
-  // se salta esa franja angosta de un salto en la dirección en la que se
-  // está girando — así nunca se ve "desaparecer", solo pasa directo de un
-  // lado sólido al otro.
-  function nombre3dEvitarCanto(angulo, avanzando){
-    const ZONA = 12; // grados a cada lado de 90/270 que se saltan
-    const mod = ((angulo % 180) + 180) % 180;
-    if(mod > 90 - ZONA && mod < 90 + ZONA){
-      const base = angulo - mod;
-      return avanzando ? base + 90 + ZONA : base + 90 - ZONA;
-    }
-    return angulo;
-  }
   nombre3dStage.addEventListener('pointerdown', (e) => {
-    const plate = nombre3dStage.querySelector('.nombre3d-plate');
-    if(!plate) return;
+    if(!n3d.group) return;
     nombre3dArrastrando = true;
     nombre3dUltimoX = e.clientX;
     nombre3dUltimoY = e.clientY;
-    plate.classList.add('nombre3d-dragging');
+    nombre3dStage.classList.add('nombre3d-dragging');
     nombre3dStage.setPointerCapture(e.pointerId);
   });
   nombre3dStage.addEventListener('pointermove', (e) => {
@@ -6106,21 +6253,16 @@
     const dy = e.clientY - nombre3dUltimoY;
     nombre3dUltimoX = e.clientX;
     nombre3dUltimoY = e.clientY;
-    // Giro libre en horizontal (para poder ver la pieza de frente, de
-    // canto y por detrás, las tres vueltas completas) — el vertical se
-    // deja con un rango amplio pero sin llegar a voltearla de cabeza.
-    nombre3dRotY = nombre3dEvitarCanto(nombre3dRotY + dx * 0.5, dx >= 0);
-    nombre3dRotX = Math.max(-60, Math.min(60, nombre3dRotX - dy * 0.5));
-    const plate = nombre3dStage.querySelector('.nombre3d-plate');
-    if(plate) plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
+    nombre3dRotY += dx * 0.012;
+    nombre3dRotX = Math.max(-1.0, Math.min(1.0, nombre3dRotX - dy * 0.012));
   });
   function nombre3dSoltar(){
     nombre3dArrastrando = false;
-    const plate = nombre3dStage.querySelector('.nombre3d-plate');
-    if(plate) plate.classList.remove('nombre3d-dragging');
+    nombre3dStage.classList.remove('nombre3d-dragging');
   }
   nombre3dStage.addEventListener('pointerup', nombre3dSoltar);
   nombre3dStage.addEventListener('pointercancel', nombre3dSoltar);
+
 
   // Comparte un link que abre la app YA en modo "solo esta pestaña" (sin
   // barra de pestañas, sin el resto de la app) — para mandárselo al
