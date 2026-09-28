@@ -6236,14 +6236,19 @@
       fondo.holes.push(new THREE.Path(ptsCorregidos));
     }
 
-    if(necesitaHueco){
+    // Para el identificador de lápiz el agujero ya no se recorta acá (un
+    // círculo calado en el plano de la placa, como una argolla de
+    // llavero) sino que se arma aparte como un tubo real que atraviesa
+    // de punta a punta, en horizontal, paralelo al nombre — ver más abajo
+    // (donde se arma la escena) el uso de "lapizMundo".
+    if(necesitaHueco && !esLapiz){
       // El agujero real para colgar (no decorativo) se recorta aparte,
       // como un círculo simple en coordenadas de mundo — si se dejara que
       // el inflado lo tapara, desaparecería (un hueco tan chico se sella
       // solo al desenfocar/agrandar la silueta).
       const cxMundo = (tabCX - W_PX / 2) * escala;
       const cyMundo = 0; // H_PX/2 - H_PX*0.5 == 0: el agujero va centrado en la altura
-      const rMundo = tabR * (esLapiz ? 0.72 : 0.45) * escala;
+      const rMundo = tabR * 0.45 * escala;
       const circuloMundo = [];
       for(let i = 0; i < 24; i++){
         const a = i / 24 * Math.PI * 2;
@@ -6258,7 +6263,10 @@
     }
 
     const argollaMundo = argollaPx ? [(argollaPx[0] - W_PX / 2) * escala, (H_PX / 2 - argollaPx[1]) * escala] : null;
-    return { shapes: shapesFondo, letraShapes, anchoMundo: W_PX * escala, argollaMundo };
+    // Borde izquierdo de la pestañita, en coordenadas de mundo — ahí se
+    // engancha el tubo del identificador de lápiz (ver renderNombre3D).
+    const lapizMundo = esLapiz ? [(tabCX - tabR - W_PX / 2) * escala, 0] : null;
+    return { shapes: shapesFondo, letraShapes, anchoMundo: W_PX * escala, argollaMundo, lapizMundo };
   }
 
   function renderNombre3D(){
@@ -6326,7 +6334,7 @@
       bevelSegments: 2, curveSegments: 16
     };
 
-    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null;
+    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null, lapizMundo = null;
     const altoMundo = N3D_ALTO;
 
     if(forma === 'hueso' || esContorno){
@@ -6335,6 +6343,7 @@
       anchoMundo = res.anchoMundo;
       argollaMundo = res.argollaMundo;
       letraShapesContorno = res.letraShapes;
+      lapizMundo = res.lapizMundo || null;
     } else {
       const fontPxRef = 100;
       const anchoTextoPx = Math.max(20, nombre3dAnchoTextoPx(texto, fontFamily, fontPxRef));
@@ -6342,11 +6351,12 @@
       const padFrac = forma === 'ovalada' ? 0.7 : forma === 'redonda' ? 0.55 : forma === 'etiqueta' ? 0.62 : 0.34;
       anchoMundo = Math.max(altoMundo * 1.25, proporcion * altoMundo * 0.62 + altoMundo * padFrac);
       const shape = nombre3dFormaVector(forma, anchoMundo, altoMundo);
-      // El identificador de lápiz necesita un agujero de verdad, del
-      // tamaño de un lápiz real, no el agujerito chico decorativo de un
-      // llavero — más separado del borde para que le quede material
-      // alrededor de sobra.
-      if(necesitaHueco) nombre3dAgregarHueco(shape, -anchoMundo / 2 + altoMundo * (esLapiz ? 0.5 : 0.35), 0, altoMundo * (esLapiz ? 0.22 : 0.09));
+      // El identificador de lápiz ya no recorta un agujero calado en el
+      // plano de la placa (eso queda para la argolla del llavero) — en
+      // vez de eso se engancha un tubo real que atraviesa de punta a
+      // punta por el borde izquierdo (ver "lapizMundo" más abajo).
+      if(necesitaHueco && !esLapiz) nombre3dAgregarHueco(shape, -anchoMundo / 2 + altoMundo * 0.35, 0, altoMundo * 0.09);
+      if(esLapiz) lapizMundo = [-anchoMundo / 2, 0];
       shapes = [shape];
       if(necesitaArgolla) argollaMundo = [-anchoMundo / 2 + altoMundo * 0.35, altoMundo / 2];
     }
@@ -6399,6 +6409,29 @@
       const anillo = new THREE.Mesh(new THREE.TorusGeometry(altoMundo * 0.11, altoMundo * 0.026, 8, 24), anilloMat);
       anillo.position.set(ax, ay + altoMundo * 0.17, 0);
       n3d.group.add(anillo);
+    }
+
+    if(esLapiz && lapizMundo){
+      // El identificador de lápiz no lleva un agujero calado en el plano
+      // de la placa (como la argolla de un llavero, que se ve de frente),
+      // sino un tubo real enganchado al borde, acostado en horizontal —
+      // en la misma dirección que se lee el nombre — con el agujero
+      // atravesándolo de punta a punta, como el bloque real donde se
+      // mete el lápiz. Se arma como una arandela (círculo con un círculo
+      // más chico agujereado) extruida a lo largo, y esa extrusión se
+      // acuesta de canto (girada 90° en Y) para que su eje quede
+      // horizontal en vez de mirar de frente a la cámara.
+      const [lx, ly] = lapizMundo;
+      const rExt = altoMundo * 0.42, rInt = altoMundo * 0.24;
+      const largoTubo = altoMundo * 0.7;
+      const arandela = new THREE.Shape();
+      arandela.absarc(0, 0, rExt, 0, Math.PI * 2, false);
+      nombre3dAgregarHueco(arandela, 0, 0, rInt);
+      const geoTubo = new THREE.ExtrudeGeometry(arandela, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
+      const tubo = new THREE.Mesh(geoTubo, materialPlaca);
+      tubo.rotation.y = Math.PI / 2;
+      tubo.position.set(lx - largoTubo / 2, ly, 0);
+      n3d.group.add(tubo);
     }
 
     // Aleja o acerca la cámara según el tamaño real de ESTA pieza (el
