@@ -5695,8 +5695,11 @@
   // paredes del relieve) dentro de un contenedor con "perspective", que se
   // puede girar arrastrando. Se ve como una pieza sólida sin cargar ninguna
   // librería 3D pesada.
-  const NOMBRE3D_COLORS = ['#2b3a67', '#c1121f', '#ffb703', '#588157', '#7b2cbf', '#023047', '#e85d75', '#495057', '#ffffff'];
-  const NOMBRE3D_TEXT_COLORS = ['#ffffff', '#000000', '#ffd60a', '#ff70a6', '#70d6ff', '#8ac926'];
+  // Mismos 9 colores para fondo y letras: rojo, amarillo, azul, verde
+  // claro, gris, negro, blanco, beige y café.
+  const NOMBRE3D_COLORS = ['#d62828', '#ffd60a', '#1c77c3', '#8ac926', '#868e96', '#1a1a1a', '#ffffff', '#d9c3a3', '#6f4e37'];
+  const NOMBRE3D_TEXT_COLORS = NOMBRE3D_COLORS;
+  const NOMBRE3D_COLORES_CLAROS = ['#ffd60a', '#8ac926', '#ffffff', '#d9c3a3']; // llevan borde más marcado para distinguirse del fondo blanco
   // Tipografías redondeadas/gruesas típicas de estas piezas — cada una ya
   // se pidió junto con las demás fuentes de la app en el <link> de Google
   // Fonts de arriba, así que no hace falta cargar nada extra aquí.
@@ -5733,8 +5736,8 @@
   const nombre3dShareRow = document.getElementById('nombre3dShareRow');
   const nombre3dIntroCard = document.getElementById('nombre3dIntroCard');
   let nombre3dTipo = 'llavero'; // 'llavero' | 'lapiz' | 'mascota'
-  let nombre3dColor = NOMBRE3D_COLORS[0];
-  let nombre3dTextColor = NOMBRE3D_TEXT_COLORS[0];
+  let nombre3dColor = NOMBRE3D_COLORS[0]; // rojo
+  let nombre3dTextColor = '#ffffff'; // blanco — distinto del fondo por defecto para que se lea
   let nombre3dFont = NOMBRE3D_FONTS[0].id;
   let nombre3dForma = NOMBRE3D_FORMAS[0].id;
   let nombre3dArgolla = NOMBRE3D_ARGOLLAS[0].id; // 'argolla' | 'agujero' — solo aplica al llavero
@@ -5751,8 +5754,8 @@
     });
   });
 
-  nombre3dColorRow.innerHTML = NOMBRE3D_COLORS.map((c, i) =>
-    '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-color="' + c + '" style="background:' + c + ';' + (c === '#ffffff' ? 'border-color:var(--line-strong);' : '') + '" title="Color"></button>'
+  nombre3dColorRow.innerHTML = NOMBRE3D_COLORS.map(c =>
+    '<button type="button" class="nombre3d-color-swatch' + (c === nombre3dColor ? ' active' : '') + '" data-color="' + c + '" style="background:' + c + ';' + (NOMBRE3D_COLORES_CLAROS.includes(c) ? 'border-color:var(--line-strong);' : '') + '" title="Color"></button>'
   ).join('');
   nombre3dColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -5761,8 +5764,8 @@
       renderNombre3D();
     });
   });
-  nombre3dTextColorRow.innerHTML = NOMBRE3D_TEXT_COLORS.map((c, i) =>
-    '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-textcolor="' + c + '" style="background:' + c + ';' + (c === '#ffffff' ? 'border-color:var(--line-strong);' : '') + '" title="Color de las letras"></button>'
+  nombre3dTextColorRow.innerHTML = NOMBRE3D_TEXT_COLORS.map(c =>
+    '<button type="button" class="nombre3d-color-swatch' + (c === nombre3dTextColor ? ' active' : '') + '" data-textcolor="' + c + '" style="background:' + c + ';' + (NOMBRE3D_COLORES_CLAROS.includes(c) ? 'border-color:var(--line-strong);' : '') + '" title="Color de las letras"></button>'
   ).join('');
   nombre3dTextColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(btn => {
     btn.addEventListener('click', () => {
