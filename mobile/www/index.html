@@ -1151,6 +1151,15 @@
     border-radius: 0;
     padding: 22px 50px;
   }
+  /* Relieve interior de la placa de hueso: mismo color aclarado, recortado
+     con la misma máscara pero un poco más chico (se aplica en JS) — deja
+     ver un borde del color de fondo alrededor, como el esmalte + centro
+     grabado de una placa real. */
+  .nombre3d-hueso-relieve{
+    position: absolute;
+    top: 8px; left: 8px; right: 8px; bottom: 8px;
+  }
+  .nombre3d-hueso-texto{ position: relative; z-index: 1; }
   /* "Contorno de letras": en vez de una placa rectangular con el nombre
      encima, el contorno de la pieza sigue la forma de las propias letras
      (como un llavero cortado con la silueta del nombre) — se logra sin
@@ -5850,8 +5859,8 @@
   // importar qué tan largo sea el nombre (solo la barra central se
   // alarga).
   function nombre3dHuesoMascara(w, h){
-    const r = h * 0.33; // radio de cada uno de los 4 círculos de las puntas
-    const barraMitad = h * 0.19; // grosor de la barra central (menos que 2r: ahí está el "pellizco" de la cintura)
+    const r = h * 0.4; // radio de cada uno de los 4 círculos de las puntas
+    const barraMitad = h * 0.24; // grosor de la barra central (menos que 2r: ahí está el "pellizco" de la cintura)
     const cy = h / 2;
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
       '<rect x="' + r.toFixed(1) + '" y="' + (cy - barraMitad).toFixed(1) + '" width="' + Math.max(0, w - 2 * r).toFixed(1) + '" height="' + (barraMitad * 2).toFixed(1) + '" fill="#fff"/>' +
@@ -5861,6 +5870,17 @@
       '<circle cx="' + (w - r).toFixed(1) + '" cy="' + (h - r).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
       '</svg>';
     return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+  }
+
+  // Aclara un color hex mezclándolo con blanco — para el "relieve" interior
+  // más claro de la placa de hueso (borde de esmalte + centro grabado más
+  // claro, como en una placa real, en vez de un color plano de punta a
+  // punta).
+  function nombre3dClarear(hex, factor){
+    const n = parseInt(hex.replace('#', ''), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const mezclar = (c) => Math.round(c + (255 - c) * factor);
+    return 'rgb(' + mezclar(r) + ',' + mezclar(g) + ',' + mezclar(b) + ')';
   }
 
   function renderNombre3D(){
@@ -5898,11 +5918,27 @@
     // del color de fondo detrás del relleno: así el trazo hace de plástico
     // alrededor de cada letra y el relleno es el hueco/color de la letra,
     // igual que un llavero cortado con la forma del nombre.
+    const esHueso = nombre3dForma === 'hueso';
     for(let i = CAPAS - 1; i >= 0; i--){
       const capa = document.createElement('div');
       capa.className = 'nombre3d-layer nombre3d-forma-' + nombre3dForma + (i === 0 ? ' nombre3d-front' : '');
-      capa.textContent = texto;
       capa.style.fontFamily = fontFamily;
+      if(i === 0 && esHueso){
+        // Placa para mascotas: la cara de adelante lleva un "relieve"
+        // interior más claro (mismo color, aclarado) detrás del nombre,
+        // como el borde de esmalte + centro grabado de una placa real —
+        // en vez de un color plano de punta a punta.
+        const relieve = document.createElement('div');
+        relieve.className = 'nombre3d-hueso-relieve';
+        relieve.style.background = nombre3dClarear(nombre3dColor, 0.7);
+        capa.appendChild(relieve);
+        const textoSpan = document.createElement('span');
+        textoSpan.className = 'nombre3d-hueso-texto';
+        textoSpan.textContent = texto;
+        capa.appendChild(textoSpan);
+      } else {
+        capa.textContent = texto;
+      }
       capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
       capa.style.transform = 'translateZ(' + (-i * PASO_Z) + 'px)';
       if(esContorno){
@@ -5916,9 +5952,6 @@
         capa.style.color = nombre3dTextColor;
         capa.style.textShadow = '';
       }
-      // Usada por los lóbulos de la forma "hueso" (box-shadow no puede
-      // leer el background con la palabra clave "inherit").
-      capa.style.setProperty('--n3d-bg', nombre3dColor);
       if(i === 0){
         capa.style.boxShadow = esContorno ? 'none' : '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
       }
@@ -5946,7 +5979,6 @@
       back.style.textShadow = '';
       back.style.color = 'transparent';
     }
-    back.style.setProperty('--n3d-bg', nombre3dColor);
     head.appendChild(back);
     if(nombre3dTipo === 'llavero' || nombre3dTipo === 'mascota'){
       if(nombre3dArgolla === 'agujero'){
@@ -6016,6 +6048,16 @@
           el.style.webkitMaskRepeat = 'no-repeat';
           el.style.maskRepeat = 'no-repeat';
         });
+        const relieve = frente.querySelector('.nombre3d-hueso-relieve');
+        if(relieve){
+          const mascaraRelieve = nombre3dHuesoMascara(relieve.offsetWidth, relieve.offsetHeight);
+          relieve.style.webkitMaskImage = mascaraRelieve;
+          relieve.style.maskImage = mascaraRelieve;
+          relieve.style.webkitMaskSize = '100% 100%';
+          relieve.style.maskSize = '100% 100%';
+          relieve.style.webkitMaskRepeat = 'no-repeat';
+          relieve.style.maskRepeat = 'no-repeat';
+        }
       };
       aplicarRecorteHueso();
       if(document.fonts && document.fonts.ready){
