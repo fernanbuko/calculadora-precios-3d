@@ -5684,7 +5684,7 @@
   // paredes del relieve) dentro de un contenedor con "perspective", que se
   // puede girar arrastrando. Se ve como una pieza sólida sin cargar ninguna
   // librería 3D pesada.
-  const NOMBRE3D_COLORS = ['#2b3a67', '#c1121f', '#ffb703', '#588157', '#7b2cbf', '#023047', '#e85d75', '#495057'];
+  const NOMBRE3D_COLORS = ['#2b3a67', '#c1121f', '#ffb703', '#588157', '#7b2cbf', '#023047', '#e85d75', '#495057', '#ffffff'];
   const NOMBRE3D_TEXT_COLORS = ['#ffffff', '#000000', '#ffd60a', '#ff70a6', '#70d6ff', '#8ac926'];
   // Tipografías redondeadas/gruesas típicas de estas piezas — cada una ya
   // se pidió junto con las demás fuentes de la app en el <link> de Google
@@ -5740,7 +5740,7 @@
   });
 
   nombre3dColorRow.innerHTML = NOMBRE3D_COLORS.map((c, i) =>
-    '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-color="' + c + '" style="background:' + c + ';" title="Color"></button>'
+    '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-color="' + c + '" style="background:' + c + ';' + (c === '#ffffff' ? 'border-color:var(--line-strong);' : '') + '" title="Color"></button>'
   ).join('');
   nombre3dColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(btn => {
     btn.addEventListener('click', () => {
