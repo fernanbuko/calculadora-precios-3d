@@ -6128,7 +6128,7 @@
     const esHueso = forma === 'hueso';
     const fontPx = esHueso ? Math.round(H_PX * 0.34) : Math.round(H_PX * 0.6);
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
-    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.22 : H_PX * 0.08;
+    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.36 : H_PX * 0.08;
     let W_PX;
     if(esHueso){
       const r = H_PX * 0.4;
@@ -6190,15 +6190,20 @@
     // afuera en vez de quedar como un agujero cerrado de verdad. Se
     // dibuja AHORA (después de trazar las letras) para que se sume a la
     // plaqueta de fondo pero no se recorte como si fuera una letra.
+    // La argolla y el agujero van en el mismo lugar exacto (mismo alto,
+    // a la mitad de la pestañita) — antes la argolla salía pegada arriba
+    // del todo y el agujero a la mitad, así que se veían en dos lugares
+    // distintos sin ningún motivo.
     const tabR = H_PX * 0.15;
     const tabCX = tabR + H_PX * 0.03;
+    const tabCY = H_PX * 0.5;
     let argollaPx = null;
     if(necesitaArgolla){
-      ctx.beginPath(); ctx.arc(tabCX, H_PX * 0.17, tabR, 0, Math.PI * 2); ctx.fill();
-      argollaPx = [tabCX, H_PX * 0.03];
+      ctx.beginPath(); ctx.arc(tabCX, tabCY, tabR, 0, Math.PI * 2); ctx.fill();
+      argollaPx = [tabCX, tabCY - tabR + H_PX * 0.01];
     }
     if(necesitaHueco){
-      ctx.beginPath(); ctx.arc(tabCX, H_PX * 0.5, tabR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tabCX, tabCY, tabR, 0, Math.PI * 2); ctx.fill();
     }
 
     // La plaqueta de fondo es la silueta (texto + pestañita) inflada hacia
