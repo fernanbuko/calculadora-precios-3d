@@ -6121,16 +6121,15 @@
     const esHueso = forma === 'hueso';
     // La barra que conecta las dos puntas del hueso es más gruesa (más
     // alta) que antes, para que el nombre pueda salir con letra más
-    // grande — y se le deja más aire horizontal (H_PX*0.9 en vez de 0.5)
-    // para que el nombre tenga espacio de sobra sin sentirse apretado
-    // contra los nudillos.
+    // grande — pero la pieza entera se mantiene compacta (poco aire
+    // horizontal de sobra) para que no se vea estirada/ancha de más.
     const HUESO_R = H_PX * 0.33, HUESO_BARRA_MITAD = H_PX * 0.3;
     const fontPx = esHueso ? Math.round(H_PX * 0.44) : Math.round(H_PX * 0.6);
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
     const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.28 : H_PX * 0.08;
     let W_PX;
     if(esHueso){
-      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.9));
+      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.35));
     } else {
       W_PX = Math.max(H_PX * 0.8, Math.ceil(anchoTexto + H_PX * 0.3 + margenTab));
     }
