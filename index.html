@@ -5943,6 +5943,23 @@
   // según lo que se desplace el dedo/mouse, sin reconstruir las capas en
   // cada movimiento (solo cambia el transform de la placa ya armada).
   let nombre3dArrastrando = false, nombre3dUltimoX = 0, nombre3dUltimoY = 0;
+
+  // El "grosor" son varias capas planas apiladas, no una pieza sólida de
+  // verdad — vista justo de canto (a 90°/270°) esas capas no tienen ancho
+  // y la pieza se reduce a una rayita casi invisible. En vez de dejar que
+  // el giro se quede ahí mostrando esa rayita mientras arrastras despacio,
+  // se salta esa franja angosta de un salto en la dirección en la que se
+  // está girando — así nunca se ve "desaparecer", solo pasa directo de un
+  // lado sólido al otro.
+  function nombre3dEvitarCanto(angulo, avanzando){
+    const ZONA = 12; // grados a cada lado de 90/270 que se saltan
+    const mod = ((angulo % 180) + 180) % 180;
+    if(mod > 90 - ZONA && mod < 90 + ZONA){
+      const base = angulo - mod;
+      return avanzando ? base + 90 + ZONA : base + 90 - ZONA;
+    }
+    return angulo;
+  }
   nombre3dStage.addEventListener('pointerdown', (e) => {
     const plate = nombre3dStage.querySelector('.nombre3d-plate');
     if(!plate) return;
@@ -5960,11 +5977,8 @@
     nombre3dUltimoY = e.clientY;
     // Giro libre en horizontal (para poder ver la pieza de frente, de
     // canto y por detrás, las tres vueltas completas) — el vertical se
-    // deja con un rango amplio pero sin llegar a voltearla de cabeza. El
-    // "grosor" son varias capas planas apiladas, no una pieza sólida de
-    // verdad, así que justo de canto (cerca de 90°) se ve más delgada por
-    // un instante al pasar — es normal, no se queda trabada ahí.
-    nombre3dRotY = nombre3dRotY + dx * 0.5;
+    // deja con un rango amplio pero sin llegar a voltearla de cabeza.
+    nombre3dRotY = nombre3dEvitarCanto(nombre3dRotY + dx * 0.5, dx >= 0);
     nombre3dRotX = Math.max(-60, Math.min(60, nombre3dRotX - dy * 0.5));
     const plate = nombre3dStage.querySelector('.nombre3d-plate');
     if(plate) plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
