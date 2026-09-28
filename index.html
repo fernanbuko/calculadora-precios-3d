@@ -1965,15 +1965,9 @@
     <div class="field field-wide">
       <div>
         <label for="nombre3dNombre">Nombre</label>
+        <small>Podés agregar un dije/emoji al final, pegándolo con el teclado de emojis de tu celular</small>
       </div>
-      <div class="input-box"><input type="text" id="nombre3dNombre" maxlength="18"></div>
-    </div>
-    <div class="field field-wide">
-      <div>
-        <label for="nombre3dEmoji">Dije / emoji (opcional)</label>
-        <small>Pégalo con el teclado de emojis de tu celular</small>
-      </div>
-      <div class="input-box"><input type="text" id="nombre3dEmoji" maxlength="4"></div>
+      <div class="input-box"><input type="text" id="nombre3dNombre" maxlength="22"></div>
     </div>
     <div class="field field-wide">
       <div>
@@ -5606,7 +5600,6 @@
   const tabBar = document.getElementById('tabBar');
   const nombre3dTipoRow = document.getElementById('nombre3dTipoRow');
   const nombre3dNombreInput = document.getElementById('nombre3dNombre');
-  const nombre3dEmojiInput = document.getElementById('nombre3dEmoji');
   const nombre3dFontRow = document.getElementById('nombre3dFontRow');
   const nombre3dFormaField = document.getElementById('nombre3dFormaField');
   const nombre3dFormaRow = document.getElementById('nombre3dFormaRow');
@@ -6248,9 +6241,10 @@
 
   function renderNombre3D(){
     const miGen = ++nombre3dRenderGen;
-    const nombre = nombre3dNombreInput.value.trim();
-    const emoji = nombre3dEmojiInput.value.trim();
-    const texto = nombre + (emoji ? ' ' + emoji : '');
+    // El nombre y el dije/emoji van en el mismo campo (el emoji se pega
+    // al final con el teclado del celular) — no hace falta separarlos,
+    // se usa tal cual para armar la pieza.
+    const texto = nombre3dNombreInput.value.trim();
     // Si Three.js no llegó a cargar (CDN bloqueado por la red, sin
     // conexión, etc.) o el navegador no puede crear el contexto WebGL, el
     // motor nunca se arma — sin este control, el mensaje de "escribe un
@@ -6395,9 +6389,7 @@
     }
   }
 
-  [nombre3dNombreInput, nombre3dEmojiInput].forEach(input => {
-    input.addEventListener('input', renderNombre3D);
-  });
+  nombre3dNombreInput.addEventListener('input', renderNombre3D);
 
   // Arrastrar para girar — libre del todo, sin límites: al ser geometría
   // 3D real (no capas de CSS apiladas) siempre hay una cara sólida que se
