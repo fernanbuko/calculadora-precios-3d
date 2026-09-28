@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Precios 3D">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Baloo+2:wght@700;800&family=Fredoka:wght@600;700&family=Bungee&family=Pacifico&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg: #0b0b0f;
@@ -1120,18 +1120,22 @@
   }
   .nombre3d-plate.nombre3d-dragging{ cursor: grabbing; }
   .nombre3d-layer{
-    font-family: 'Baloo 2', 'Inter', sans-serif;
     font-weight: 800;
     font-size: 34px;
     color: #fff;
     padding: 16px 28px;
-    border-radius: 26px;
     white-space: nowrap;
     position: absolute;
     top: 0; left: 0;
     backface-visibility: hidden;
+    box-sizing: border-box;
   }
   .nombre3d-layer.nombre3d-front{ position: relative; }
+  /* Forma de la placa detrás del nombre — se aplica a cada capa apilada. */
+  .nombre3d-forma-redonda{ border-radius: 999px; }
+  .nombre3d-forma-cuadrada{ border-radius: 12px; }
+  .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
+  .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
   .nombre3d-ring{
     position: absolute;
     top: -13px; left: 18px;
@@ -1998,6 +2002,18 @@
         <small>Pégalo con el teclado de emojis de tu celular</small>
       </div>
       <div class="input-box"><input type="text" id="nombre3dEmoji" placeholder="🎀" maxlength="4"></div>
+    </div>
+    <div class="field field-wide">
+      <div>
+        <label>Tipo de letra</label>
+      </div>
+      <div class="btn-row" id="nombre3dFontRow"></div>
+    </div>
+    <div class="field field-wide">
+      <div>
+        <label>Forma del llavero</label>
+      </div>
+      <div class="btn-row" id="nombre3dFormaRow"></div>
     </div>
     <div class="field field-wide">
       <div>
@@ -5577,10 +5593,27 @@
   // puede girar arrastrando. Se ve como una pieza sólida sin cargar ninguna
   // librería 3D pesada.
   const NOMBRE3D_COLORS = ['#2b3a67', '#c1121f', '#ffb703', '#588157', '#7b2cbf', '#023047', '#e85d75', '#495057'];
+  // Tipografías redondeadas/gruesas típicas de estas piezas — cada una ya
+  // se pidió junto con las demás fuentes de la app en el <link> de Google
+  // Fonts de arriba, así que no hace falta cargar nada extra aquí.
+  const NOMBRE3D_FONTS = [
+    { id: 'burbuja', label: 'Burbuja', family: "'Baloo 2', sans-serif" },
+    { id: 'redondeada', label: 'Redondeada', family: "'Fredoka', sans-serif" },
+    { id: 'cursiva', label: 'Cursiva', family: "'Pacifico', cursive" },
+    { id: 'bloque', label: 'Bloque', family: "'Bungee', sans-serif" }
+  ];
+  const NOMBRE3D_FORMAS = [
+    { id: 'redonda', label: 'Redonda' },
+    { id: 'cuadrada', label: 'Cuadrada' },
+    { id: 'ovalada', label: 'Ovalada' },
+    { id: 'etiqueta', label: 'Etiqueta' }
+  ];
   const tabBar = document.getElementById('tabBar');
   const nombre3dTipoRow = document.getElementById('nombre3dTipoRow');
   const nombre3dNombreInput = document.getElementById('nombre3dNombre');
   const nombre3dEmojiInput = document.getElementById('nombre3dEmoji');
+  const nombre3dFontRow = document.getElementById('nombre3dFontRow');
+  const nombre3dFormaRow = document.getElementById('nombre3dFormaRow');
   const nombre3dColorRow = document.getElementById('nombre3dColorRow');
   const nombre3dStage = document.getElementById('nombre3dStage');
   const nombre3dShareBtn = document.getElementById('nombre3dShareBtn');
@@ -5588,6 +5621,8 @@
   const nombre3dIntroCard = document.getElementById('nombre3dIntroCard');
   let nombre3dTipo = 'llavero'; // 'llavero' | 'lapiz'
   let nombre3dColor = NOMBRE3D_COLORS[0];
+  let nombre3dFont = NOMBRE3D_FONTS[0].id;
+  let nombre3dForma = NOMBRE3D_FORMAS[0].id;
   let nombre3dRotX = -10, nombre3dRotY = 18;
 
   nombre3dColorRow.innerHTML = NOMBRE3D_COLORS.map((c, i) =>
@@ -5607,6 +5642,26 @@
       renderNombre3D();
     });
   });
+  nombre3dFontRow.innerHTML = NOMBRE3D_FONTS.map((f, i) =>
+    '<button type="button" class="btn small filter-btn' + (i === 0 ? ' active' : '') + '" data-font="' + f.id + '" style="font-family:' + f.family + ';">' + f.label + '</button>'
+  ).join('');
+  nombre3dFontRow.querySelectorAll('[data-font]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nombre3dFont = btn.dataset.font;
+      nombre3dFontRow.querySelectorAll('[data-font]').forEach(b => b.classList.toggle('active', b === btn));
+      renderNombre3D();
+    });
+  });
+  nombre3dFormaRow.innerHTML = NOMBRE3D_FORMAS.map((f, i) =>
+    '<button type="button" class="btn small filter-btn' + (i === 0 ? ' active' : '') + '" data-forma="' + f.id + '">' + f.label + '</button>'
+  ).join('');
+  nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nombre3dForma = btn.dataset.forma;
+      nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(b => b.classList.toggle('active', b === btn));
+      renderNombre3D();
+    });
+  });
 
   function renderNombre3D(){
     const nombre = nombre3dNombreInput.value.trim();
@@ -5620,12 +5675,14 @@
     const plate = document.createElement('div');
     plate.className = 'nombre3d-plate';
     plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
+    const fontFamily = (NOMBRE3D_FONTS.find(f => f.id === nombre3dFont) || NOMBRE3D_FONTS[0]).family;
     const CAPAS = 10;
     for(let i = CAPAS - 1; i >= 0; i--){
       const capa = document.createElement('div');
-      capa.className = 'nombre3d-layer' + (i === 0 ? ' nombre3d-front' : '');
+      capa.className = 'nombre3d-layer nombre3d-forma-' + nombre3dForma + (i === 0 ? ' nombre3d-front' : '');
       capa.textContent = texto;
       capa.style.background = nombre3dColor;
+      capa.style.fontFamily = fontFamily;
       capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
       capa.style.transform = 'translateZ(' + (-i * 2) + 'px)';
       if(i === 0){
