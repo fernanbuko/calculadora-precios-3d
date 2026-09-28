@@ -6122,14 +6122,19 @@
     // La barra que conecta las dos puntas del hueso es más gruesa (más
     // alta) que antes, para que el nombre pueda salir con letra más
     // grande — pero la pieza entera se mantiene compacta (poco aire
-    // horizontal de sobra) para que no se vea estirada/ancha de más.
-    const HUESO_R = H_PX * 0.33, HUESO_BARRA_MITAD = H_PX * 0.3;
-    const fontPx = esHueso ? Math.round(H_PX * 0.44) : Math.round(H_PX * 0.6);
+    // horizontal de sobra) para que no se vea estirada/ancha de más. El
+    // radio de los nudillos se achica un poco respecto al alto total
+    // (H_PX) para que los dos círculos de cada punta se superpongan
+    // menos y se noten como dos bolitas separadas, no una sola forma
+    // ovalada — la barra se achica en la misma proporción para que siga
+    // más angosta que las puntas, como un hueso de verdad.
+    const HUESO_R = H_PX * 0.27, HUESO_BARRA_MITAD = H_PX * 0.22;
+    const fontPx = esHueso ? Math.round(H_PX * 0.32) : Math.round(H_PX * 0.6);
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
     const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.28 : H_PX * 0.08;
     let W_PX;
     if(esHueso){
-      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.35));
+      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.25));
     } else {
       W_PX = Math.max(H_PX * 0.8, Math.ceil(anchoTexto + H_PX * 0.3 + margenTab));
     }
