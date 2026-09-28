@@ -6169,15 +6169,20 @@
     }
 
     // "Contorno de letras": una plaqueta sólida (como una calcomanía
-    // cortada de verdad), no las letras sueltas como piezas propias ni
-    // con el nombre calado — el nombre se nota por el propio contorno
-    // exterior de la plaqueta (que sigue de cerca la forma del texto),
-    // dejando toda la pieza de una sola pieza sólida, sin agujeros que la
-    // puedan romper ni que junten mugre.
+    // cortada de verdad) — nunca calada, para que quede de una sola
+    // pieza sin agujeros que la puedan romper ni que junten mugre. El
+    // contorno exterior de la plaqueta ya sigue de cerca la forma del
+    // texto, pero además el nombre se pinta encima en otro color (como
+    // una calcomanía de dos colores) para que se lea clarito.
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.font = '800 ' + fontPx + 'px ' + fontFamily;
     ctx.fillText(texto, margenTab, H_PX * 0.54);
+    // Se traza el texto SOLO (sin la pestañita) para poder pintarlo
+    // encima — cada letra sale con su propio hueco natural ya resuelto
+    // (el "ojo" de la "a" o la "o"), así se lee como una letra de
+    // verdad y no como una mancha rellena.
+    const letraShapes = nombre3dSiluetaDesdeCanvas(canvas, N3D_ALTO * canvas.height / H_PX);
 
     // La pestañita (para la argolla o el agujero) se centra bien adentro
     // del lienzo, nunca pegada al borde — si no, al recortarle el hueco
@@ -6233,7 +6238,7 @@
     }
 
     const argollaMundo = argollaPx ? [(argollaPx[0] - W_PX / 2) * escala, (H_PX / 2 - argollaPx[1]) * escala] : null;
-    return { shapes: shapesFondo, anchoMundo: W_PX * escala, argollaMundo };
+    return { shapes: shapesFondo, letraShapes, anchoMundo: W_PX * escala, argollaMundo };
   }
 
   function renderNombre3D(){
@@ -6300,7 +6305,7 @@
       bevelSegments: 2, curveSegments: 16
     };
 
-    let shapes, anchoMundo, argollaMundo = null;
+    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null;
     const altoMundo = N3D_ALTO;
 
     if(forma === 'hueso' || esContorno){
@@ -6308,6 +6313,7 @@
       shapes = res.shapes;
       anchoMundo = res.anchoMundo;
       argollaMundo = res.argollaMundo;
+      letraShapesContorno = res.letraShapes;
     } else {
       const fontPxRef = 100;
       const anchoTextoPx = Math.max(20, nombre3dAnchoTextoPx(texto, fontFamily, fontPxRef));
@@ -6328,6 +6334,20 @@
       mesh.position.z = -profundidad / 2;
       n3d.group.add(mesh);
     });
+
+    if(esContorno && letraShapesContorno && letraShapesContorno.length){
+      // La plaqueta de "Contorno de letras" queda siempre sólida (sin
+      // calar el nombre — ver más arriba), así que el nombre se pinta
+      // encima con su propio color, plano y sin bisel, pegado a la cara
+      // de adelante — como una calcomanía de dos colores, para que se
+      // lea clarito sin perforar nada.
+      const materialLetras = new THREE.MeshStandardMaterial({ color: nombre3dTextColor, roughness: 0.5, metalness: 0.06, side: THREE.DoubleSide });
+      letraShapesContorno.forEach(letra => {
+        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(letra), materialLetras);
+        mesh.position.z = profundidad / 2 + bevelGrosor + 0.006;
+        n3d.group.add(mesh);
+      });
+    }
 
     if(!esContorno){
       const { texture, aspecto } = nombre3dTexturaTexto(texto, fontFamily, nombre3dTextColor);
