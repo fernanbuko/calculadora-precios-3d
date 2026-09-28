@@ -6119,13 +6119,18 @@
     // desplazado MARGEN píxeles hacia adentro para dejar ese aire.
     const MARGEN = 8;
     const esHueso = forma === 'hueso';
-    const fontPx = esHueso ? Math.round(H_PX * 0.34) : Math.round(H_PX * 0.6);
+    // La barra que conecta las dos puntas del hueso quedó más angosta
+    // (menos alta) que antes, así que la letra también se achica un
+    // poco para que quepa cómoda ahí adentro — y se le deja más aire
+    // horizontal (H_PX*0.9 en vez de 0.5) para que el nombre tenga
+    // espacio de sobra sin sentirse apretado contra los nudillos.
+    const HUESO_R = H_PX * 0.33, HUESO_BARRA_MITAD = H_PX * 0.13;
+    const fontPx = esHueso ? Math.round(H_PX * 0.24) : Math.round(H_PX * 0.6);
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
-    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.36 : H_PX * 0.08;
+    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.28 : H_PX * 0.08;
     let W_PX;
     if(esHueso){
-      const r = H_PX * 0.4;
-      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + r * 2 + H_PX * 0.5));
+      W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.9));
     } else {
       W_PX = Math.max(H_PX * 0.8, Math.ceil(anchoTexto + H_PX * 0.3 + margenTab));
     }
@@ -6137,12 +6142,7 @@
     const escala = N3D_ALTO / H_PX;
 
     if(esHueso){
-      // Nudillos más angostos que la barra que los conecta con respecto a
-      // la versión anterior (menos superpuestos entre sí) para que las
-      // dos bolitas de cada punta se noten separadas, como en una placa
-      // de hueso de verdad — antes casi se fundían en una sola forma
-      // ovalada por punta.
-      const r = H_PX * 0.33, barraMitad = H_PX * 0.19, cy = H_PX / 2;
+      const r = HUESO_R, barraMitad = HUESO_BARRA_MITAD, cy = H_PX / 2;
       ctx.fillRect(r, cy - barraMitad, Math.max(0, W_PX - 2 * r), barraMitad * 2);
       [[r, r], [r, H_PX - r], [W_PX - r, r], [W_PX - r, H_PX - r]].forEach(([cx, cyy]) => {
         ctx.beginPath(); ctx.arc(cx, cyy, r, 0, Math.PI * 2); ctx.fill();
@@ -6201,7 +6201,7 @@
     // a la mitad de la pestañita) — antes la argolla salía pegada arriba
     // del todo y el agujero a la mitad, así que se veían en dos lugares
     // distintos sin ningún motivo.
-    const tabR = H_PX * 0.15;
+    const tabR = H_PX * 0.11;
     const tabCX = tabR + H_PX * 0.03;
     const tabCY = H_PX * 0.5;
     let argollaPx = null;
@@ -6235,7 +6235,7 @@
       // solo al desenfocar/agrandar la silueta).
       const cxMundo = (tabCX - W_PX / 2) * escala;
       const cyMundo = 0; // H_PX/2 - H_PX*0.5 == 0: el agujero va centrado en la altura
-      const rMundo = tabR * 0.32 * escala;
+      const rMundo = tabR * 0.45 * escala;
       const circuloMundo = [];
       for(let i = 0; i < 24; i++){
         const a = i / 24 * Math.PI * 2;
