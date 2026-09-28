@@ -1141,15 +1141,15 @@
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
   .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
   .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
-  /* Placa para mascotas: forma de hueso — se recorta con un clip-path
-     poligonal calculado en JS a partir del tamaño real de la capa (dos
-     círculos grandes en las puntas conectados por una cintura angosta),
-     en vez del truco de pseudo-elementos/box-shadow (que no se leía
-     como hueso de verdad). El padding solo da el margen necesario para
-     que quepan las puntas redondeadas. */
+  /* Placa para mascotas: forma de hueso — se recorta con una máscara
+     (mini-SVG armado en JS a partir del tamaño real de la capa: 4
+     círculos, dos por punta superpuestos entre sí para el "nudillo"
+     doble, más una barra central) en vez de un clip-path a mano. El
+     padding solo da el margen necesario para que quepan las puntas
+     redondeadas. */
   .nombre3d-forma-hueso{
     border-radius: 0;
-    padding: 20px 48px;
+    padding: 22px 50px;
   }
   /* "Contorno de letras": en vez de una placa rectangular con el nombre
      encima, el contorno de la pieza sigue la forma de las propias letras
@@ -5838,40 +5838,29 @@
     return sombras.join(', ');
   }
 
-  // Recorte de "Placa para mascotas": dos círculos grandes en las puntas
-  // (tan altos como toda la capa) unidos por una cintura angosta en el
-  // medio — la silueta clásica de un hueso de perro. Se calcula con el
-  // ancho/alto real ya medidos, en vez de un truco con porcentajes, para
-  // que las puntas midan siempre lo mismo sin importar qué tan largo sea
-  // el nombre (solo la cintura se alarga).
-  function nombre3dHuesoClipPath(w, h){
+  // Recorte de "Placa para mascotas": la silueta clásica de un hueso de
+  // perro es la UNIÓN de 4 círculos (uno en cada esquina — los dos de
+  // cada punta se superponen entre sí y arman ese "nudillo" doble
+  // redondeado) más una barra central que los conecta. Calcular a mano
+  // el contorno de esa unión (con arcos que se cortan) es un dolor de
+  // cabeza con clip-path; en vez de eso se arma un mini-SVG con esas 5
+  // formas (más fácil de tener bien seguro) y se usa como máscara — todo
+  // lo blanco queda visible, todo lo demás se recorta. Con el ancho/alto
+  // real ya medido, para que las puntas midan siempre lo mismo sin
+  // importar qué tan largo sea el nombre (solo la barra central se
+  // alarga).
+  function nombre3dHuesoMascara(w, h){
+    const r = h * 0.33; // radio de cada uno de los 4 círculos de las puntas
+    const barraMitad = h * 0.19; // grosor de la barra central (menos que 2r: ahí está el "pellizco" de la cintura)
     const cy = h / 2;
-    const R = h / 2; // las puntas tocan el borde de arriba y de abajo
-    const cinturaMitad = Math.min(h * 0.13, 11);
-    const medioAngulo = Math.asin(Math.min(1, cinturaMitad / R));
-    const PASOS = 16;
-    const puntos = [];
-    // Punta izquierda: del punto de unión de arriba, dando toda la vuelta
-    // por la izquierda (por atrás del círculo), hasta el punto de unión
-    // de abajo.
-    const cxIzq = R;
-    const inicioIzq = -medioAngulo;
-    const finIzq = medioAngulo - Math.PI * 2;
-    for(let i = 0; i <= PASOS; i++){
-      const t = inicioIzq + (finIzq - inicioIzq) * (i / PASOS);
-      puntos.push([cxIzq + R * Math.cos(t), cy + R * Math.sin(t)]);
-    }
-    // Punta derecha: del punto de unión de abajo, dando toda la vuelta
-    // por la derecha (por delante del círculo, pasando por su punto más
-    // a la derecha), hasta el punto de unión de arriba.
-    const cxDer = w - R;
-    const inicioDer = Math.PI * 3 - medioAngulo;
-    const finDer = Math.PI + medioAngulo;
-    for(let i = 0; i <= PASOS; i++){
-      const t = inicioDer + (finDer - inicioDer) * (i / PASOS);
-      puntos.push([cxDer + R * Math.cos(t), cy + R * Math.sin(t)]);
-    }
-    return 'polygon(' + puntos.map(p => p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px').join(', ') + ')';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+      '<rect x="' + r.toFixed(1) + '" y="' + (cy - barraMitad).toFixed(1) + '" width="' + Math.max(0, w - 2 * r).toFixed(1) + '" height="' + (barraMitad * 2).toFixed(1) + '" fill="#fff"/>' +
+      '<circle cx="' + r.toFixed(1) + '" cy="' + r.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
+      '<circle cx="' + r.toFixed(1) + '" cy="' + (h - r).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
+      '<circle cx="' + (w - r).toFixed(1) + '" cy="' + r.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
+      '<circle cx="' + (w - r).toFixed(1) + '" cy="' + (h - r).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff"/>' +
+      '</svg>';
+    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
   }
 
   function renderNombre3D(){
@@ -6018,8 +6007,15 @@
         if(miGen !== nombre3dRenderGen) return;
         const frente = head.querySelector('.nombre3d-front');
         if(!frente) return;
-        const clip = nombre3dHuesoClipPath(frente.offsetWidth, frente.offsetHeight);
-        head.querySelectorAll('.nombre3d-forma-hueso').forEach(el => { el.style.clipPath = clip; });
+        const mascara = nombre3dHuesoMascara(frente.offsetWidth, frente.offsetHeight);
+        head.querySelectorAll('.nombre3d-forma-hueso').forEach(el => {
+          el.style.webkitMaskImage = mascara;
+          el.style.maskImage = mascara;
+          el.style.webkitMaskSize = '100% 100%';
+          el.style.maskSize = '100% 100%';
+          el.style.webkitMaskRepeat = 'no-repeat';
+          el.style.maskRepeat = 'no-repeat';
+        });
       };
       aplicarRecorteHueso();
       if(document.fonts && document.fonts.ready){
