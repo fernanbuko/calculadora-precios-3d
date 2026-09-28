@@ -6003,23 +6003,32 @@
         cruces.sort((a, c) => a - c);
         return cruces;
       }
+      // Una sola línea de corte puede caer justo dentro de OTRO hueco
+      // anidado dentro de este mismo trazo (p. ej., el ojo de la "R" o de
+      // la "o", ya fusionadas con el resto del nombre por la franja de
+      // unión) y dar como resultado "hueco" con votación unánime aunque
+      // este trazo sea en realidad la pieza sólida — no basta con confiar
+      // en la primera línea que dé una votación no empatada. Se prueban
+      // TODAS las fracciones y se suman los votos de todas juntas, así una
+      // línea que cae en un hueco anidado queda superada por las demás
+      // líneas que sí caen en material sólido de verdad.
       const fracciones = [0.5, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9, 0.4, 0.6];
+      let votos1 = 0, votos0 = 0, puntoAlpha1 = null, puntoAlpha0 = null;
       for(const f of fracciones){
         const y = minY + (maxY - minY) * f;
         const cruces = cortarEn(y);
         if(cruces.length < 2) continue;
         const x0 = cruces[0], x1 = cruces[1];
-        let votos1 = 0, votos0 = 0, puntoAlpha1 = null;
         for(let m = 1; m <= 7; m++){
           const x = x0 + (x1 - x0) * (m / 8);
           if(alphaEn(x, y) === 1){ votos1++; if(!puntoAlpha1) puntoAlpha1 = [x, y]; }
-          else votos0++;
+          else { votos0++; if(!puntoAlpha0) puntoAlpha0 = [x, y]; }
         }
-        if(votos1 !== votos0){
-          return votos1 > votos0
-            ? { exterior: true, punto: puntoAlpha1 || [(x0 + x1) / 2, y] }
-            : { exterior: false, punto: [(x0 + x1) / 2, y] };
-        }
+      }
+      if(votos1 !== votos0){
+        return votos1 > votos0
+          ? { exterior: true, punto: puntoAlpha1 }
+          : { exterior: false, punto: puntoAlpha0 };
       }
       let sx = 0, sy = 0;
       b.forEach(p => { sx += p[0]; sy += p[1]; });
@@ -6101,6 +6110,22 @@
       ctx.textBaseline = 'middle';
       ctx.font = '800 ' + fontPx + 'px ' + fontFamily;
       ctx.fillText(texto, margenTab, H_PX * 0.54);
+      // Cada letra sale como un trazo separado — sin nada que las una,
+      // al imprimir la pieza de verdad las letras se caerían en pedazos
+      // sueltos. Se agrega una franja fina que las conecta a todas,
+      // pegada a la base del texto (como la base/riel de los llaveros de
+      // letras de verdad) — se mide dónde termina la tinta real (no el
+      // cuadro completo de la tipografía) para que la franja quede pegada
+      // a las letras sea cual sea la fuente.
+      const metricsTexto = ctx.measureText(texto);
+      const inkBottomY = H_PX * 0.54 + metricsTexto.actualBoundingBoxDescent;
+      const franjaGrosor = fontPx * 0.13;
+      ctx.fillRect(
+        margenTab - fontPx * 0.02,
+        inkBottomY - franjaGrosor,
+        anchoTexto + fontPx * 0.04,
+        franjaGrosor
+      );
       // La pestañita (para la argolla o el agujero) se centra bien adentro
       // del lienzo, nunca pegada al borde — si no, al recortarle el hueco
       // no queda casi nada de material alrededor y se puede "abrir" hacia
@@ -6220,35 +6245,6 @@
       mesh.position.z = -profundidad / 2;
       n3d.group.add(mesh);
     });
-
-    // La placa de hueso lleva un "relieve" interior del mismo color pero
-    // aclarado, detrás del nombre — como el borde de esmalte + centro
-    // grabado más claro de una placa real, en vez de un color plano de
-    // punta a punta. Se arma con una copia de la silueta encogida hacia
-    // su centro (sin la precisión de un verdadero offset de polígono,
-    // pero de sobra para una forma tan redondeada como el hueso) pegada
-    // encima de la cara de adelante.
-    if(forma === 'hueso'){
-      const colorRelieve = new THREE.Color(colorPlaca).lerp(new THREE.Color(0xffffff), 0.32);
-      const materialRelieve = new THREE.MeshStandardMaterial({ color: colorRelieve, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide });
-      shapes.forEach(s => {
-        const pts = s.getPoints();
-        let cx = 0, cy = 0;
-        pts.forEach(p => { cx += p.x; cy += p.y; });
-        cx /= pts.length; cy /= pts.length;
-        const factor = 0.8;
-        const encoger = (p) => new THREE.Vector2(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor);
-        const relieveShape = new THREE.Shape(pts.map(encoger));
-        // Si la silueta tiene un agujero (la pestañita del "Agujero" en vez
-        // de argolla), el relieve también lo respeta — si no, lo taparía.
-        // El agujero real NO se encoge (si no, quedaría desalineado del
-        // agujero de verdad, que sigue en su lugar original).
-        relieveShape.holes = s.holes.map(h => new THREE.Path(h.getPoints()));
-        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(relieveShape), materialRelieve);
-        mesh.position.z = profundidad / 2 + bevelGrosor + 0.006;
-        n3d.group.add(mesh);
-      });
-    }
 
     if(!esContorno){
       const { texture, aspecto } = nombre3dTexturaTexto(texto, fontFamily, nombre3dTextColor);
