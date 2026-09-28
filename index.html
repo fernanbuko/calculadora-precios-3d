@@ -5928,12 +5928,14 @@
     const dy = e.clientY - nombre3dUltimoY;
     nombre3dUltimoX = e.clientX;
     nombre3dUltimoY = e.clientY;
-    // El "grosor" es varias capas planas apiladas, no una pieza sólida de
-    // verdad — vista casi de canto (cerca de 90°) una capa plana no tiene
-    // ancho y se ve como si desapareciera. Se limita el giro para que
-    // nunca llegue a ese ángulo y la pieza se vea sólida siempre.
-    nombre3dRotY = Math.max(-40, Math.min(40, nombre3dRotY + dx * 0.5));
-    nombre3dRotX = Math.max(-40, Math.min(40, nombre3dRotX - dy * 0.5));
+    // Giro libre en horizontal (para poder ver la pieza de frente, de
+    // canto y por detrás, las tres vueltas completas) — el vertical se
+    // deja con un rango amplio pero sin llegar a voltearla de cabeza. El
+    // "grosor" son varias capas planas apiladas, no una pieza sólida de
+    // verdad, así que justo de canto (cerca de 90°) se ve más delgada por
+    // un instante al pasar — es normal, no se queda trabada ahí.
+    nombre3dRotY = nombre3dRotY + dx * 0.5;
+    nombre3dRotX = Math.max(-60, Math.min(60, nombre3dRotX - dy * 0.5));
     const plate = nombre3dStage.querySelector('.nombre3d-plate');
     if(plate) plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
   });
