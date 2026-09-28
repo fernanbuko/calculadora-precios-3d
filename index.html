@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Precios 3D">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg: #0b0b0f;
@@ -101,10 +101,9 @@
   }
   .tab-bar-btn .tab-icon{ font-size: 20px; line-height: 1; }
   .tab-bar-btn .tab-label{ font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
-  .top-ajustes-btn{
+  .top-ajustes-btn, .top-nombre3d-btn{
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 14px);
-    right: 16px;
     z-index: 41;
     width: 38px;
     height: 38px;
@@ -119,7 +118,9 @@
     cursor: pointer;
     box-shadow: 0 6px 16px -8px rgba(0,0,0,.3);
   }
-  .top-ajustes-btn.active{ color: var(--orange); background: var(--orange-dim); }
+  .top-ajustes-btn{ right: 16px; }
+  .top-nombre3d-btn{ right: 62px; }
+  .top-ajustes-btn.active, .top-nombre3d-btn.active{ color: var(--orange); background: var(--orange-dim); }
   .tab-bar-btn.active{ color: var(--orange); background: var(--orange-dim); }
 
   header{ margin-bottom: 24px; display:flex; justify-content: space-between; align-items:flex-start; gap: 12px; }
@@ -1090,6 +1091,60 @@
     .tab-bar-btn .tab-icon{ font-size: 18px; }
     .tab-bar-btn .tab-label{ font-size: 13.5px; }
   }
+
+  /* ---- Nombre 3D: placa con relieve falso-3D, sin motor 3D real ---- */
+  .nombre3d-color-swatch{
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .nombre3d-color-swatch.active{ border-color: var(--text); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+  #nombre3dPreviewCard{ overflow: hidden; }
+  .nombre3d-stage{
+    perspective: 1000px;
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 16px;
+    touch-action: none;
+    user-select: none;
+  }
+  .nombre3d-plate{
+    position: relative;
+    transform-style: preserve-3d;
+    cursor: grab;
+  }
+  .nombre3d-plate.nombre3d-dragging{ cursor: grabbing; }
+  .nombre3d-layer{
+    font-family: 'Baloo 2', 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: 34px;
+    color: #fff;
+    padding: 16px 28px;
+    border-radius: 26px;
+    white-space: nowrap;
+    position: absolute;
+    top: 0; left: 0;
+    backface-visibility: hidden;
+  }
+  .nombre3d-layer.nombre3d-front{ position: relative; }
+  .nombre3d-ring{
+    position: absolute;
+    top: -13px; left: 18px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 5px solid #9a9a9a;
+    transform: translateZ(4px);
+  }
+  /* Modo cliente: se abrió con ?vista3d=1 — se esconde todo lo que no sea
+     esta herramienta, para poder mandarle el link solo de esto a un
+     cliente sin que vea nada de la calculadora de precios. */
+  body.modo-cliente-nombre3d header{ display: none; }
+  body.modo-cliente-nombre3d .tab-panel{ padding-bottom: 24px; }
 </style>
 </head>
 <body>
@@ -1922,6 +1977,43 @@
   </div>
   </div><!-- /tab-panel notas -->
 
+  <div class="tab-panel hidden" data-tab="nombre3d" id="tabPanelNombre3d">
+  <!-- NOMBRE 3D -->
+  <div class="card" id="nombre3dIntroCard">
+    <p class="card-title">Nombre 3D <span class="tag">VISTA PREVIA PARA EL CLIENTE</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Escribe un nombre y velo como quedaría en 3D antes de pedirlo — gíralo arrastrando con el dedo o el mouse.</p>
+    <div class="btn-row" id="nombre3dTipoRow">
+      <button type="button" class="btn small filter-btn active" data-nombre3d-tipo="llavero">Llavero</button>
+      <button type="button" class="btn small filter-btn" data-nombre3d-tipo="lapiz">Identificador de lápiz</button>
+    </div>
+    <div class="field field-wide">
+      <div>
+        <label for="nombre3dNombre">Nombre</label>
+      </div>
+      <div class="input-box"><input type="text" id="nombre3dNombre" placeholder="Ej: Lucía" maxlength="18"></div>
+    </div>
+    <div class="field field-wide">
+      <div>
+        <label for="nombre3dEmoji">Dije / emoji (opcional)</label>
+        <small>Pégalo con el teclado de emojis de tu celular</small>
+      </div>
+      <div class="input-box"><input type="text" id="nombre3dEmoji" placeholder="🎀" maxlength="4"></div>
+    </div>
+    <div class="field field-wide">
+      <div>
+        <label>Color</label>
+      </div>
+      <div class="btn-row" id="nombre3dColorRow"></div>
+    </div>
+    <div class="btn-row" id="nombre3dShareRow">
+      <button type="button" class="btn small" id="nombre3dShareBtn">🔗 Copiar link para el cliente</button>
+    </div>
+  </div>
+  <div class="card" id="nombre3dPreviewCard">
+    <div class="nombre3d-stage" id="nombre3dStage"></div>
+  </div>
+  </div><!-- /tab-panel nombre3d -->
+
   <div class="tab-panel hidden" data-tab="ajustes" id="tabPanelAjustes">
   <!-- AJUSTES -->
   <div class="card account-banner">
@@ -1997,6 +2089,7 @@
   </button>
 </nav>
 
+<button type="button" class="top-nombre3d-btn" id="topNombre3dBtn" title="Nombre 3D">🔤</button>
 <button type="button" class="top-ajustes-btn" id="topAjustesBtn" title="Ajustes">⚙️</button>
 
 <div class="toast" id="toast"></div>
@@ -5167,6 +5260,7 @@
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     topAjustesBtn.classList.toggle('active', tab === 'ajustes');
+    topNombre3dBtn.classList.toggle('active', tab === 'nombre3d');
     if(tab === 'inicio') renderGreeting();
     window.scrollTo(0, 0);
   }
@@ -5205,6 +5299,8 @@
   });
   const topAjustesBtn = document.getElementById('topAjustesBtn');
   topAjustesBtn.addEventListener('click', () => setActiveTab('ajustes'));
+  const topNombre3dBtn = document.getElementById('topNombre3dBtn');
+  topNombre3dBtn.addEventListener('click', () => setActiveTab('nombre3d'));
 
   // ---------- cuenta de Google / Firestore ----------
   const accountLabel = document.getElementById('accountLabel');
@@ -5474,6 +5570,137 @@
     if(firebaseReady) firebase.auth().signOut();
   });
 
+  // ---------- Nombre 3D: vista previa (falso 3D con CSS) para el cliente ----------
+  // No es un motor 3D real (Three.js) — es una placa armada con varias capas
+  // de texto apiladas en el eje Z (más oscuras hacia atrás, para simular las
+  // paredes del relieve) dentro de un contenedor con "perspective", que se
+  // puede girar arrastrando. Se ve como una pieza sólida sin cargar ninguna
+  // librería 3D pesada.
+  const NOMBRE3D_COLORS = ['#2b3a67', '#c1121f', '#ffb703', '#588157', '#7b2cbf', '#023047', '#e85d75', '#495057'];
+  const tabBar = document.getElementById('tabBar');
+  const nombre3dTipoRow = document.getElementById('nombre3dTipoRow');
+  const nombre3dNombreInput = document.getElementById('nombre3dNombre');
+  const nombre3dEmojiInput = document.getElementById('nombre3dEmoji');
+  const nombre3dColorRow = document.getElementById('nombre3dColorRow');
+  const nombre3dStage = document.getElementById('nombre3dStage');
+  const nombre3dShareBtn = document.getElementById('nombre3dShareBtn');
+  const nombre3dShareRow = document.getElementById('nombre3dShareRow');
+  const nombre3dIntroCard = document.getElementById('nombre3dIntroCard');
+  let nombre3dTipo = 'llavero'; // 'llavero' | 'lapiz'
+  let nombre3dColor = NOMBRE3D_COLORS[0];
+  let nombre3dRotX = -10, nombre3dRotY = 18;
+
+  nombre3dColorRow.innerHTML = NOMBRE3D_COLORS.map((c, i) =>
+    '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-color="' + c + '" style="background:' + c + ';" title="Color"></button>'
+  ).join('');
+  nombre3dColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nombre3dColor = btn.dataset.color;
+      nombre3dColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(b => b.classList.toggle('active', b === btn));
+      renderNombre3D();
+    });
+  });
+  nombre3dTipoRow.querySelectorAll('[data-nombre3d-tipo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nombre3dTipo = btn.dataset.nombre3dTipo;
+      nombre3dTipoRow.querySelectorAll('[data-nombre3d-tipo]').forEach(b => b.classList.toggle('active', b === btn));
+      renderNombre3D();
+    });
+  });
+
+  function renderNombre3D(){
+    const nombre = nombre3dNombreInput.value.trim();
+    const emoji = nombre3dEmojiInput.value.trim();
+    const texto = nombre + (emoji ? ' ' + emoji : '');
+    nombre3dStage.innerHTML = '';
+    if(!texto){
+      nombre3dStage.innerHTML = '<p class="empty-note">Escribe un nombre para verlo aquí</p>';
+      return;
+    }
+    const plate = document.createElement('div');
+    plate.className = 'nombre3d-plate';
+    plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
+    const CAPAS = 10;
+    for(let i = CAPAS - 1; i >= 0; i--){
+      const capa = document.createElement('div');
+      capa.className = 'nombre3d-layer' + (i === 0 ? ' nombre3d-front' : '');
+      capa.textContent = texto;
+      capa.style.background = nombre3dColor;
+      capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
+      capa.style.transform = 'translateZ(' + (-i * 2) + 'px)';
+      if(i === 0){
+        capa.style.boxShadow = '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
+      }
+      plate.appendChild(capa);
+    }
+    if(nombre3dTipo === 'llavero'){
+      const ring = document.createElement('div');
+      ring.className = 'nombre3d-ring';
+      plate.appendChild(ring);
+    }
+    nombre3dStage.appendChild(plate);
+  }
+  [nombre3dNombreInput, nombre3dEmojiInput].forEach(input => {
+    input.addEventListener('input', renderNombre3D);
+  });
+
+  // Arrastrar para girar — sencillo: guarda el ángulo actual y lo mueve
+  // según lo que se desplace el dedo/mouse, sin reconstruir las capas en
+  // cada movimiento (solo cambia el transform de la placa ya armada).
+  let nombre3dArrastrando = false, nombre3dUltimoX = 0, nombre3dUltimoY = 0;
+  nombre3dStage.addEventListener('pointerdown', (e) => {
+    const plate = nombre3dStage.querySelector('.nombre3d-plate');
+    if(!plate) return;
+    nombre3dArrastrando = true;
+    nombre3dUltimoX = e.clientX;
+    nombre3dUltimoY = e.clientY;
+    plate.classList.add('nombre3d-dragging');
+    nombre3dStage.setPointerCapture(e.pointerId);
+  });
+  nombre3dStage.addEventListener('pointermove', (e) => {
+    if(!nombre3dArrastrando) return;
+    const dx = e.clientX - nombre3dUltimoX;
+    const dy = e.clientY - nombre3dUltimoY;
+    nombre3dUltimoX = e.clientX;
+    nombre3dUltimoY = e.clientY;
+    nombre3dRotY += dx * 0.5;
+    nombre3dRotX = Math.max(-45, Math.min(45, nombre3dRotX - dy * 0.5));
+    const plate = nombre3dStage.querySelector('.nombre3d-plate');
+    if(plate) plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
+  });
+  function nombre3dSoltar(){
+    nombre3dArrastrando = false;
+    const plate = nombre3dStage.querySelector('.nombre3d-plate');
+    if(plate) plate.classList.remove('nombre3d-dragging');
+  }
+  nombre3dStage.addEventListener('pointerup', nombre3dSoltar);
+  nombre3dStage.addEventListener('pointercancel', nombre3dSoltar);
+
+  // Comparte un link que abre la app YA en modo "solo esta pestaña" (sin
+  // barra de pestañas, sin el resto de la app) — para mandárselo al
+  // cliente y que pruebe su nombre sin ver nada de tu calculadora.
+  nombre3dShareBtn.addEventListener('click', async () => {
+    const link = location.origin + location.pathname + '?vista3d=1';
+    try{
+      await navigator.clipboard.writeText(link);
+      showToast('Link copiado — pruébalo antes de mandarlo');
+    }catch(e){
+      showToast('No se pudo copiar el link');
+    }
+  });
+
+  // Modo cliente: si el link trae "?vista3d=1", se esconde todo lo demás
+  // (pestañas, ajustes, el botón de "+") y solo se ve esta herramienta.
+  function activarModoClienteNombre3D(){
+    document.body.classList.add('modo-cliente-nombre3d');
+    tabBar.classList.add('hidden');
+    topAjustesBtn.classList.add('hidden');
+    topNombre3dBtn.classList.add('hidden');
+    document.getElementById('addOrderFab').classList.add('hidden');
+    nombre3dShareRow.classList.add('hidden');
+    setActiveTab('nombre3d');
+  }
+
   // ---------- init ----------
   renderExtraCosts();
   renderProfiles();
@@ -5487,6 +5714,8 @@
   if(hasSharedQuery) simpleModeToggle.checked = false;
   syncSimpleMode(false);
   setActiveTab('inicio');
+  renderNombre3D();
+  if(new URLSearchParams(location.search).get('vista3d') === '1') activarModoClienteNombre3D();
 
   if("serviceWorker" in navigator){
     window.addEventListener("load", () => {
