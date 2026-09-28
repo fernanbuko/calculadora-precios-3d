@@ -1167,6 +1167,19 @@
     background: radial-gradient(ellipse at 35% 35%, #555 0%, #000 75%);
     box-shadow: inset 0 2px 5px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
   }
+  /* Identificador de lápiz + "Contorno de letras": ahí no hay caja de
+     material alrededor del nombre donde perforar sin partir una letra —
+     así que en vez del hueco metido en el texto, se le agrega al costado
+     una pestañita sólida del mismo color (igual idea que la de la
+     argolla) y el hueco va dentro de esa pestaña, nunca sobre el nombre. */
+  .nombre3d-lapiz-mount-contorno{
+    position: absolute;
+    top: 50%; left: -14px;
+    width: 18px; height: 30px;
+    border-radius: 8px;
+    transform: translateY(-50%) translateZ(3px);
+  }
+  .nombre3d-hueco-lapiz-contorno{ left: -13px; }
   /* Argolla: la base ("mount") es una pestañita del mismo color de la
      pieza que sobresale del borde de arriba, y la argolla metálica se
      apoya encima de esa pestaña — así queda fundida a la pieza en vez de
@@ -5740,10 +5753,6 @@
     btn.addEventListener('click', () => {
       nombre3dTipo = btn.dataset.nombre3dTipo;
       nombre3dTipoRow.querySelectorAll('[data-nombre3d-tipo]').forEach(b => b.classList.toggle('active', b === btn));
-      // "Contorno de letras" solo tiene sentido en el llavero: en el
-      // identificador de lápiz necesita ser un bloque real (con su hueco
-      // atravesado), no una silueta hueca con la forma del nombre.
-      if(nombre3dTipo === 'lapiz' && nombre3dForma === 'contorno') nombre3dForma = 'redonda';
       // La elección de argolla/agujero solo tiene sentido en el llavero —
       // el identificador de lápiz ya trae su propio hueco atravesado.
       nombre3dArgollaField.classList.toggle('hidden', nombre3dTipo === 'lapiz');
@@ -5762,12 +5771,7 @@
     });
   });
   function renderFormaRow(){
-    // "Contorno de letras" (silueta hueca con la forma del nombre) solo se
-    // ofrece para el llavero — en el identificador de lápiz necesita ser
-    // un bloque sólido de verdad para que el hueco del lápiz tenga dónde
-    // atravesar.
-    const formas = nombre3dTipo === 'lapiz' ? NOMBRE3D_FORMAS.filter(f => f.id !== 'contorno') : NOMBRE3D_FORMAS;
-    nombre3dFormaRow.innerHTML = formas.map(f =>
+    nombre3dFormaRow.innerHTML = NOMBRE3D_FORMAS.map(f =>
       '<button type="button" class="btn small filter-btn' + (f.id === nombre3dForma ? ' active' : '') + '" data-forma="' + f.id + '">' + f.label + '</button>'
     ).join('');
     nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(btn => {
@@ -5897,6 +5901,15 @@
         ring.className = 'nombre3d-ring';
         head.appendChild(ring);
       }
+    } else if(esContorno){
+      const mount = document.createElement('div');
+      mount.className = 'nombre3d-lapiz-mount-contorno';
+      mount.style.background = nombre3dColor;
+      mount.style.filter = 'brightness(0.85)';
+      head.appendChild(mount);
+      const hueco = document.createElement('div');
+      hueco.className = 'nombre3d-hueco-lapiz nombre3d-hueco-lapiz-contorno';
+      head.appendChild(hueco);
     } else {
       const hueco = document.createElement('div');
       hueco.className = 'nombre3d-hueco-lapiz';
