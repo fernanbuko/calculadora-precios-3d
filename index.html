@@ -6121,7 +6121,26 @@
     const nombre = nombre3dNombreInput.value.trim();
     const emoji = nombre3dEmojiInput.value.trim();
     const texto = nombre + (emoji ? ' ' + emoji : '');
-    if(!n3d.renderer) nombre3dInitEngine();
+    // Si Three.js no llegó a cargar (CDN bloqueado por la red, sin
+    // conexión, etc.) o el navegador no puede crear el contexto WebGL, el
+    // motor nunca se arma — sin este control, el mensaje de "escribe un
+    // nombre" se queda pegado para siempre aunque sí se haya escrito uno,
+    // sin ninguna pista de qué falló.
+    if(typeof THREE === 'undefined'){
+      nombre3dEmptyNote.textContent = 'No se pudo cargar el motor 3D — revisa tu conexión a internet y vuelve a intentar (recarga la página).';
+      nombre3dEmptyNote.style.display = 'flex';
+      return;
+    }
+    if(!n3d.renderer){
+      try {
+        nombre3dInitEngine();
+      } catch(err) {
+        console.error('Nombre 3D: no se pudo iniciar el motor', err);
+        nombre3dEmptyNote.textContent = 'No se pudo mostrar la vista previa 3D en este navegador. Probá con otro navegador o dispositivo.';
+        nombre3dEmptyNote.style.display = 'flex';
+        return;
+      }
+    }
     while(n3d.group.children.length){
       const hijo = n3d.group.children[0];
       n3d.group.remove(hijo);
@@ -6129,9 +6148,11 @@
       hijo.material && hijo.material.map && hijo.material.map.dispose();
       hijo.material && hijo.material.dispose();
     }
+    nombre3dEmptyNote.textContent = 'Escribe un nombre para verlo aquí';
     nombre3dEmptyNote.style.display = texto ? 'none' : 'flex';
     if(!texto) return;
 
+    try {
     const fontFamily = (NOMBRE3D_FONTS.find(f => f.id === nombre3dFont) || NOMBRE3D_FONTS[0]).family;
     const esLapiz = nombre3dTipo === 'lapiz';
     const esMascota = nombre3dTipo === 'mascota';
@@ -6237,6 +6258,11 @@
       const anillo = new THREE.Mesh(new THREE.TorusGeometry(altoMundo * 0.11, altoMundo * 0.026, 8, 24), anilloMat);
       anillo.position.set(ax, ay + altoMundo * 0.17, 0);
       n3d.group.add(anillo);
+    }
+    } catch(err) {
+      console.error('Nombre 3D: error armando la pieza', err);
+      nombre3dEmptyNote.textContent = 'Algo salió mal armando la vista previa. Probá con otro nombre/forma, o recargá la página.';
+      nombre3dEmptyNote.style.display = 'flex';
     }
   }
 
