@@ -1167,13 +1167,39 @@
     background: radial-gradient(ellipse at 35% 35%, #555 0%, #000 75%);
     box-shadow: inset 0 2px 5px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
   }
+  /* Argolla: la base ("mount") es una pestañita del mismo color de la
+     pieza que sobresale del borde de arriba, y la argolla metálica se
+     apoya encima de esa pestaña — así queda fundida a la pieza en vez de
+     verse flotando sola en el aire sin nada que la sostenga. */
+  .nombre3d-ring-mount{
+    position: absolute;
+    top: -8px; left: 13px;
+    width: 16px; height: 14px;
+    border-radius: 5px 5px 2px 2px;
+    transform: translateZ(3px);
+  }
   .nombre3d-ring{
     position: absolute;
-    top: -13px; left: 18px;
-    width: 18px; height: 18px;
+    top: -19px; left: 15px;
+    width: 20px; height: 20px;
+    box-sizing: border-box;
     border-radius: 50%;
     border: 5px solid #9a9a9a;
-    transform: translateZ(4px);
+    background: transparent;
+    box-shadow: 0 2px 3px rgba(0,0,0,.35);
+    transform: translateZ(5px);
+  }
+  /* Agujero: en vez de una argolla aparte, un hueco redondo atraviesa la
+     pieza cerca de la esquina de arriba — no flota nada, es parte del
+     mismo material. */
+  .nombre3d-agujero-llavero{
+    position: absolute;
+    top: 12px; left: 12px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    transform: translateZ(3px);
+    background: radial-gradient(circle at 35% 35%, #555 0%, #000 75%);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
   }
   /* Modo cliente: se abrió con ?vista3d=1 — se esconde todo lo que no sea
      esta herramienta, para poder mandarle el link solo de esto a un
@@ -2045,6 +2071,12 @@
         <label>Forma del llavero</label>
       </div>
       <div class="btn-row" id="nombre3dFormaRow"></div>
+    </div>
+    <div class="field field-wide" id="nombre3dArgollaField">
+      <div>
+        <label>Argolla o agujero</label>
+      </div>
+      <div class="btn-row" id="nombre3dArgollaRow"></div>
     </div>
     <div class="field field-wide">
       <div>
@@ -5647,12 +5679,18 @@
     { id: 'etiqueta', label: 'Etiqueta' },
     { id: 'contorno', label: 'Contorno de letras' }
   ];
+  const NOMBRE3D_ARGOLLAS = [
+    { id: 'argolla', label: 'Argolla' },
+    { id: 'agujero', label: 'Agujero' }
+  ];
   const tabBar = document.getElementById('tabBar');
   const nombre3dTipoRow = document.getElementById('nombre3dTipoRow');
   const nombre3dNombreInput = document.getElementById('nombre3dNombre');
   const nombre3dEmojiInput = document.getElementById('nombre3dEmoji');
   const nombre3dFontRow = document.getElementById('nombre3dFontRow');
   const nombre3dFormaRow = document.getElementById('nombre3dFormaRow');
+  const nombre3dArgollaField = document.getElementById('nombre3dArgollaField');
+  const nombre3dArgollaRow = document.getElementById('nombre3dArgollaRow');
   const nombre3dColorRow = document.getElementById('nombre3dColorRow');
   const nombre3dTextColorRow = document.getElementById('nombre3dTextColorRow');
   const nombre3dStage = document.getElementById('nombre3dStage');
@@ -5664,7 +5702,19 @@
   let nombre3dTextColor = NOMBRE3D_TEXT_COLORS[0];
   let nombre3dFont = NOMBRE3D_FONTS[0].id;
   let nombre3dForma = NOMBRE3D_FORMAS[0].id;
+  let nombre3dArgolla = NOMBRE3D_ARGOLLAS[0].id; // 'argolla' | 'agujero' — solo aplica al llavero
   let nombre3dRotX = -10, nombre3dRotY = 18;
+
+  nombre3dArgollaRow.innerHTML = NOMBRE3D_ARGOLLAS.map((a, i) =>
+    '<button type="button" class="btn small filter-btn' + (i === 0 ? ' active' : '') + '" data-argolla="' + a.id + '">' + a.label + '</button>'
+  ).join('');
+  nombre3dArgollaRow.querySelectorAll('[data-argolla]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nombre3dArgolla = btn.dataset.argolla;
+      nombre3dArgollaRow.querySelectorAll('[data-argolla]').forEach(b => b.classList.toggle('active', b === btn));
+      renderNombre3D();
+    });
+  });
 
   nombre3dColorRow.innerHTML = NOMBRE3D_COLORS.map((c, i) =>
     '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-color="' + c + '" style="background:' + c + ';" title="Color"></button>'
@@ -5694,6 +5744,9 @@
       // identificador de lápiz necesita ser un bloque real (con su hueco
       // atravesado), no una silueta hueca con la forma del nombre.
       if(nombre3dTipo === 'lapiz' && nombre3dForma === 'contorno') nombre3dForma = 'redonda';
+      // La elección de argolla/agujero solo tiene sentido en el llavero —
+      // el identificador de lápiz ya trae su propio hueco atravesado.
+      nombre3dArgollaField.classList.toggle('hidden', nombre3dTipo === 'lapiz');
       renderFormaRow();
       renderNombre3D();
     });
@@ -5825,9 +5878,25 @@
     }
     head.appendChild(back);
     if(nombre3dTipo === 'llavero'){
-      const ring = document.createElement('div');
-      ring.className = 'nombre3d-ring';
-      head.appendChild(ring);
+      if(nombre3dArgolla === 'agujero'){
+        // Agujero: un hueco redondo atraviesa la propia pieza — no hay
+        // nada aparte que sostener, así que nunca se ve "flotando".
+        const agujero = document.createElement('div');
+        agujero.className = 'nombre3d-agujero-llavero';
+        head.appendChild(agujero);
+      } else {
+        // Argolla: la pestaña ("mount") del mismo color de la pieza sube
+        // desde el borde de arriba y la argolla metálica se apoya justo
+        // encima, fundida a esa pestaña en vez de quedar suelta en el aire.
+        const mount = document.createElement('div');
+        mount.className = 'nombre3d-ring-mount';
+        mount.style.background = nombre3dColor;
+        mount.style.filter = 'brightness(0.85)';
+        head.appendChild(mount);
+        const ring = document.createElement('div');
+        ring.className = 'nombre3d-ring';
+        head.appendChild(ring);
+      }
     } else {
       const hueco = document.createElement('div');
       hueco.className = 'nombre3d-hueco-lapiz';
