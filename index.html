@@ -1141,6 +1141,32 @@
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
   .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
   .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
+  /* Placa para mascotas: forma de hueso — un cuerpo central rectangular
+     con dos "lóbulos" redondeados en cada punta (cada lóbulo hecho de dos
+     círculos, arriba y abajo, del mismo color de la placa) para armar la
+     silueta clásica de hueso sin depender de ningún recorte/imagen. */
+  .nombre3d-forma-hueso{
+    border-radius: 999px;
+    padding: 8px 44px;
+  }
+  .nombre3d-forma-hueso::before,
+  .nombre3d-forma-hueso::after{
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 30px; height: 30px;
+    background: inherit;
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .nombre3d-forma-hueso::before{
+    left: -6px;
+    box-shadow: 0 -16px 0 0 var(--n3d-bg, currentColor), 0 16px 0 0 var(--n3d-bg, currentColor);
+  }
+  .nombre3d-forma-hueso::after{
+    right: -6px;
+    box-shadow: 0 -16px 0 0 var(--n3d-bg, currentColor), 0 16px 0 0 var(--n3d-bg, currentColor);
+  }
   /* "Contorno de letras": en vez de una placa rectangular con el nombre
      encima, el contorno de la pieza sigue la forma de las propias letras
      (como un llavero cortado con la silueta del nombre) — se logra sin
@@ -2069,6 +2095,7 @@
     <div class="btn-row" id="nombre3dTipoRow">
       <button type="button" class="btn small filter-btn active" data-nombre3d-tipo="llavero">Llavero</button>
       <button type="button" class="btn small filter-btn" data-nombre3d-tipo="lapiz">Identificador de lápiz</button>
+      <button type="button" class="btn small filter-btn" data-nombre3d-tipo="mascota">🦴 Placa para mascotas</button>
     </div>
     <div class="field field-wide">
       <div>
@@ -2089,9 +2116,9 @@
       </div>
       <div class="btn-row" id="nombre3dFontRow"></div>
     </div>
-    <div class="field field-wide">
+    <div class="field field-wide" id="nombre3dFormaField">
       <div>
-        <label>Forma del llavero</label>
+        <label>Forma</label>
       </div>
       <div class="btn-row" id="nombre3dFormaRow"></div>
     </div>
@@ -5711,6 +5738,7 @@
   const nombre3dNombreInput = document.getElementById('nombre3dNombre');
   const nombre3dEmojiInput = document.getElementById('nombre3dEmoji');
   const nombre3dFontRow = document.getElementById('nombre3dFontRow');
+  const nombre3dFormaField = document.getElementById('nombre3dFormaField');
   const nombre3dFormaRow = document.getElementById('nombre3dFormaRow');
   const nombre3dArgollaField = document.getElementById('nombre3dArgollaField');
   const nombre3dArgollaRow = document.getElementById('nombre3dArgollaRow');
@@ -5720,7 +5748,7 @@
   const nombre3dShareBtn = document.getElementById('nombre3dShareBtn');
   const nombre3dShareRow = document.getElementById('nombre3dShareRow');
   const nombre3dIntroCard = document.getElementById('nombre3dIntroCard');
-  let nombre3dTipo = 'llavero'; // 'llavero' | 'lapiz'
+  let nombre3dTipo = 'llavero'; // 'llavero' | 'lapiz' | 'mascota'
   let nombre3dColor = NOMBRE3D_COLORS[0];
   let nombre3dTextColor = NOMBRE3D_TEXT_COLORS[0];
   let nombre3dFont = NOMBRE3D_FONTS[0].id;
@@ -5763,9 +5791,20 @@
     btn.addEventListener('click', () => {
       nombre3dTipo = btn.dataset.nombre3dTipo;
       nombre3dTipoRow.querySelectorAll('[data-nombre3d-tipo]').forEach(b => b.classList.toggle('active', b === btn));
-      // La elección de argolla/agujero solo tiene sentido en el llavero —
-      // el identificador de lápiz ya trae su propio hueco atravesado.
+      // La elección de argolla/agujero solo tiene sentido en el llavero y
+      // en la placa para mascotas — el identificador de lápiz ya trae su
+      // propio hueco atravesado.
       nombre3dArgollaField.classList.toggle('hidden', nombre3dTipo === 'lapiz');
+      // La placa para mascotas siempre sale en forma de hueso — no hay
+      // selector de forma para ella, se oculta ese campo. Al salir de
+      // mascota, si se había quedado en "hueso" se vuelve a una forma
+      // normal.
+      if(nombre3dTipo === 'mascota'){
+        nombre3dForma = 'hueso';
+      } else if(nombre3dForma === 'hueso'){
+        nombre3dForma = 'redonda';
+      }
+      nombre3dFormaField.classList.toggle('hidden', nombre3dTipo === 'mascota');
       renderFormaRow();
       renderNombre3D();
     });
@@ -5863,6 +5902,9 @@
         capa.style.color = nombre3dTextColor;
         capa.style.textShadow = '';
       }
+      // Usada por los lóbulos de la forma "hueso" (box-shadow no puede
+      // leer el background con la palabra clave "inherit").
+      capa.style.setProperty('--n3d-bg', nombre3dColor);
       if(i === 0){
         capa.style.boxShadow = esContorno ? 'none' : '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
       }
@@ -5890,8 +5932,9 @@
       back.style.textShadow = '';
       back.style.color = 'transparent';
     }
+    back.style.setProperty('--n3d-bg', nombre3dColor);
     head.appendChild(back);
-    if(nombre3dTipo === 'llavero'){
+    if(nombre3dTipo === 'llavero' || nombre3dTipo === 'mascota'){
       if(nombre3dArgolla === 'agujero'){
         // Agujero: la pestañita sólida sale del costado izquierdo, a la
         // mitad de la altura, y el hueco va perforado dentro de ella —
