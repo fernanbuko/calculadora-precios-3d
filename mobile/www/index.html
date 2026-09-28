@@ -1133,8 +1133,9 @@
   .nombre3d-layer.nombre3d-front{ position: relative; }
   /* Cara trasera de la placa: mismo texto (para que mida igual) pero con
      las letras transparentes, para que al girar no se vea un hueco vacío
-     sino una placa lisa por detrás, como una pieza real. */
-  .nombre3d-layer.nombre3d-back{ text-shadow: none !important; }
+     sino una placa lisa por detrás, como una pieza real. Los colores y el
+     contorno exactos se calculan en JS según la forma (caja vs. contorno
+     de letras). */
   /* Forma de la placa detrás del nombre — se aplica a cada capa apilada. */
   .nombre3d-forma-redonda{ border-radius: 999px; }
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
@@ -1143,9 +1144,11 @@
   /* "Contorno de letras": en vez de una placa rectangular con el nombre
      encima, el contorno de la pieza sigue la forma de las propias letras
      (como un llavero cortado con la silueta del nombre) — se logra sin
-     ningún recorte real, dibujando el texto con un trazo (text-stroke)
-     bien grueso del color de fondo detrás del relleno, así el "borde"
-     de cada letra hace de plástico y el relleno hace de hueco/letra. */
+     ningún recorte real, con un halo de sombras borrosas alrededor del
+     texto (calculado en JS) del color de fondo detrás del relleno, así
+     el "borde" de cada letra hace de plástico y queda redondeado en las
+     puntas/esquinas (un simple text-stroke se ve picudo ahí), y el
+     relleno hace de hueco/letra. */
   .nombre3d-forma-contorno{
     background: transparent !important;
     border-radius: 0;
@@ -5724,6 +5727,23 @@
   }
   renderFormaRow();
 
+  // "Contorno de letras" arma el borde alrededor de cada letra con muchas
+  // copias borrosas del texto (text-shadow) puestas en círculo alrededor
+  // del original, en vez de un simple -webkit-text-stroke — el stroke da
+  // esquinas filosas/picudas en las uniones, mientras que el desenfoque de
+  // cada copia redondea las puntas y esquinas, como un corte real.
+  function nombre3dContornoSombra(color){
+    const radio = 9, borroso = 3, pasos = 14;
+    const sombras = [];
+    for(let i = 0; i < pasos; i++){
+      const angulo = (i / pasos) * Math.PI * 2;
+      const x = (Math.cos(angulo) * radio).toFixed(2);
+      const y = (Math.sin(angulo) * radio).toFixed(2);
+      sombras.push(x + 'px ' + y + 'px ' + borroso + 'px ' + color);
+    }
+    return sombras.join(', ');
+  }
+
   function renderNombre3D(){
     const nombre = nombre3dNombreInput.value.trim();
     const emoji = nombre3dEmojiInput.value.trim();
@@ -5767,15 +5787,14 @@
       capa.style.transform = 'translateZ(' + (-i * PASO_Z) + 'px)';
       if(esContorno){
         capa.style.background = 'transparent';
-        capa.style.webkitTextStroke = '0.3em ' + nombre3dColor;
-        capa.style.paintOrder = 'stroke fill';
+        capa.style.textShadow = nombre3dContornoSombra(nombre3dColor);
         // Las capas de atrás son el "grosor" del corte: mismo color por
         // fuera y por dentro (silueta sólida), sin distinguir letra/fondo.
         capa.style.color = i === 0 ? nombre3dTextColor : nombre3dColor;
       } else {
         capa.style.background = nombre3dColor;
         capa.style.color = nombre3dTextColor;
-        capa.style.webkitTextStroke = '';
+        capa.style.textShadow = '';
       }
       if(i === 0){
         capa.style.boxShadow = esContorno ? 'none' : '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
@@ -5797,12 +5816,11 @@
     back.style.transform = 'translateZ(' + (-(CAPAS) * PASO_Z) + 'px) rotateY(180deg)';
     if(esContorno){
       back.style.background = 'transparent';
-      back.style.webkitTextStroke = '0.3em ' + nombre3dColor;
-      back.style.paintOrder = 'stroke fill';
+      back.style.textShadow = nombre3dContornoSombra(nombre3dColor);
       back.style.color = nombre3dColor;
     } else {
       back.style.background = nombre3dColor;
-      back.style.webkitTextStroke = '';
+      back.style.textShadow = '';
       back.style.color = 'transparent';
     }
     head.appendChild(back);
