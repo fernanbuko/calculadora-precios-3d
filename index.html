@@ -5742,6 +5742,7 @@
   let nombre3dForma = NOMBRE3D_FORMAS[0].id;
   let nombre3dArgolla = NOMBRE3D_ARGOLLAS[0].id; // 'argolla' | 'agujero' — solo aplica al llavero
   let nombre3dRotX = -10, nombre3dRotY = 18;
+  let nombre3dRenderGen = 0; // ver comentario junto al recorte de "hueso" más abajo
 
   nombre3dArgollaRow.innerHTML = NOMBRE3D_ARGOLLAS.map((a, i) =>
     '<button type="button" class="btn small filter-btn' + (i === 0 ? ' active' : '') + '" data-argolla="' + a.id + '">' + a.label + '</button>'
@@ -5874,6 +5875,7 @@
   }
 
   function renderNombre3D(){
+    const miGen = ++nombre3dRenderGen;
     const nombre = nombre3dNombreInput.value.trim();
     const emoji = nombre3dEmojiInput.value.trim();
     const texto = nombre + (emoji ? ' ' + emoji : '');
@@ -6001,14 +6003,29 @@
     plate.appendChild(head);
     nombre3dStage.appendChild(plate);
     if(nombre3dForma === 'hueso'){
-      // Recién ahora la capa está en el documento y tiene tamaño real —
-      // se mide una sola vez (todas las capas miden lo mismo, mismo
-      // texto) y se aplica el mismo recorte a todas.
-      const frente = head.querySelector('.nombre3d-front');
-      if(frente){
+      // Se mide y aplica el recorte de hueso ahora (todas las capas miden
+      // lo mismo, mismo texto) — pero la tipografía (Google Fonts) puede
+      // terminar de cargar DESPUÉS de este punto, y al llegar cambia el
+      // ancho real del texto sin que el recorte ya aplicado se entere,
+      // dejando las puntas mal alineadas con la cintura (se vio en un
+      // celular real, aunque no en las pruebas de escritorio, porque ahí
+      // la fuente no cargaba nunca y por eso nunca se movía). Por las
+      // dudas se vuelve a medir y aplicar cuando las fuentes terminan de
+      // cargar, protegido con un número de "generación" para no pisar un
+      // renderizado más nuevo si para entonces ya se volvió a llamar a
+      // esta función (con otro nombre, color, etc).
+      const aplicarRecorteHueso = () => {
+        if(miGen !== nombre3dRenderGen) return;
+        const frente = head.querySelector('.nombre3d-front');
+        if(!frente) return;
         const clip = nombre3dHuesoClipPath(frente.offsetWidth, frente.offsetHeight);
         head.querySelectorAll('.nombre3d-forma-hueso').forEach(el => { el.style.clipPath = clip; });
+      };
+      aplicarRecorteHueso();
+      if(document.fonts && document.fonts.ready){
+        document.fonts.ready.then(aplicarRecorteHueso);
       }
+      setTimeout(aplicarRecorteHueso, 350);
     }
   }
   [nombre3dNombreInput, nombre3dEmojiInput].forEach(input => {
