@@ -1119,10 +1119,10 @@
     cursor: grab;
   }
   .nombre3d-plate.nombre3d-dragging{ cursor: grabbing; }
+  .nombre3d-head{ position: relative; transform-style: preserve-3d; }
   .nombre3d-layer{
     font-weight: 800;
     font-size: 34px;
-    color: #fff;
     padding: 16px 28px;
     white-space: nowrap;
     position: absolute;
@@ -1131,11 +1131,36 @@
     box-sizing: border-box;
   }
   .nombre3d-layer.nombre3d-front{ position: relative; }
+  /* Cara trasera de la placa: mismo texto (para que mida igual) pero con
+     las letras transparentes, para que al girar no se vea un hueco vacío
+     sino una placa lisa por detrás, como una pieza real. */
+  .nombre3d-layer.nombre3d-back{ color: transparent !important; text-shadow: none !important; }
   /* Forma de la placa detrás del nombre — se aplica a cada capa apilada. */
   .nombre3d-forma-redonda{ border-radius: 999px; }
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
   .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
   .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
+  /* Identificador de lápiz: tubo/funda debajo de la placa, con un hueco
+     ovalado donde entraría el lápiz — para que se vea distinto de un
+     llavero plano, en vez de solo quitarle el arito. */
+  .nombre3d-tubo-wrap{ display: flex; flex-direction: column; align-items: center; }
+  .nombre3d-tubo{
+    width: 46px;
+    height: 64px;
+    border-radius: 18px;
+    margin-top: -6px;
+    position: relative;
+    box-shadow: inset 6px 0 10px rgba(255,255,255,.15), inset -6px 0 14px rgba(0,0,0,.35), 0 10px 16px -8px rgba(0,0,0,.5);
+  }
+  .nombre3d-tubo-hueco{
+    position: absolute;
+    left: 50%; bottom: 8px;
+    width: 26px; height: 14px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, #000 0%, #000 60%, rgba(0,0,0,.7) 100%);
+    box-shadow: 0 1px 0 rgba(255,255,255,.2);
+  }
   .nombre3d-ring{
     position: absolute;
     top: -13px; left: 18px;
@@ -2017,9 +2042,15 @@
     </div>
     <div class="field field-wide">
       <div>
-        <label>Color</label>
+        <label>Color de fondo</label>
       </div>
       <div class="btn-row" id="nombre3dColorRow"></div>
+    </div>
+    <div class="field field-wide">
+      <div>
+        <label>Color de las letras</label>
+      </div>
+      <div class="btn-row" id="nombre3dTextColorRow"></div>
     </div>
     <div class="btn-row" id="nombre3dShareRow">
       <button type="button" class="btn small" id="nombre3dShareBtn">🔗 Copiar link para el cliente</button>
@@ -5593,6 +5624,7 @@
   // puede girar arrastrando. Se ve como una pieza sólida sin cargar ninguna
   // librería 3D pesada.
   const NOMBRE3D_COLORS = ['#2b3a67', '#c1121f', '#ffb703', '#588157', '#7b2cbf', '#023047', '#e85d75', '#495057'];
+  const NOMBRE3D_TEXT_COLORS = ['#ffffff', '#000000', '#ffd60a', '#ff70a6', '#70d6ff', '#8ac926'];
   // Tipografías redondeadas/gruesas típicas de estas piezas — cada una ya
   // se pidió junto con las demás fuentes de la app en el <link> de Google
   // Fonts de arriba, así que no hace falta cargar nada extra aquí.
@@ -5615,12 +5647,14 @@
   const nombre3dFontRow = document.getElementById('nombre3dFontRow');
   const nombre3dFormaRow = document.getElementById('nombre3dFormaRow');
   const nombre3dColorRow = document.getElementById('nombre3dColorRow');
+  const nombre3dTextColorRow = document.getElementById('nombre3dTextColorRow');
   const nombre3dStage = document.getElementById('nombre3dStage');
   const nombre3dShareBtn = document.getElementById('nombre3dShareBtn');
   const nombre3dShareRow = document.getElementById('nombre3dShareRow');
   const nombre3dIntroCard = document.getElementById('nombre3dIntroCard');
   let nombre3dTipo = 'llavero'; // 'llavero' | 'lapiz'
   let nombre3dColor = NOMBRE3D_COLORS[0];
+  let nombre3dTextColor = NOMBRE3D_TEXT_COLORS[0];
   let nombre3dFont = NOMBRE3D_FONTS[0].id;
   let nombre3dForma = NOMBRE3D_FORMAS[0].id;
   let nombre3dRotX = -10, nombre3dRotY = 18;
@@ -5632,6 +5666,16 @@
     btn.addEventListener('click', () => {
       nombre3dColor = btn.dataset.color;
       nombre3dColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(b => b.classList.toggle('active', b === btn));
+      renderNombre3D();
+    });
+  });
+  nombre3dTextColorRow.innerHTML = NOMBRE3D_TEXT_COLORS.map((c, i) =>
+    '<button type="button" class="nombre3d-color-swatch' + (i === 0 ? ' active' : '') + '" data-textcolor="' + c + '" style="background:' + c + ';' + (c === '#ffffff' ? 'border-color:var(--line-strong);' : '') + '" title="Color de las letras"></button>'
+  ).join('');
+  nombre3dTextColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      nombre3dTextColor = btn.dataset.textcolor;
+      nombre3dTextColorRow.querySelectorAll('.nombre3d-color-swatch').forEach(b => b.classList.toggle('active', b === btn));
       renderNombre3D();
     });
   });
@@ -5674,26 +5718,59 @@
     }
     const plate = document.createElement('div');
     plate.className = 'nombre3d-plate';
+    plate.style.display = 'flex';
+    plate.style.flexDirection = 'column';
+    plate.style.alignItems = 'center';
     plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
     const fontFamily = (NOMBRE3D_FONTS.find(f => f.id === nombre3dFont) || NOMBRE3D_FONTS[0]).family;
+
+    // La "cabeza" agrupa las capas apiladas que arman el relieve — necesita
+    // su propio transform-style:preserve-3d para que la profundidad (los
+    // translateZ de cada capa) no se aplaste al meterla dentro de "plate".
+    const head = document.createElement('div');
+    head.className = 'nombre3d-head';
     const CAPAS = 10;
     for(let i = CAPAS - 1; i >= 0; i--){
       const capa = document.createElement('div');
       capa.className = 'nombre3d-layer nombre3d-forma-' + nombre3dForma + (i === 0 ? ' nombre3d-front' : '');
       capa.textContent = texto;
       capa.style.background = nombre3dColor;
+      capa.style.color = nombre3dTextColor;
       capa.style.fontFamily = fontFamily;
       capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
       capa.style.transform = 'translateZ(' + (-i * 2) + 'px)';
       if(i === 0){
         capa.style.boxShadow = '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
       }
-      plate.appendChild(capa);
+      head.appendChild(capa);
     }
+    // Cara trasera: mismo texto (para medir igual) pero con las letras
+    // transparentes, puesta en el fondo del todo y girada 180° sobre sí
+    // misma — así al girar la pieza y "mostrar atrás" se ve una placa
+    // lisa en vez de un hueco vacío (antes desaparecía el diseño).
+    const back = document.createElement('div');
+    back.className = 'nombre3d-layer nombre3d-back nombre3d-forma-' + nombre3dForma;
+    back.textContent = texto;
+    back.style.background = nombre3dColor;
+    back.style.fontFamily = fontFamily;
+    back.style.filter = 'brightness(0.4)';
+    back.style.transform = 'translateZ(' + (-(CAPAS) * 2) + 'px) rotateY(180deg)';
+    head.appendChild(back);
     if(nombre3dTipo === 'llavero'){
       const ring = document.createElement('div');
       ring.className = 'nombre3d-ring';
-      plate.appendChild(ring);
+      head.appendChild(ring);
+    }
+    plate.appendChild(head);
+
+    if(nombre3dTipo === 'lapiz'){
+      const tubo = document.createElement('div');
+      tubo.className = 'nombre3d-tubo';
+      tubo.style.background = nombre3dColor;
+      const hueco = document.createElement('div');
+      hueco.className = 'nombre3d-tubo-hueco';
+      tubo.appendChild(hueco);
+      plate.appendChild(tubo);
     }
     nombre3dStage.appendChild(plate);
   }
