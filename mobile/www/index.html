@@ -1134,12 +1134,23 @@
   /* Cara trasera de la placa: mismo texto (para que mida igual) pero con
      las letras transparentes, para que al girar no se vea un hueco vacío
      sino una placa lisa por detrás, como una pieza real. */
-  .nombre3d-layer.nombre3d-back{ color: transparent !important; text-shadow: none !important; }
+  .nombre3d-layer.nombre3d-back{ text-shadow: none !important; }
   /* Forma de la placa detrás del nombre — se aplica a cada capa apilada. */
   .nombre3d-forma-redonda{ border-radius: 999px; }
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
   .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
   .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
+  /* "Contorno de letras": en vez de una placa rectangular con el nombre
+     encima, el contorno de la pieza sigue la forma de las propias letras
+     (como un llavero cortado con la silueta del nombre) — se logra sin
+     ningún recorte real, dibujando el texto con un trazo (text-stroke)
+     bien grueso del color de fondo detrás del relleno, así el "borde"
+     de cada letra hace de plástico y el relleno hace de hueco/letra. */
+  .nombre3d-forma-contorno{
+    background: transparent !important;
+    border-radius: 0;
+    padding: 10px 14px;
+  }
   /* Identificador de lápiz: un bloque bien más grueso que el llavero (más
      capas apiladas, más separadas), con un hueco ovalado atravesándolo
      donde entraría el lápiz — para que se vea distinto de verdad, en vez
@@ -5630,7 +5641,8 @@
     { id: 'redonda', label: 'Redonda' },
     { id: 'cuadrada', label: 'Cuadrada' },
     { id: 'ovalada', label: 'Ovalada' },
-    { id: 'etiqueta', label: 'Etiqueta' }
+    { id: 'etiqueta', label: 'Etiqueta' },
+    { id: 'contorno', label: 'Contorno de letras' }
   ];
   const tabBar = document.getElementById('tabBar');
   const nombre3dTipoRow = document.getElementById('nombre3dTipoRow');
@@ -5675,6 +5687,11 @@
     btn.addEventListener('click', () => {
       nombre3dTipo = btn.dataset.nombre3dTipo;
       nombre3dTipoRow.querySelectorAll('[data-nombre3d-tipo]').forEach(b => b.classList.toggle('active', b === btn));
+      // "Contorno de letras" solo tiene sentido en el llavero: en el
+      // identificador de lápiz necesita ser un bloque real (con su hueco
+      // atravesado), no una silueta hueca con la forma del nombre.
+      if(nombre3dTipo === 'lapiz' && nombre3dForma === 'contorno') nombre3dForma = 'redonda';
+      renderFormaRow();
       renderNombre3D();
     });
   });
@@ -5688,16 +5705,24 @@
       renderNombre3D();
     });
   });
-  nombre3dFormaRow.innerHTML = NOMBRE3D_FORMAS.map((f, i) =>
-    '<button type="button" class="btn small filter-btn' + (i === 0 ? ' active' : '') + '" data-forma="' + f.id + '">' + f.label + '</button>'
-  ).join('');
-  nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      nombre3dForma = btn.dataset.forma;
-      nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(b => b.classList.toggle('active', b === btn));
-      renderNombre3D();
+  function renderFormaRow(){
+    // "Contorno de letras" (silueta hueca con la forma del nombre) solo se
+    // ofrece para el llavero — en el identificador de lápiz necesita ser
+    // un bloque sólido de verdad para que el hueco del lápiz tenga dónde
+    // atravesar.
+    const formas = nombre3dTipo === 'lapiz' ? NOMBRE3D_FORMAS.filter(f => f.id !== 'contorno') : NOMBRE3D_FORMAS;
+    nombre3dFormaRow.innerHTML = formas.map(f =>
+      '<button type="button" class="btn small filter-btn' + (f.id === nombre3dForma ? ' active' : '') + '" data-forma="' + f.id + '">' + f.label + '</button>'
+    ).join('');
+    nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        nombre3dForma = btn.dataset.forma;
+        nombre3dFormaRow.querySelectorAll('[data-forma]').forEach(b => b.classList.toggle('active', b === btn));
+        renderNombre3D();
+      });
     });
-  });
+  }
+  renderFormaRow();
 
   function renderNombre3D(){
     const nombre = nombre3dNombreInput.value.trim();
@@ -5723,35 +5748,63 @@
     // llavero (más capas, más separadas entre sí), con un hueco ovalado
     // atravesándolo — no una placa delgada con un simple aro.
     const esLapiz = nombre3dTipo === 'lapiz';
+    const esContorno = nombre3dForma === 'contorno';
     const head = document.createElement('div');
     head.className = 'nombre3d-head';
     const CAPAS = esLapiz ? 22 : 10;
     const PASO_Z = esLapiz ? 3 : 2;
+    // "Contorno de letras" no es una caja con el nombre encima — el texto
+    // mismo hace de silueta, dibujado con un trazo grueso (text-stroke)
+    // del color de fondo detrás del relleno: así el trazo hace de plástico
+    // alrededor de cada letra y el relleno es el hueco/color de la letra,
+    // igual que un llavero cortado con la forma del nombre.
     for(let i = CAPAS - 1; i >= 0; i--){
       const capa = document.createElement('div');
       capa.className = 'nombre3d-layer nombre3d-forma-' + nombre3dForma + (i === 0 ? ' nombre3d-front' : '');
       capa.textContent = texto;
-      capa.style.background = nombre3dColor;
-      capa.style.color = nombre3dTextColor;
       capa.style.fontFamily = fontFamily;
       capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
       capa.style.transform = 'translateZ(' + (-i * PASO_Z) + 'px)';
+      if(esContorno){
+        capa.style.background = 'transparent';
+        capa.style.webkitTextStroke = '0.3em ' + nombre3dColor;
+        capa.style.paintOrder = 'stroke fill';
+        // Las capas de atrás son el "grosor" del corte: mismo color por
+        // fuera y por dentro (silueta sólida), sin distinguir letra/fondo.
+        capa.style.color = i === 0 ? nombre3dTextColor : nombre3dColor;
+      } else {
+        capa.style.background = nombre3dColor;
+        capa.style.color = nombre3dTextColor;
+        capa.style.webkitTextStroke = '';
+      }
       if(i === 0){
-        capa.style.boxShadow = '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
+        capa.style.boxShadow = esContorno ? 'none' : '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
       }
       head.appendChild(capa);
     }
     // Cara trasera: mismo texto (para medir igual) pero con las letras
     // transparentes, puesta en el fondo del todo y girada 180° sobre sí
     // misma — así al girar la pieza y "mostrar atrás" se ve una placa
-    // lisa en vez de un hueco vacío (antes desaparecía el diseño).
+    // lisa en vez de un hueco vacío (antes desaparecía el diseño). En
+    // "Contorno de letras" no hay caja de fondo que mostrar: la cara
+    // trasera es la misma silueta sólida (mismo truco de trazo+relleno
+    // del color de fondo) en vez de una placa transparente.
     const back = document.createElement('div');
     back.className = 'nombre3d-layer nombre3d-back nombre3d-forma-' + nombre3dForma;
     back.textContent = texto;
-    back.style.background = nombre3dColor;
     back.style.fontFamily = fontFamily;
     back.style.filter = 'brightness(0.4)';
     back.style.transform = 'translateZ(' + (-(CAPAS) * PASO_Z) + 'px) rotateY(180deg)';
+    if(esContorno){
+      back.style.background = 'transparent';
+      back.style.webkitTextStroke = '0.3em ' + nombre3dColor;
+      back.style.paintOrder = 'stroke fill';
+      back.style.color = nombre3dColor;
+    } else {
+      back.style.background = nombre3dColor;
+      back.style.webkitTextStroke = '';
+      back.style.color = 'transparent';
+    }
     head.appendChild(back);
     if(nombre3dTipo === 'llavero'){
       const ring = document.createElement('div');
