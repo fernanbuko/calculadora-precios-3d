@@ -6138,10 +6138,20 @@
 
     if(esHueso){
       const r = H_PX * 0.4, barraMitad = H_PX * 0.24, cy = H_PX / 2;
-      ctx.fillRect(r, cy - barraMitad, Math.max(0, W_PX - 2 * r), barraMitad * 2);
-      [[r, r], [r, H_PX - r], [W_PX - r, r], [W_PX - r, H_PX - r]].forEach(([cx, cyy]) => {
-        ctx.beginPath(); ctx.arc(cx, cyy, r, 0, Math.PI * 2); ctx.fill();
-      });
+      // Dibuja el hueso (4 círculos + barra) en el contexto que se le
+      // pase, con el radio de círculo/grosor de barra que se le pida —
+      // los CENTROS de los círculos y las puntas de la barra quedan
+      // siempre en el mismo lugar (los del hueso de afuera, "r"), así
+      // que encoger solo el radio/grosor da un borde parejo alrededor
+      // (el centro claro de una placa esmaltada) en vez de una copia
+      // escalada/desplazada hacia adentro que deja huecos disparejos.
+      function dibujarHueso(ctxDestino, radioCirculo, mitadBarra){
+        ctxDestino.fillRect(r, cy - mitadBarra, Math.max(0, W_PX - 2 * r), mitadBarra * 2);
+        [[r, r], [r, H_PX - r], [W_PX - r, r], [W_PX - r, H_PX - r]].forEach(([cx, cyy]) => {
+          ctxDestino.beginPath(); ctxDestino.arc(cx, cyy, radioCirculo, 0, Math.PI * 2); ctxDestino.fill();
+        });
+      }
+      dibujarHueso(ctx, r, barraMitad);
       let huecoPx = null, argollaPx = null;
       if(necesitaHueco) huecoPx = [r, H_PX / 2, H_PX * 0.11];
       if(necesitaArgolla) argollaPx = [r, H_PX * 0.05];
@@ -6158,7 +6168,28 @@
       // la silueta salga del tamaño correcto — el margen no debe encogerla.
       const shapes = nombre3dSiluetaDesdeCanvas(canvas, N3D_ALTO * canvas.height / H_PX);
       const argollaMundo = argollaPx ? [(argollaPx[0] - W_PX / 2) * escala, (H_PX / 2 - argollaPx[1]) * escala] : null;
-      return { shapes, anchoMundo: W_PX * escala, argollaMundo };
+
+      // Placa de hueso "esmaltada", como las de mascotas de verdad: un
+      // borde de color parejo alrededor y el centro claro.
+      const canvasInterior = document.createElement('canvas');
+      canvasInterior.width = canvas.width; canvasInterior.height = canvas.height;
+      const ctxInterior = canvasInterior.getContext('2d');
+      ctxInterior.translate(MARGEN, MARGEN);
+      ctxInterior.fillStyle = '#fff';
+      const bordeGrosor = r * 0.22;
+      dibujarHueso(ctxInterior, r - bordeGrosor, barraMitad - bordeGrosor);
+      if(huecoPx){
+        // El agujero real (no decorativo) también se recorta del centro
+        // claro — si no, la plaqueta blanca de encima taparía el hueco
+        // aunque la placa de abajo sí esté perforada de verdad.
+        ctxInterior.save();
+        ctxInterior.globalCompositeOperation = 'destination-out';
+        ctxInterior.beginPath(); ctxInterior.arc(huecoPx[0], huecoPx[1], huecoPx[2], 0, Math.PI * 2); ctxInterior.fill();
+        ctxInterior.restore();
+      }
+      const shapesInterior = nombre3dSiluetaDesdeCanvas(canvasInterior, N3D_ALTO * canvasInterior.height / H_PX);
+
+      return { shapes, shapesInterior, anchoMundo: W_PX * escala, argollaMundo };
     }
 
     // "Contorno de letras": una plaqueta sólida (como una calcomanía
@@ -6304,7 +6335,7 @@
       bevelSegments: 2, curveSegments: 16
     };
 
-    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null;
+    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null, shapesInteriorHueso = null;
     const altoMundo = N3D_ALTO;
 
     if(forma === 'hueso' || esContorno){
@@ -6313,6 +6344,7 @@
       anchoMundo = res.anchoMundo;
       argollaMundo = res.argollaMundo;
       letraShapesContorno = res.letraShapes;
+      shapesInteriorHueso = res.shapesInterior;
     } else {
       const fontPxRef = 100;
       const anchoTextoPx = Math.max(20, nombre3dAnchoTextoPx(texto, fontFamily, fontPxRef));
@@ -6334,6 +6366,19 @@
       n3d.group.add(mesh);
     });
 
+    if(forma === 'hueso' && shapesInteriorHueso && shapesInteriorHueso.length){
+      // Placa "esmaltada" como las de mascotas de verdad: el centro claro
+      // (blanco) deja ver el borde de color de la placa alrededor, parejo
+      // en todo el contorno. Va plana y sin bisel, pegada a la cara de
+      // adelante, detrás de la calcomanía del nombre.
+      const materialInterior = new THREE.MeshStandardMaterial({ color: 0xfaf7f0, roughness: 0.45, metalness: 0.03, side: THREE.DoubleSide });
+      shapesInteriorHueso.forEach(s => {
+        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(s), materialInterior);
+        mesh.position.z = profundidad / 2 + bevelGrosor + 0.006;
+        n3d.group.add(mesh);
+      });
+    }
+
     if(esContorno && letraShapesContorno && letraShapesContorno.length){
       // La plaqueta de "Contorno de letras" queda siempre sólida (sin
       // calar el nombre — ver más arriba), así que el nombre se pinta
@@ -6349,7 +6394,13 @@
     }
 
     if(!esContorno){
-      const { texture, aspecto } = nombre3dTexturaTexto(texto, fontFamily, nombre3dTextColor);
+      // En la placa de hueso el nombre va grabado sobre el centro claro
+      // de la placa esmaltada — se usa el color de fondo (el del borde)
+      // para que el nombre se lea siempre, sea cual sea el color de
+      // letras elegido (que podría no notarse nada sobre un centro casi
+      // blanco).
+      const colorTextoDecal = forma === 'hueso' ? nombre3dColor : nombre3dTextColor;
+      const { texture, aspecto } = nombre3dTexturaTexto(texto, fontFamily, colorTextoDecal);
       let decalH = altoMundo * 0.5, decalW = decalH * aspecto;
       const maxW = anchoMundo * 0.84;
       if(decalW > maxW){ decalW = maxW; decalH = decalW / aspecto; }
