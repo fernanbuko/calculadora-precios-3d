@@ -5745,12 +5745,29 @@
     scene.add(group);
 
     n3d.scene = scene; n3d.camera = camera; n3d.renderer = renderer; n3d.group = group;
+    // El ancho de la pieza cambia según el nombre y la forma (un nombre
+    // largo en "Etiqueta" sale bastante más ancho que uno corto) — con una
+    // distancia de cámara fija, esas piezas anchas se salían del cuadro.
+    // radioEncuadre guarda el radio de la esfera que envuelve toda la
+    // pieza actual (se actualiza en cada renderNombre3D) y, con él,
+    // ajustarEncuadre() aleja o acerca la cámara lo justo para que quepa
+    // completa sin importar el ángulo al que se la gire.
+    n3d.radioEncuadre = N3D_ALTO * 0.6;
+    function ajustarEncuadre(){
+      const vFovHalf = camera.fov * Math.PI / 360;
+      const hFovHalf = Math.atan(Math.tan(vFovHalf) * camera.aspect);
+      const r = n3d.radioEncuadre;
+      const dist = Math.max(r / Math.sin(vFovHalf), r / Math.sin(hFovHalf));
+      camera.position.z = dist * 1.12;
+      camera.updateProjectionMatrix();
+    }
+    n3d.ajustarEncuadre = ajustarEncuadre;
 
     function resize(){
       const w = nombre3dStage.clientWidth, h = nombre3dStage.clientHeight;
       if(w <= 0 || h <= 0) return;
       camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      ajustarEncuadre();
       renderer.setSize(w, h, false);
     }
     resize();
@@ -6259,6 +6276,14 @@
       anillo.position.set(ax, ay + altoMundo * 0.17, 0);
       n3d.group.add(anillo);
     }
+
+    // Aleja o acerca la cámara según el tamaño real de ESTA pieza (el
+    // ancho cambia con el nombre y la forma) para que siempre entre
+    // completa en el cuadro, gire para donde gire.
+    const caja = new THREE.Box3().setFromObject(n3d.group);
+    const esfera = caja.getBoundingSphere(new THREE.Sphere());
+    n3d.radioEncuadre = esfera.radius;
+    n3d.ajustarEncuadre();
     } catch(err) {
       console.error('Nombre 3D: error armando la pieza', err);
       nombre3dEmptyNote.textContent = 'Algo salió mal armando la vista previa. Probá con otro nombre/forma, o recargá la página.';
