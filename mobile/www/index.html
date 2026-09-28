@@ -1202,15 +1202,25 @@
     box-shadow: 0 2px 3px rgba(0,0,0,.35);
     transform: translateZ(5px);
   }
-  /* Agujero: en vez de una argolla aparte, un hueco redondo atraviesa la
-     pieza cerca de la esquina de arriba — no flota nada, es parte del
-     mismo material. */
+  /* Agujero: en vez de una argolla aparte, un hueco redondo atraviesa una
+     pestañita sólida del mismo color pegada al costado izquierdo, a la
+     mitad de la altura del nombre — así nunca cae encima de una letra, sin
+     importar el nombre o la forma elegida (incluido "Contorno de letras",
+     donde no hay material alrededor del texto donde perforar sin partir
+     una letra). */
+  .nombre3d-agujero-mount{
+    position: absolute;
+    top: 50%; left: -15px;
+    width: 18px; height: 28px;
+    border-radius: 8px;
+    transform: translateY(-50%) translateZ(3px);
+  }
   .nombre3d-agujero-llavero{
     position: absolute;
-    top: 12px; left: 12px;
+    top: 50%; left: -12px;
     width: 14px; height: 14px;
     border-radius: 50%;
-    transform: translateZ(3px);
+    transform: translateY(-50%) translateZ(4px);
     background: radial-gradient(circle at 35% 35%, #555 0%, #000 75%);
     box-shadow: inset 0 2px 4px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
   }
@@ -5883,8 +5893,15 @@
     head.appendChild(back);
     if(nombre3dTipo === 'llavero'){
       if(nombre3dArgolla === 'agujero'){
-        // Agujero: un hueco redondo atraviesa la propia pieza — no hay
-        // nada aparte que sostener, así que nunca se ve "flotando".
+        // Agujero: la pestañita sólida sale del costado izquierdo, a la
+        // mitad de la altura, y el hueco va perforado dentro de ella —
+        // así nunca cae encima de una letra, sin importar el nombre o la
+        // forma (incluido "Contorno de letras").
+        const mount = document.createElement('div');
+        mount.className = 'nombre3d-agujero-mount';
+        mount.style.background = nombre3dColor;
+        mount.style.filter = 'brightness(0.85)';
+        head.appendChild(mount);
         const agujero = document.createElement('div');
         agujero.className = 'nombre3d-agujero-llavero';
         head.appendChild(agujero);
