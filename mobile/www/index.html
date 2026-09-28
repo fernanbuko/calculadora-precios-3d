@@ -6169,19 +6169,15 @@
     }
 
     // "Contorno de letras": una plaqueta sólida (como una calcomanía
-    // cortada de verdad) con el nombre recortado como hueco — no las
-    // letras sueltas como piezas propias. Primero se traza el texto SOLO
-    // (sin la pestañita) para saber exactamente qué recortar; cada letra
-    // sale con su propio hueco natural ya resuelto (el "ojo" de la "a" o
-    // la "o"), pero para recortarla de la plaqueta se usa nada más su
-    // contorno exterior — así el hueco de esa letra queda como una sola
-    // pieza sin partir la plaqueta en pedacitos sueltos.
+    // cortada de verdad), no las letras sueltas como piezas propias ni
+    // con el nombre calado — el nombre se nota por el propio contorno
+    // exterior de la plaqueta (que sigue de cerca la forma del texto),
+    // dejando toda la pieza de una sola pieza sólida, sin agujeros que la
+    // puedan romper ni que junten mugre.
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.font = '800 ' + fontPx + 'px ' + fontFamily;
     ctx.fillText(texto, margenTab, H_PX * 0.54);
-    const worldHOriginal = N3D_ALTO * canvas.height / H_PX;
-    const letraShapes = nombre3dSiluetaDesdeCanvas(canvas, worldHOriginal);
 
     // La pestañita (para la argolla o el agujero) se centra bien adentro
     // del lienzo, nunca pegada al borde — si no, al recortarle el hueco
@@ -6214,17 +6210,6 @@
       const ptsCorregidos = (Math.sign(areaFondo) === Math.sign(areaHueco)) ? pts.slice().reverse() : pts;
       fondo.holes.push(new THREE.Path(ptsCorregidos));
     }
-
-    letraShapes.forEach(letra => {
-      const p = letra.getPoints()[0];
-      if(!p) return;
-      for(const fondo of shapesFondo){
-        if(nombre3dPuntoDentro([p.x, p.y], fondo.getPoints().map(q => [q.x, q.y]))){
-          agregarHueco(fondo, letra.getPoints());
-          break;
-        }
-      }
-    });
 
     if(necesitaHueco){
       // El agujero real para colgar (no decorativo) se recorta aparte,
@@ -6308,15 +6293,8 @@
     const colorPlaca = nombre3dColor;
     const materialPlaca = new THREE.MeshStandardMaterial({ color: colorPlaca, roughness: 0.5, metalness: 0.06, side: THREE.DoubleSide });
     const bevelGrosor = Math.min(0.05, profundidad * 0.18);
-    // El bisel de ExtrudeGeometry se calcula desplazando cada arista hacia
-    // adentro/afuera — con los polígonos tan densos que salen del
-    // trazador de contornos (miles de puntos, sobre todo en "Contorno de
-    // letras" con varios huecos de letra), ese desplazamiento se vuelve
-    // numéricamente inestable y el hueco sale con triángulos rotos en vez
-    // de una cavidad limpia. Para esa forma se manda sin bisel (cantos
-    // rectos, nada raro para una pieza ya recortada a medida).
     const extrudeOpts = {
-      depth: profundidad, bevelEnabled: !esContorno,
+      depth: profundidad, bevelEnabled: true,
       bevelThickness: bevelGrosor,
       bevelSize: Math.min(0.045, profundidad * 0.16),
       bevelSegments: 2, curveSegments: 16
