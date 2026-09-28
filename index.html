@@ -1140,26 +1140,18 @@
   .nombre3d-forma-cuadrada{ border-radius: 12px; }
   .nombre3d-forma-ovalada{ border-radius: 50%; padding-left: 34px; padding-right: 34px; }
   .nombre3d-forma-etiqueta{ border-radius: 10px 30px 30px 10px; padding-right: 44px; }
-  /* Identificador de lápiz: tubo/funda debajo de la placa, con un hueco
-     ovalado donde entraría el lápiz — para que se vea distinto de un
-     llavero plano, en vez de solo quitarle el arito. */
-  .nombre3d-tubo-wrap{ display: flex; flex-direction: column; align-items: center; }
-  .nombre3d-tubo{
-    width: 46px;
-    height: 64px;
-    border-radius: 18px;
-    margin-top: -6px;
-    position: relative;
-    box-shadow: inset 6px 0 10px rgba(255,255,255,.15), inset -6px 0 14px rgba(0,0,0,.35), 0 10px 16px -8px rgba(0,0,0,.5);
-  }
-  .nombre3d-tubo-hueco{
+  /* Identificador de lápiz: un bloque bien más grueso que el llavero (más
+     capas apiladas, más separadas), con un hueco ovalado atravesándolo
+     donde entraría el lápiz — para que se vea distinto de verdad, en vez
+     de solo quitarle el arito a la misma placa delgada. */
+  .nombre3d-hueco-lapiz{
     position: absolute;
-    left: 50%; bottom: 8px;
-    width: 26px; height: 14px;
-    transform: translateX(-50%);
+    top: 50%; left: 15px;
+    width: 16px; height: 24px;
+    transform: translateY(-50%) translateZ(3px);
     border-radius: 50%;
-    background: radial-gradient(ellipse at center, #000 0%, #000 60%, rgba(0,0,0,.7) 100%);
-    box-shadow: 0 1px 0 rgba(255,255,255,.2);
+    background: radial-gradient(ellipse at 35% 35%, #555 0%, #000 75%);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.15);
   }
   .nombre3d-ring{
     position: absolute;
@@ -5727,9 +5719,14 @@
     // La "cabeza" agrupa las capas apiladas que arman el relieve — necesita
     // su propio transform-style:preserve-3d para que la profundidad (los
     // translateZ de cada capa) no se aplaste al meterla dentro de "plate".
+    // El identificador de lápiz es un bloque bien más grueso que el
+    // llavero (más capas, más separadas entre sí), con un hueco ovalado
+    // atravesándolo — no una placa delgada con un simple aro.
+    const esLapiz = nombre3dTipo === 'lapiz';
     const head = document.createElement('div');
     head.className = 'nombre3d-head';
-    const CAPAS = 10;
+    const CAPAS = esLapiz ? 22 : 10;
+    const PASO_Z = esLapiz ? 3 : 2;
     for(let i = CAPAS - 1; i >= 0; i--){
       const capa = document.createElement('div');
       capa.className = 'nombre3d-layer nombre3d-forma-' + nombre3dForma + (i === 0 ? ' nombre3d-front' : '');
@@ -5738,7 +5735,7 @@
       capa.style.color = nombre3dTextColor;
       capa.style.fontFamily = fontFamily;
       capa.style.filter = 'brightness(' + (1 - (i / CAPAS) * 0.55) + ')';
-      capa.style.transform = 'translateZ(' + (-i * 2) + 'px)';
+      capa.style.transform = 'translateZ(' + (-i * PASO_Z) + 'px)';
       if(i === 0){
         capa.style.boxShadow = '0 2px 0 rgba(255,255,255,.35) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 20px 30px -12px rgba(0,0,0,.5)';
       }
@@ -5754,24 +5751,18 @@
     back.style.background = nombre3dColor;
     back.style.fontFamily = fontFamily;
     back.style.filter = 'brightness(0.4)';
-    back.style.transform = 'translateZ(' + (-(CAPAS) * 2) + 'px) rotateY(180deg)';
+    back.style.transform = 'translateZ(' + (-(CAPAS) * PASO_Z) + 'px) rotateY(180deg)';
     head.appendChild(back);
     if(nombre3dTipo === 'llavero'){
       const ring = document.createElement('div');
       ring.className = 'nombre3d-ring';
       head.appendChild(ring);
+    } else {
+      const hueco = document.createElement('div');
+      hueco.className = 'nombre3d-hueco-lapiz';
+      head.appendChild(hueco);
     }
     plate.appendChild(head);
-
-    if(nombre3dTipo === 'lapiz'){
-      const tubo = document.createElement('div');
-      tubo.className = 'nombre3d-tubo';
-      tubo.style.background = nombre3dColor;
-      const hueco = document.createElement('div');
-      hueco.className = 'nombre3d-tubo-hueco';
-      tubo.appendChild(hueco);
-      plate.appendChild(tubo);
-    }
     nombre3dStage.appendChild(plate);
   }
   [nombre3dNombreInput, nombre3dEmojiInput].forEach(input => {
@@ -5797,8 +5788,12 @@
     const dy = e.clientY - nombre3dUltimoY;
     nombre3dUltimoX = e.clientX;
     nombre3dUltimoY = e.clientY;
-    nombre3dRotY += dx * 0.5;
-    nombre3dRotX = Math.max(-45, Math.min(45, nombre3dRotX - dy * 0.5));
+    // El "grosor" es varias capas planas apiladas, no una pieza sólida de
+    // verdad — vista casi de canto (cerca de 90°) una capa plana no tiene
+    // ancho y se ve como si desapareciera. Se limita el giro para que
+    // nunca llegue a ese ángulo y la pieza se vea sólida siempre.
+    nombre3dRotY = Math.max(-40, Math.min(40, nombre3dRotY + dx * 0.5));
+    nombre3dRotX = Math.max(-40, Math.min(40, nombre3dRotX - dy * 0.5));
     const plate = nombre3dStage.querySelector('.nombre3d-plate');
     if(plate) plate.style.transform = 'rotateX(' + nombre3dRotX + 'deg) rotateY(' + nombre3dRotY + 'deg)';
   });
