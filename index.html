@@ -6109,7 +6109,7 @@
   // sólida (para la argolla o el agujero, siempre en el mismo lugar
   // relativo sin importar el nombre) y recorta un agujero real perforando
   // esa pestañita — todo antes de convertirlo en polígono.
-  function nombre3dFormaRaster(forma, texto, fontFamily, necesitaHueco, necesitaArgolla){
+  function nombre3dFormaRaster(forma, texto, fontFamily, necesitaHueco, necesitaArgolla, esLapiz){
     const H_PX = 320;
     // El trazador de contornos (marching squares) necesita un borde de
     // ceros alrededor de toda la silueta para poder cerrar el contorno —
@@ -6131,7 +6131,11 @@
     const HUESO_R = H_PX * 0.27, HUESO_BARRA_MITAD = H_PX * 0.22;
     const fontPx = esHueso ? Math.round(H_PX * 0.32) : Math.round(H_PX * 0.6);
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
-    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.28 : H_PX * 0.08;
+    // El identificador de lápiz necesita un agujero de verdad, del
+    // tamaño de un lápiz real (no el agujerito chico decorativo de un
+    // llavero) — así que su pestañita y el margen que la separa del
+    // nombre salen bastante más grandes.
+    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * (esLapiz ? 0.5 : 0.28) : H_PX * 0.08;
     let W_PX;
     if(esHueso){
       W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.25));
@@ -6205,7 +6209,7 @@
     // a la mitad de la pestañita) — antes la argolla salía pegada arriba
     // del todo y el agujero a la mitad, así que se veían en dos lugares
     // distintos sin ningún motivo.
-    const tabR = H_PX * 0.11;
+    const tabR = H_PX * (esLapiz ? 0.24 : 0.11);
     const tabCX = tabR + H_PX * 0.03;
     const tabCY = H_PX * 0.5;
     let argollaPx = null;
@@ -6239,7 +6243,7 @@
       // solo al desenfocar/agrandar la silueta).
       const cxMundo = (tabCX - W_PX / 2) * escala;
       const cyMundo = 0; // H_PX/2 - H_PX*0.5 == 0: el agujero va centrado en la altura
-      const rMundo = tabR * 0.45 * escala;
+      const rMundo = tabR * (esLapiz ? 0.72 : 0.45) * escala;
       const circuloMundo = [];
       for(let i = 0; i < 24; i++){
         const a = i / 24 * Math.PI * 2;
@@ -6326,7 +6330,7 @@
     const altoMundo = N3D_ALTO;
 
     if(forma === 'hueso' || esContorno){
-      const res = nombre3dFormaRaster(forma, texto, fontFamily, necesitaHueco, necesitaArgolla);
+      const res = nombre3dFormaRaster(forma, texto, fontFamily, necesitaHueco, necesitaArgolla, esLapiz);
       shapes = res.shapes;
       anchoMundo = res.anchoMundo;
       argollaMundo = res.argollaMundo;
@@ -6338,7 +6342,11 @@
       const padFrac = forma === 'ovalada' ? 0.7 : forma === 'redonda' ? 0.55 : forma === 'etiqueta' ? 0.62 : 0.34;
       anchoMundo = Math.max(altoMundo * 1.25, proporcion * altoMundo * 0.62 + altoMundo * padFrac);
       const shape = nombre3dFormaVector(forma, anchoMundo, altoMundo);
-      if(necesitaHueco) nombre3dAgregarHueco(shape, -anchoMundo / 2 + altoMundo * 0.35, 0, altoMundo * 0.09);
+      // El identificador de lápiz necesita un agujero de verdad, del
+      // tamaño de un lápiz real, no el agujerito chico decorativo de un
+      // llavero — más separado del borde para que le quede material
+      // alrededor de sobra.
+      if(necesitaHueco) nombre3dAgregarHueco(shape, -anchoMundo / 2 + altoMundo * (esLapiz ? 0.5 : 0.35), 0, altoMundo * (esLapiz ? 0.22 : 0.09));
       shapes = [shape];
       if(necesitaArgolla) argollaMundo = [-anchoMundo / 2 + altoMundo * 0.35, altoMundo / 2];
     }
