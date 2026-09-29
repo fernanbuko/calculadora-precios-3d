@@ -6131,11 +6131,10 @@
     const HUESO_R = H_PX * 0.27, HUESO_BARRA_MITAD = H_PX * 0.22;
     const fontPx = esHueso ? Math.round(H_PX * 0.32) : Math.round(H_PX * 0.6);
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
-    // El identificador de lápiz necesita un agujero de verdad, del
-    // tamaño de un lápiz real (no el agujerito chico decorativo de un
-    // llavero) — así que su pestañita y el margen que la separa del
-    // nombre salen bastante más grandes.
-    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * (esLapiz ? 0.5 : 0.28) : H_PX * 0.08;
+    // El identificador de lápiz ya no lleva una pestañita calada adentro
+    // del lienzo (ver más abajo: su túnel se arma aparte, pegado atrás
+    // de toda la pieza), así que no necesita más margen que el normal.
+    const margenTab = (necesitaArgolla || necesitaHueco) ? H_PX * 0.28 : H_PX * 0.08;
     let W_PX;
     if(esHueso){
       W_PX = Math.max(H_PX * 1.5, Math.ceil(anchoTexto + HUESO_R * 2 + H_PX * 0.25));
@@ -6209,7 +6208,7 @@
     // a la mitad de la pestañita) — antes la argolla salía pegada arriba
     // del todo y el agujero a la mitad, así que se veían en dos lugares
     // distintos sin ningún motivo.
-    const tabR = H_PX * (esLapiz ? 0.24 : 0.11);
+    const tabR = H_PX * 0.11;
     const tabCX = tabR + H_PX * 0.03;
     const tabCY = H_PX * 0.5;
     let argollaPx = null;
@@ -6217,7 +6216,11 @@
       ctx.beginPath(); ctx.arc(tabCX, tabCY, tabR, 0, Math.PI * 2); ctx.fill();
       argollaPx = [tabCX, tabCY - tabR + H_PX * 0.01];
     }
-    if(necesitaHueco){
+    // El identificador de lápiz ya NO dibuja esta pestañita redonda — su
+    // túnel se arma aparte, pegado atrás de toda la pieza (ver más abajo,
+    // donde se arma la escena) — así que acá solo queda el caso del
+    // llavero con "agujero" en vez de argolla.
+    if(necesitaHueco && !esLapiz){
       ctx.beginPath(); ctx.arc(tabCX, tabCY, tabR, 0, Math.PI * 2); ctx.fill();
     }
 
