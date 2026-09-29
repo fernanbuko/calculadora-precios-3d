@@ -6427,8 +6427,12 @@
       // misma dirección en la que se lee el nombre) y corrida hacia
       // atrás en Z para que quede detrás de la placa y no le tape la
       // calcomanía del nombre de adelante.
+      // El tubo se achica y se hunde más adentro de la placa (menos
+      // asomado hacia atrás) para que no se note como un bulto redondo
+      // aparte, sino que se pierda un poco dentro de la silueta propia
+      // de la pieza — sea la que sea (redonda, contorno, etc.).
       const ly = lapizMundo[1];
-      const rExt = altoMundo * 0.3, rInt = altoMundo * 0.18;
+      const rExt = altoMundo * 0.22, rInt = altoMundo * 0.14;
       const margenTunel = altoMundo * 0.12;
       const largoTubo = anchoMundo + margenTunel * 2;
       const arandela = new THREE.Shape();
@@ -6437,7 +6441,7 @@
       const geoTubo = new THREE.ExtrudeGeometry(arandela, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
       const tubo = new THREE.Mesh(geoTubo, materialPlaca);
       tubo.rotation.y = Math.PI / 2;
-      const zTunel = -profundidad / 2 - rExt * 0.55;
+      const zTunel = -profundidad / 2 - rExt * 0.35;
       tubo.position.set(-largoTubo / 2, ly, zTunel);
       n3d.group.add(tubo);
     }
