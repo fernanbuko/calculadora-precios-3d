@@ -6423,52 +6423,34 @@
     if(esLapiz && lapizMundo){
       // El identificador de lápiz no lleva un agujero calado en el plano
       // de la placa (como la argolla de un llavero, que se ve de frente),
-      // sino un túnel real pegado ATRÁS de toda la placa (no en el mismo
-      // plano donde va el nombre) — un solo tubo continuo que corre por
-      // detrás de punta a punta, para meter el lápiz entero de un lado y
-      // que salga por el otro, como una funda de verdad. En vez de un
-      // caño redondo "pegado" que se nota como un bulto aparte, el
-      // contorno del tubo es una cápsula bien redondeada (mismo estilo
-      // burbujeante que las letras, no un círculo seco) y mide EXACTO lo
-      // mismo de largo que el nombre — ni más ni menos — para que sus
-      // dos bocas queden justo en las dos puntas de la pieza. Se arma
-      // como esa cápsula con un círculo agujereado en el medio, extruida
-      // a lo largo, acostada de canto (girada 90° en Y para que su eje
-      // quede horizontal, en la misma dirección en la que se lee el
-      // nombre) y corrida hacia atrás en Z para que quede detrás de la
-      // calcomanía del nombre de adelante.
-      // El tubo ya no se corre hacia atrás más allá de la placa — se
-      // esconde DENTRO del grosor que ya tiene la pieza (el ancho de la
-      // cápsula, que pasa a ser el "fondo" del túnel después de girarlo,
-      // se achica para entrar justo en ese grosor, centrado), así no se
-      // nota como un bulto aparte sobresaliendo por atrás.
-      // La cápsula no puede ser tan alta como el nombre completo: en las
-      // dos puntas (donde el túnel tiene que abrir) la silueta del propio
-      // nombre/forma es mucho más angosta que en el medio (la puntita de
-      // una letra, el borde curvo de la forma) — si la cápsula es más
-      // alta que eso, sobresale por las esquinas en vez de quedar
-      // escondida adentro. Se la deja bastante más baja que la letra
-      // para que quepa entera dentro de la silueta en cualquier punto,
-      // puntas incluidas, y además quede bien visible el agujero (si la
-      // cápsula es casi del mismo porte que el agujero, se nota clarito
-      // que es un hueco de verdad y no un bulto sólido).
+      // sino un túnel real: un tubo continuo con forma de cápsula bien
+      // redondeada (mismo estilo burbujeante que las letras) que corre
+      // por detrás de punta a punta, para meter el lápiz entero de un
+      // lado y que salga por el otro. Se arma como esa cápsula con un
+      // círculo agujereado en el medio, extruida a lo largo de todo el
+      // ancho de la pieza, acostada de canto (girada 90° en Y para que
+      // su eje quede horizontal, en la misma dirección en la que se lee
+      // el nombre).
+      //
+      // El tubo NO puede quedar en el mismo espacio (mismo Z) que ocupa
+      // la placa: la placa es sólida ahí (no tiene ningún calado, ni
+      // siquiera en "Contorno de letras", que es sólida a propósito) y
+      // Three.js no hace un corte real entre dos mallas separadas — si
+      // el hueco del tubo cae adentro del espacio de la placa, la propia
+      // placa lo tapa por dentro y el túnel se ve cerrado aunque la
+      // geometría del hueco esté bien. Por eso el tubo va corrido hacia
+      // atrás, tocando el borde trasero de la placa pero sin invadir su
+      // espacio — así el hueco queda en el aire, de verdad atravesado.
       const ly = lapizMundo[1];
-      const capW = profundidad * 0.82, capH = altoMundo * 0.34;
-      // El agujero tiene que entrar en el ANCHO y el ALTO de la cápsula
-      // — si no, se sale de la cápsula y la geometría queda inválida.
+      const capW = altoMundo * 0.5, capH = altoMundo * 0.34;
       const rInt = Math.min(capW, capH) * 0.34;
-      // El túnel tiene que asomar un poquito MÁS ALLÁ de la punta exacta
-      // de la pieza — si terminara justo en el borde (o antes), quedaría
-      // enterrado del todo dentro del material sólido de la placa (nada
-      // de tres.js hace un "corte" real entre dos mallas separadas) y no
-      // se vería ni el bulto ni el agujero, como si no existiera.
       const largoTubo = anchoMundo + altoMundo * 0.03;
       const capsula = nombre3dRectRedondeado(capW, capH, capH / 2);
       nombre3dAgregarHueco(capsula, 0, 0, rInt);
       const geoTubo = new THREE.ExtrudeGeometry(capsula, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
       const tubo = new THREE.Mesh(geoTubo, materialPlaca);
       tubo.rotation.y = Math.PI / 2;
-      const zTunel = 0;
+      const zTunel = -profundidad / 2 - capW / 2;
       tubo.position.set(-largoTubo / 2, ly, zTunel);
       n3d.group.add(tubo);
     }
