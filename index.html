@@ -5945,6 +5945,51 @@
     }
     return p;
   }
+  // Simplifica un contorno CERRADO (lista de puntos {x,y}) quitando los
+  // que caen casi sobre la línea recta entre sus vecinos — "Douglas-
+  // Peucker" de toda la vida, aplicado en dos mitades (partiendo del
+  // punto más lejano al primero) porque el algoritmo original está
+  // pensado para un tramo ABIERTO, no un lazo cerrado. Sirve para bajar
+  // de miles de puntos casi-colineales (marching squares + suavizado de
+  // Chaikin) a unos pocos cientos sin que se note el cambio de forma,
+  // así una resta CSG contra este contorno no se pone numéricamente
+  // inestable ni pesada.
+  function nombre3dSimplificarBucle(pts, eps){
+    if(pts.length <= 4) return pts;
+    function distPuntoSegmento(p, a, b){
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      if(len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+      let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    }
+    function rdp(puntos){
+      if(puntos.length < 3) return puntos;
+      const a = puntos[0], b = puntos[puntos.length - 1];
+      let maxD = 0, idx = 0;
+      for(let i = 1; i < puntos.length - 1; i++){
+        const d = distPuntoSegmento(puntos[i], a, b);
+        if(d > maxD){ maxD = d; idx = i; }
+      }
+      if(maxD > eps){
+        const izq = rdp(puntos.slice(0, idx + 1));
+        const der = rdp(puntos.slice(idx));
+        return izq.slice(0, -1).concat(der);
+      }
+      return [a, b];
+    }
+    let farIdx = 0, farD = 0;
+    for(let i = 1; i < pts.length; i++){
+      const d = Math.hypot(pts[i].x - pts[0].x, pts[i].y - pts[0].y);
+      if(d > farD){ farD = d; farIdx = i; }
+    }
+    const mitad1 = pts.slice(0, farIdx + 1);
+    const mitad2 = pts.slice(farIdx).concat([pts[0]]);
+    const s1 = rdp(mitad1);
+    const s2 = rdp(mitad2);
+    return s1.slice(0, -1).concat(s2.slice(0, -1));
+  }
   // Área con signo (fórmula del "shoelace") — su signo indica el sentido
   // de giro del polígono (horario/antihorario). THREE.ExtrudeGeometry
   // necesita que los huecos giren en sentido CONTRARIO al contorno
@@ -6236,6 +6281,30 @@
     const canvasInflado = nombre3dInflarCanvas(canvas, radioInflado);
     const worldHInflado = N3D_ALTO * canvasInflado.height / H_PX;
     const shapesFondo = nombre3dSiluetaDesdeCanvas(canvasInflado, worldHInflado);
+    if(esLapiz){
+      // El contorno de "Contorno de letras" sale del trazador de
+      // marching squares + suavizado de Chaikin con MILES de puntos (uno
+      // casi por píxel, duplicados por el suavizado) — de sobra para
+      // verse bien extruido normal, pero es un contorno demasiado denso
+      // y con tramos casi rectos hechos de puntos casi-colineales para
+      // la resta CSG del túnel: el algoritmo (basado en un árbol BSP)
+      // se pone numéricamente inestable ahí y puede dejar una de las dos
+      // puntas del túnel sin abrir del todo. Se simplifica el contorno
+      // (Douglas-Peucker, tolerancia chica — imperceptible a la vista)
+      // antes de armar la malla, así la resta sale limpia de las dos
+      // puntas y además la resta se arma bastante más rápido.
+      shapesFondo.forEach(f => {
+        const pts = nombre3dSimplificarBucle(f.getPoints(), N3D_ALTO * 0.004);
+        f.curves = [];
+        f.setFromPoints(pts);
+        f.holes = f.holes.map(h => {
+          const hp = nombre3dSimplificarBucle(h.getPoints(), N3D_ALTO * 0.004);
+          const p = new THREE.Path();
+          p.setFromPoints(hp);
+          return p;
+        });
+      });
+    }
 
     function agregarHueco(fondo, pts){
       const areaFondo = nombre3dAreaConSigno(fondo.getPoints());
@@ -6378,32 +6447,46 @@
       mesh.position.z = -profundidad / 2;
       mesh.updateMatrix();
       if(esLapiz && typeof CSG !== 'undefined'){
-        // El túnel del identificador de lápiz se recorta con una resta 3D
-        // real (CSG: constructive solid geometry) contra la pieza ya
-        // armada — un cilindro acostado en horizontal (mismo eje que se
-        // lee el nombre), centrado en el grosor de la placa y bastante
-        // más largo que el propio nombre (para que la resta abra bien
-        // limpio las dos puntas, sin quedar apenas tangente al borde).
-        // A diferencia de agregar una malla aparte (lo que se probó
-        // antes), acá el hueco es de verdad: no queda tapado por la
-        // propia placa ni asoma como un bulto separado, porque pasa a
-        // ser parte de la MISMA pieza sólida.
-        // El radio tiene que quedar CLARAMENTE adentro del grosor de la
-        // placa (profundidad/2) — si el cilindro asoma por la cara de
-        // adelante o de atrás, la resta CSG contra un sólido con bisel
-        // en el borde se pone inestable y deja fisuras/grietas visibles
-        // en vez de un hueco prolijo.
-        const rTunel = profundidad * 0.3;
-        const largoTunel = anchoMundo + altoMundo * 0.6;
-        const cutGeo = new THREE.CylinderGeometry(rTunel, rTunel, largoTunel, 20, 1, false);
-        cutGeo.rotateZ(Math.PI / 2);
-        const cutMesh = new THREE.Mesh(cutGeo, materialPlaca);
-        cutMesh.updateMatrix();
-        try {
-          mesh = CSG.subtract(mesh, cutMesh);
-        } catch(errCsg){
-          console.error('Nombre 3D: no se pudo recortar el túnel del lápiz', errCsg);
-        }
+        // El túnel del identificador de lápiz se arma con CSG
+        // (constructive solid geometry — restas/uniones 3D reales entre
+        // mallas). Restar un cilindro DIRECTO contra el contorno
+        // completo y muy irregular de "Contorno de letras" resultaba
+        // numéricamente inestable para este algoritmo (basado en un
+        // árbol BSP): cuando el cilindro cruzaba ciertas curvas del
+        // nombre (el "ojo" de una letra como la "o") alguna de las dos
+        // puntas quedaba sin abrir, aunque la otra saliera perfecta.
+        //
+        // En vez de eso, el agujero se recorta aparte, en una piecita
+        // simple (un cilindro macizo menos otro cilindro más chico
+        // adentro — dos formas simples, sin ninguna curva rara, restan
+        // siempre limpio) y esa piecita YA CON EL HUECO se suelda
+        // (une) contra la pieza entera. La unión entre dos sólidos es
+        // mucho más estable que restar un cilindro directo contra una
+        // silueta tan irregular como el contorno de un nombre.
+        const rExt = profundidad * 0.42, rInt = profundidad * 0.24;
+        const hondo = altoMundo * 0.9;
+        const asoma = altoMundo * 0.06;
+        [-1, 1].forEach(lado => {
+          const puntaX = lado * anchoMundo / 2 + lado * asoma;
+          const centroX = puntaX - lado * hondo / 2;
+          const solidoGeo = new THREE.CylinderGeometry(rExt, rExt, hondo, 20, 1, false);
+          solidoGeo.rotateZ(Math.PI / 2);
+          const solidoMesh = new THREE.Mesh(solidoGeo, materialPlaca);
+          solidoMesh.position.x = centroX;
+          solidoMesh.updateMatrix();
+          const huecoGeo = new THREE.CylinderGeometry(rInt, rInt, hondo * 1.4, 20, 1, false);
+          huecoGeo.rotateZ(Math.PI / 2);
+          const huecoMesh = new THREE.Mesh(huecoGeo, materialPlaca);
+          huecoMesh.position.x = centroX;
+          huecoMesh.updateMatrix();
+          try {
+            const tapon = CSG.subtract(solidoMesh, huecoMesh);
+            tapon.updateMatrix();
+            mesh = CSG.union(mesh, tapon);
+          } catch(errCsg){
+            console.error('Nombre 3D: no se pudo armar el túnel del lápiz', errCsg);
+          }
+        });
       }
       n3d.group.add(mesh);
     });
