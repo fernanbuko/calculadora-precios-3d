@@ -6129,7 +6129,11 @@
     // ovalada — la barra se achica en la misma proporción para que siga
     // más angosta que las puntas, como un hueso de verdad.
     const HUESO_R = H_PX * 0.27, HUESO_BARRA_MITAD = H_PX * 0.22;
-    const fontPx = esHueso ? Math.round(H_PX * 0.32) : Math.round(H_PX * 0.6);
+    // En el identificador de lápiz la letra sale más grande, para que
+    // quede de la misma altura que el túnel de atrás (ver más abajo,
+    // donde se arma la escena) — así no se ve una letra chica al lado
+    // de un tubo grande.
+    const fontPx = esHueso ? Math.round(H_PX * 0.32) : Math.round(H_PX * (esLapiz ? 0.72 : 0.6));
     const anchoTexto = nombre3dAnchoTextoPx(texto, fontFamily, fontPx);
     // El identificador de lápiz ya no lleva una pestañita calada adentro
     // del lienzo (ver más abajo: su túnel se arma aparte, pegado atrás
@@ -6389,7 +6393,9 @@
 
     if(!esContorno){
       const { texture, aspecto } = nombre3dTexturaTexto(texto, fontFamily, nombre3dTextColor);
-      let decalH = altoMundo * 0.5, decalW = decalH * aspecto;
+      // En el identificador de lápiz la letra sale más grande, para que
+      // quede de la misma altura que el túnel de atrás.
+      let decalH = altoMundo * (esLapiz ? 0.62 : 0.5), decalW = decalH * aspecto;
       const maxW = anchoMundo * 0.84;
       if(decalW > maxW){ decalW = maxW; decalH = decalW / aspecto; }
       const plane = new THREE.Mesh(
@@ -6431,16 +6437,24 @@
       // quede horizontal, en la misma dirección en la que se lee el
       // nombre) y corrida hacia atrás en Z para que quede detrás de la
       // calcomanía del nombre de adelante.
+      // El tubo ya no se corre hacia atrás más allá de la placa — se
+      // esconde DENTRO del grosor que ya tiene la pieza (el ancho de la
+      // cápsula, que pasa a ser el "fondo" del túnel después de girarlo,
+      // se achica para entrar justo en ese grosor, centrado), así no se
+      // nota como un bulto aparte sobresaliendo por atrás.
       const ly = lapizMundo[1];
-      const capW = altoMundo * 0.85, capH = altoMundo * 0.6;
-      const rInt = altoMundo * 0.22;
+      const capW = profundidad * 0.82, capH = altoMundo * 0.6;
+      // El agujero tiene que entrar en el ANCHO de la cápsula (que ahora
+      // es angosto, del porte del grosor de la pieza) — si no, se sale
+      // de la cápsula y la geometría queda inválida.
+      const rInt = capW * 0.32;
       const largoTubo = anchoMundo;
       const capsula = nombre3dRectRedondeado(capW, capH, capH / 2);
       nombre3dAgregarHueco(capsula, 0, 0, rInt);
       const geoTubo = new THREE.ExtrudeGeometry(capsula, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
       const tubo = new THREE.Mesh(geoTubo, materialPlaca);
       tubo.rotation.y = Math.PI / 2;
-      const zTunel = -profundidad / 2 - capW * 0.3;
+      const zTunel = 0;
       tubo.position.set(-largoTubo / 2, ly, zTunel);
       n3d.group.add(tubo);
     }
