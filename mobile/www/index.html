@@ -6414,29 +6414,29 @@
     if(esLapiz && lapizMundo){
       // El identificador de lápiz no lleva un agujero calado en el plano
       // de la placa (como la argolla de un llavero, que se ve de frente),
-      // sino un tubo real enganchado a cada punta, acostado en horizontal
-      // — en la misma dirección que se lee el nombre — con el agujero
-      // atravesándolo de punta a punta, como el bloque real donde se
-      // mete el lápiz. Va en LAS DOS puntas (no solo la izquierda) para
-      // que se note que el hueco atraviesa todo el nombre de extremo a
-      // extremo, y no una perforación ciega de un solo lado. Cada tubo
-      // se arma como una arandela (círculo con un círculo más chico
-      // agujereado) extruida a lo largo, y esa extrusión se acuesta de
-      // canto (girada 90° en Y) para que su eje quede horizontal en vez
-      // de mirar de frente a la cámara.
+      // sino un túnel real pegado ATRÁS de toda la placa (no en el mismo
+      // plano donde va el nombre) — un solo tubo continuo que corre por
+      // detrás de punta a punta, para meter el lápiz entero de un lado y
+      // que salga por el otro, como una funda de verdad. Se arma como
+      // una arandela (círculo con un círculo más chico agujereado)
+      // extruida a lo largo de TODO el ancho de la pieza, acostada de
+      // canto (girada 90° en Y para que su eje quede horizontal, en la
+      // misma dirección en la que se lee el nombre) y corrida hacia
+      // atrás en Z para que quede detrás de la placa y no le tape la
+      // calcomanía del nombre de adelante.
       const ly = lapizMundo[1];
-      const rExt = altoMundo * 0.42, rInt = altoMundo * 0.24;
-      const largoTubo = altoMundo * 0.7;
+      const rExt = altoMundo * 0.3, rInt = altoMundo * 0.18;
+      const margenTunel = altoMundo * 0.12;
+      const largoTubo = anchoMundo + margenTunel * 2;
       const arandela = new THREE.Shape();
       arandela.absarc(0, 0, rExt, 0, Math.PI * 2, false);
       nombre3dAgregarHueco(arandela, 0, 0, rInt);
       const geoTubo = new THREE.ExtrudeGeometry(arandela, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
-      [-anchoMundo / 2, anchoMundo / 2].forEach(bordeX => {
-        const tubo = new THREE.Mesh(geoTubo, materialPlaca);
-        tubo.rotation.y = Math.PI / 2;
-        tubo.position.set(bordeX - largoTubo / 2, ly, 0);
-        n3d.group.add(tubo);
-      });
+      const tubo = new THREE.Mesh(geoTubo, materialPlaca);
+      tubo.rotation.y = Math.PI / 2;
+      const zTunel = -profundidad / 2 - rExt * 0.55;
+      tubo.position.set(-largoTubo / 2, ly, zTunel);
+      n3d.group.add(tubo);
     }
 
     // Aleja o acerca la cámara según el tamaño real de ESTA pieza (el
