@@ -6420,28 +6420,27 @@
       // sino un túnel real pegado ATRÁS de toda la placa (no en el mismo
       // plano donde va el nombre) — un solo tubo continuo que corre por
       // detrás de punta a punta, para meter el lápiz entero de un lado y
-      // que salga por el otro, como una funda de verdad. Se arma como
-      // una arandela (círculo con un círculo más chico agujereado)
-      // extruida a lo largo de TODO el ancho de la pieza, acostada de
-      // canto (girada 90° en Y para que su eje quede horizontal, en la
-      // misma dirección en la que se lee el nombre) y corrida hacia
-      // atrás en Z para que quede detrás de la placa y no le tape la
+      // que salga por el otro, como una funda de verdad. En vez de un
+      // caño redondo "pegado" que se nota como un bulto aparte, el
+      // contorno del tubo es una cápsula bien redondeada (mismo estilo
+      // burbujeante que las letras, no un círculo seco) y mide EXACTO lo
+      // mismo de largo que el nombre — ni más ni menos — para que sus
+      // dos bocas queden justo en las dos puntas de la pieza. Se arma
+      // como esa cápsula con un círculo agujereado en el medio, extruida
+      // a lo largo, acostada de canto (girada 90° en Y para que su eje
+      // quede horizontal, en la misma dirección en la que se lee el
+      // nombre) y corrida hacia atrás en Z para que quede detrás de la
       // calcomanía del nombre de adelante.
-      // El tubo se achica y se hunde más adentro de la placa (menos
-      // asomado hacia atrás) para que no se note como un bulto redondo
-      // aparte, sino que se pierda un poco dentro de la silueta propia
-      // de la pieza — sea la que sea (redonda, contorno, etc.).
       const ly = lapizMundo[1];
-      const rExt = altoMundo * 0.22, rInt = altoMundo * 0.14;
-      const margenTunel = altoMundo * 0.12;
-      const largoTubo = anchoMundo + margenTunel * 2;
-      const arandela = new THREE.Shape();
-      arandela.absarc(0, 0, rExt, 0, Math.PI * 2, false);
-      nombre3dAgregarHueco(arandela, 0, 0, rInt);
-      const geoTubo = new THREE.ExtrudeGeometry(arandela, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
+      const capW = altoMundo * 0.85, capH = altoMundo * 0.6;
+      const rInt = altoMundo * 0.22;
+      const largoTubo = anchoMundo;
+      const capsula = nombre3dRectRedondeado(capW, capH, capH / 2);
+      nombre3dAgregarHueco(capsula, 0, 0, rInt);
+      const geoTubo = new THREE.ExtrudeGeometry(capsula, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
       const tubo = new THREE.Mesh(geoTubo, materialPlaca);
       tubo.rotation.y = Math.PI / 2;
-      const zTunel = -profundidad / 2 - rExt * 0.35;
+      const zTunel = -profundidad / 2 - capW * 0.3;
       tubo.position.set(-largoTubo / 2, ly, zTunel);
       n3d.group.add(tubo);
     }
