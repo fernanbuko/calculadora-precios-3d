@@ -6463,7 +6463,10 @@
         // (une) contra la pieza entera. La unión entre dos sólidos es
         // mucho más estable que restar un cilindro directo contra una
         // silueta tan irregular como el contorno de un nombre.
-        const rExt = profundidad * 0.42, rInt = profundidad * 0.24;
+        // El agujero se agranda (antes se notaba como un puntito muy
+        // chico, casi imperceptible, más una sombra que un hueco de
+        // verdad) para que se lea clarito como un túnel atravesado.
+        const rExt = profundidad * 0.48, rInt = profundidad * 0.32;
         const hondo = altoMundo * 0.9;
         const asoma = 0;
         [-1, 1].forEach(lado => {
