@@ -2153,6 +2153,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="three.min.js"></script>
+<script src="csg.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -6243,11 +6244,12 @@
       fondo.holes.push(new THREE.Path(ptsCorregidos));
     }
 
-    // Para el identificador de lápiz el agujero ya no se recorta acá (un
+    // Para el identificador de lápiz el agujero no se recorta acá (un
     // círculo calado en el plano de la placa, como una argolla de
-    // llavero) sino que se arma aparte como un tubo real que atraviesa
-    // de punta a punta, en horizontal, paralelo al nombre — ver más abajo
-    // (donde se arma la escena) el uso de "lapizMundo".
+    // llavero) — su túnel se recorta de verdad más abajo (donde se arma
+    // la escena) con una resta 3D real (CSG) contra toda la pieza ya
+    // armada, así puede quedar horizontal y escondido en el grosor sin
+    // partir el nombre.
     if(necesitaHueco && !esLapiz){
       // El agujero real para colgar (no decorativo) se recorta aparte,
       // como un círculo simple en coordenadas de mundo — si se dejara que
@@ -6270,10 +6272,7 @@
     }
 
     const argollaMundo = argollaPx ? [(argollaPx[0] - W_PX / 2) * escala, (H_PX / 2 - argollaPx[1]) * escala] : null;
-    // Borde izquierdo de la pestañita, en coordenadas de mundo — ahí se
-    // engancha el tubo del identificador de lápiz (ver renderNombre3D).
-    const lapizMundo = esLapiz ? [(tabCX - tabR - W_PX / 2) * escala, 0] : null;
-    return { shapes: shapesFondo, letraShapes, anchoMundo: W_PX * escala, argollaMundo, lapizMundo };
+    return { shapes: shapesFondo, letraShapes, anchoMundo: W_PX * escala, argollaMundo };
   }
 
   function renderNombre3D(){
@@ -6334,14 +6333,23 @@
     const colorPlaca = nombre3dColor;
     const materialPlaca = new THREE.MeshStandardMaterial({ color: colorPlaca, roughness: 0.5, metalness: 0.06, side: THREE.DoubleSide });
     const bevelGrosor = Math.min(0.05, profundidad * 0.18);
-    const extrudeOpts = {
+    // El identificador de lápiz recorta su túnel con una resta 3D (CSG)
+    // sobre esta misma geometría — el bisel del borde multiplica varias
+    // veces la cantidad de polígonos (varios anillos extra por cada
+    // borde), y ese peso extra hace que la resta CSG se vuelva pesada de
+    // verdad (varios segundos por letra tipeada en "Contorno de
+    // letras"). Se lo desactiva solo para el lápiz: el canto queda recto
+    // en vez de biselado, pero la vista previa se arma al toque.
+    const extrudeOpts = esLapiz ? {
+      depth: profundidad, bevelEnabled: false, curveSegments: 16
+    } : {
       depth: profundidad, bevelEnabled: true,
       bevelThickness: bevelGrosor,
       bevelSize: Math.min(0.045, profundidad * 0.16),
       bevelSegments: 2, curveSegments: 16
     };
 
-    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null, lapizMundo = null;
+    let shapes, anchoMundo, argollaMundo = null, letraShapesContorno = null;
     const altoMundo = N3D_ALTO;
 
     if(forma === 'hueso' || esContorno){
@@ -6350,7 +6358,6 @@
       anchoMundo = res.anchoMundo;
       argollaMundo = res.argollaMundo;
       letraShapesContorno = res.letraShapes;
-      lapizMundo = res.lapizMundo || null;
     } else {
       const fontPxRef = 100;
       const anchoTextoPx = Math.max(20, nombre3dAnchoTextoPx(texto, fontFamily, fontPxRef));
@@ -6358,12 +6365,7 @@
       const padFrac = forma === 'ovalada' ? 0.7 : forma === 'redonda' ? 0.55 : forma === 'etiqueta' ? 0.62 : 0.34;
       anchoMundo = Math.max(altoMundo * 1.25, proporcion * altoMundo * 0.62 + altoMundo * padFrac);
       const shape = nombre3dFormaVector(forma, anchoMundo, altoMundo);
-      // El identificador de lápiz ya no recorta un agujero calado en el
-      // plano de la placa (eso queda para la argolla del llavero) — en
-      // vez de eso se engancha un tubo real que atraviesa de punta a
-      // punta por el borde izquierdo (ver "lapizMundo" más abajo).
       if(necesitaHueco && !esLapiz) nombre3dAgregarHueco(shape, -anchoMundo / 2 + altoMundo * 0.35, 0, altoMundo * 0.09);
-      if(esLapiz) lapizMundo = [-anchoMundo / 2, 0];
       shapes = [shape];
       if(necesitaArgolla) argollaMundo = [-anchoMundo / 2 + altoMundo * 0.35, altoMundo / 2];
     }
@@ -6372,8 +6374,37 @@
 
     shapes.forEach(s => {
       const geo = new THREE.ExtrudeGeometry(s, extrudeOpts);
-      const mesh = new THREE.Mesh(geo, materialPlaca);
+      let mesh = new THREE.Mesh(geo, materialPlaca);
       mesh.position.z = -profundidad / 2;
+      mesh.updateMatrix();
+      if(esLapiz && typeof CSG !== 'undefined'){
+        // El túnel del identificador de lápiz se recorta con una resta 3D
+        // real (CSG: constructive solid geometry) contra la pieza ya
+        // armada — un cilindro acostado en horizontal (mismo eje que se
+        // lee el nombre), centrado en el grosor de la placa y bastante
+        // más largo que el propio nombre (para que la resta abra bien
+        // limpio las dos puntas, sin quedar apenas tangente al borde).
+        // A diferencia de agregar una malla aparte (lo que se probó
+        // antes), acá el hueco es de verdad: no queda tapado por la
+        // propia placa ni asoma como un bulto separado, porque pasa a
+        // ser parte de la MISMA pieza sólida.
+        // El radio tiene que quedar CLARAMENTE adentro del grosor de la
+        // placa (profundidad/2) — si el cilindro asoma por la cara de
+        // adelante o de atrás, la resta CSG contra un sólido con bisel
+        // en el borde se pone inestable y deja fisuras/grietas visibles
+        // en vez de un hueco prolijo.
+        const rTunel = profundidad * 0.3;
+        const largoTunel = anchoMundo + altoMundo * 0.6;
+        const cutGeo = new THREE.CylinderGeometry(rTunel, rTunel, largoTunel, 20, 1, false);
+        cutGeo.rotateZ(Math.PI / 2);
+        const cutMesh = new THREE.Mesh(cutGeo, materialPlaca);
+        cutMesh.updateMatrix();
+        try {
+          mesh = CSG.subtract(mesh, cutMesh);
+        } catch(errCsg){
+          console.error('Nombre 3D: no se pudo recortar el túnel del lápiz', errCsg);
+        }
+      }
       n3d.group.add(mesh);
     });
 
@@ -6420,40 +6451,6 @@
       n3d.group.add(anillo);
     }
 
-    if(esLapiz && lapizMundo){
-      // El identificador de lápiz no lleva un agujero calado en el plano
-      // de la placa (como la argolla de un llavero, que se ve de frente),
-      // sino un túnel real: un tubo continuo con forma de cápsula bien
-      // redondeada (mismo estilo burbujeante que las letras) que corre
-      // por detrás de punta a punta, para meter el lápiz entero de un
-      // lado y que salga por el otro. Se arma como esa cápsula con un
-      // círculo agujereado en el medio, extruida a lo largo de todo el
-      // ancho de la pieza, acostada de canto (girada 90° en Y para que
-      // su eje quede horizontal, en la misma dirección en la que se lee
-      // el nombre).
-      //
-      // El tubo NO puede quedar en el mismo espacio (mismo Z) que ocupa
-      // la placa: la placa es sólida ahí (no tiene ningún calado, ni
-      // siquiera en "Contorno de letras", que es sólida a propósito) y
-      // Three.js no hace un corte real entre dos mallas separadas — si
-      // el hueco del tubo cae adentro del espacio de la placa, la propia
-      // placa lo tapa por dentro y el túnel se ve cerrado aunque la
-      // geometría del hueco esté bien. Por eso el tubo va corrido hacia
-      // atrás, tocando el borde trasero de la placa pero sin invadir su
-      // espacio — así el hueco queda en el aire, de verdad atravesado.
-      const ly = lapizMundo[1];
-      const capW = altoMundo * 0.5, capH = altoMundo * 0.34;
-      const rInt = Math.min(capW, capH) * 0.34;
-      const largoTubo = anchoMundo + altoMundo * 0.03;
-      const capsula = nombre3dRectRedondeado(capW, capH, capH / 2);
-      nombre3dAgregarHueco(capsula, 0, 0, rInt);
-      const geoTubo = new THREE.ExtrudeGeometry(capsula, { depth: largoTubo, bevelEnabled: false, curveSegments: 32 });
-      const tubo = new THREE.Mesh(geoTubo, materialPlaca);
-      tubo.rotation.y = Math.PI / 2;
-      const zTunel = -profundidad / 2 - capW / 2;
-      tubo.position.set(-largoTubo / 2, ly, zTunel);
-      n3d.group.add(tubo);
-    }
 
     // Aleja o acerca la cámara según el tamaño real de ESTA pieza (el
     // ancho cambia con el nombre y la forma) para que siempre entre
@@ -6469,7 +6466,17 @@
     }
   }
 
-  nombre3dNombreInput.addEventListener('input', renderNombre3D);
+  // El identificador de lápiz recorta su túnel con una resta 3D real
+  // (CSG, ver más arriba) — es bastante más pesado que armar la placa
+  // sola, así que tipear rápido con un re-render por cada letra se
+  // sentiría trabado. Se espera una pausa cortita después de la última
+  // tecla antes de volver a armar la vista previa (la escritura en el
+  // campo de texto no se frena, solo se retrasa cuándo se arma el 3D).
+  let nombre3dDebounceTimer = null;
+  nombre3dNombreInput.addEventListener('input', () => {
+    clearTimeout(nombre3dDebounceTimer);
+    nombre3dDebounceTimer = setTimeout(renderNombre3D, 220);
+  });
 
   // Arrastrar para girar — libre del todo, sin límites: al ser geometría
   // 3D real (no capas de CSS apiladas) siempre hay una cara sólida que se
