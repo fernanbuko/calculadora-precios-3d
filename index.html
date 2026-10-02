@@ -2292,6 +2292,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="three.min.js"></script>
 <script src="csg.js"></script>
+<script type="module">
+  // Motor de corte del Cortador de STL: Manifold (https://github.com/elalish/manifold),
+  // auto-hospedado (manifold.js + manifold.wasm) igual que el resto de la app.
+  // A diferencia del CSG por BSP de csg.js (que usa Nombre 3D, con geometría
+  // simple generada a mano), Manifold está hecho para aguantar mallas reales
+  // "no perfectas" — self-intersecciones, pequeños huecos, etc. — sin
+  // destrozar el resultado. Se expone como promesa global porque el resto de
+  // la app son scripts clásicos (sin módulos) que no pueden hacer `import`.
+  import ManifoldModuleFactory from './manifold.js';
+  window.manifoldReady = ManifoldModuleFactory().then((m) => {
+    m.setup();
+    window.Manifold3D = m;
+    return m;
+  }).catch((err) => {
+    console.error('No se pudo cargar el motor Manifold', err);
+    throw err;
+  });
+</script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -6797,11 +6815,109 @@
   const CSTL_COLORES = [0xff4d4d, 0x4dff88, 0x4dd2ff, 0xffa94d, 0xb34dff, 0xffe14d, 0x4d6aff, 0xff4dc4];
   const CSTL_GRIS_CORTE = [0.72, 0.72, 0.74]; // color "neutro" para las caras nuevas que aparecen al cortar (no tienen color original)
 
-  function cstlColorearUniforme(geo, rgb){
-    const n = geo.attributes.position.count;
-    const arr = new Float32Array(n * 3);
-    for(let i = 0; i < n; i++){ arr[i * 3] = rgb[0]; arr[i * 3 + 1] = rgb[1]; arr[i * 3 + 2] = rgb[2]; }
-    geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  // ---- conversión THREE.BufferGeometry <-> Manifold ----
+  // Manifold lleva propiedades extra por vértice (más allá de x,y,z) a
+  // través de las operaciones booleanas, interpolándolas correctamente en
+  // los bordes de corte — así es como el color real del 3MF sobrevive al
+  // corte: numProp=6 (xyz + rgb) en vez de numProp=3 (solo posición).
+  // "colorUniforme" se usa para las herramientas de corte (caja, cilindros
+  // de los conectores), que no tienen color propio: sin pasarles un color
+  // parejo, Manifold no podría ni mezclar sus propiedades con las del
+  // modelo (necesita el mismo numProp de los dos lados de cada operación).
+  function cstlGeometriaAManifold(M, geometry, numProp, colorUniforme){
+    // THREE.BoxGeometry/CylinderGeometry tampoco comparten vértices entre
+    // caras vecinas (cada cara necesita los suyos propios para tener su
+    // propia normal) — pasan por la misma soldadura que el modelo para
+    // que Manifold las acepte como sólidos reales.
+    geometry = cstlSoldarGeometria(geometry);
+    const pos = geometry.attributes.position;
+    const col = geometry.attributes.color;
+    const n = pos.count;
+    const vertProperties = new Float32Array(n * numProp);
+    for(let i = 0; i < n; i++){
+      vertProperties[i * numProp] = pos.getX(i);
+      vertProperties[i * numProp + 1] = pos.getY(i);
+      vertProperties[i * numProp + 2] = pos.getZ(i);
+      if(numProp >= 6){
+        const c = col ? [col.getX(i), col.getY(i), col.getZ(i)] : colorUniforme;
+        vertProperties[i * numProp + 3] = c[0];
+        vertProperties[i * numProp + 4] = c[1];
+        vertProperties[i * numProp + 5] = c[2];
+      }
+    }
+    let triVerts;
+    if(geometry.index) triVerts = Uint32Array.from(geometry.index.array);
+    else { triVerts = new Uint32Array(n); for(let i = 0; i < n; i++) triVerts[i] = i; }
+    const mesh = new M.Mesh({ numProp, vertProperties, triVerts });
+    return M.Manifold.ofMesh(mesh);
+  }
+  function cstlManifoldAGeometria(manifold, numProp){
+    const mesh = manifold.getMesh();
+    const n = mesh.numVert;
+    const positions = new Float32Array(n * 3);
+    let colors = null;
+    if(numProp >= 6) colors = new Float32Array(n * 3);
+    for(let i = 0; i < n; i++){
+      positions[i * 3] = mesh.vertProperties[i * numProp];
+      positions[i * 3 + 1] = mesh.vertProperties[i * numProp + 1];
+      positions[i * 3 + 2] = mesh.vertProperties[i * numProp + 2];
+      if(colors){
+        colors[i * 3] = mesh.vertProperties[i * numProp + 3];
+        colors[i * 3 + 1] = mesh.vertProperties[i * numProp + 4];
+        colors[i * 3 + 2] = mesh.vertProperties[i * numProp + 5];
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    if(colors) geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    geo.computeBoundingBox();
+    return geo;
+  }
+
+  // Funde en un solo vértice (con un solo índice) todas las esquinas de
+  // triángulo que caen en la misma posición (dentro de una tolerancia
+  // chica) — lo que llega del parser STL/3MF es un triángulo suelto por
+  // esquina, sin esa conexión. Si dos esquinas coincidentes tenían colores
+  // distintos (un borde de color exacto sobre una arista compartida, caso
+  // raro), se queda con el primero — perder ese matiz puntual vale la pena
+  // a cambio de que Manifold pueda cortar la malla.
+  function cstlSoldarGeometria(geometry, tolerancia){
+    tolerancia = tolerancia || 1e-4;
+    const pos = geometry.attributes.position;
+    const col = geometry.attributes.color;
+    const idxOriginal = geometry.index;
+    // Si ya viene indexada (como el BoxGeometry/CylinderGeometry de
+    // THREE, o esta misma geometría si ya pasó una vez por acá), el
+    // atributo "position" ya está comprimido a vértices únicos — iterar
+    // por "corner" lógico (a través del índice) en vez de por posición
+    // cruda evita tratar esos pocos vértices únicos como si fueran una
+    // esquina de triángulo cada uno, que rompería la conectividad.
+    const nCorners = idxOriginal ? idxOriginal.count : pos.count;
+    const inv = 1 / tolerancia;
+    const mapa = new Map();
+    const nuevasPos = [];
+    const nuevosCol = col ? [] : null;
+    const indices = new Uint32Array(nCorners);
+    for(let i = 0; i < nCorners; i++){
+      const vi = idxOriginal ? idxOriginal.getX(i) : i;
+      const x = pos.getX(vi), y = pos.getY(vi), z = pos.getZ(vi);
+      const clave = Math.round(x * inv) + '_' + Math.round(y * inv) + '_' + Math.round(z * inv);
+      let idx = mapa.get(clave);
+      if(idx === undefined){
+        idx = nuevasPos.length / 3;
+        nuevasPos.push(x, y, z);
+        if(nuevosCol) nuevosCol.push(col.getX(vi), col.getY(vi), col.getZ(vi));
+        mapa.set(clave, idx);
+      }
+      indices[i] = idx;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nuevasPos), 3));
+    if(nuevosCol) geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nuevosCol), 3));
+    return geo;
   }
 
   function cstlParseSTL(buffer){
@@ -6997,9 +7113,20 @@
         positions = cstlParseSTL(buf);
         if(positions.length < 9) throw new Error('STL vacío o inválido');
       }
-      const geo = new THREE.BufferGeometry();
+      let geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       if(colorsArr) geo.setAttribute('color', new THREE.BufferAttribute(colorsArr, 3));
+      // El STL (y el 3MF, armado a propósito con un vértice por esquina de
+      // triángulo para poder darle color por esquina) llega como un
+      // montón de triángulos sueltos: cada esquina es su propio vértice,
+      // sin compartir índice con la esquina "igual" del triángulo vecino.
+      // Manifold necesita lo contrario — una malla realmente soldada,
+      // donde dos triángulos que comparten una arista comparten también
+      // los índices de esos vértices — si no, la rechaza como "no es
+      // manifold" aunque geométricamente esté perfecta. Soldar por
+      // posición (fusionando los vértices que caen en el mismo lugar)
+      // arma esa conexión.
+      geo = cstlSoldarGeometria(geo);
       geo.computeVertexNormals();
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
@@ -7068,15 +7195,16 @@
 
   async function cstlCortarModelo(){
     if(!cstl.geometry) return;
-    // El corte usa CSG por BSP (igual que Nombre 3D) — es confiable pero
-    // nada rápido: en un modelo de varios miles de triángulos cada celda
-    // puede tardar segundos, y con conectores se suman muchas más
-    // operaciones. Sin este aviso, alguien que sube un modelo real de un
-    // slicer (no una piececita simple) ve que "no pasa nada" durante un
-    // buen rato y piensa que está roto, cuando en realidad sigue
-    // trabajando — máxime en el celular, donde además puede sentirse
-    // trabado porque el navegador no repinta bien mientras el hilo
-    // principal está ocupado.
+    // El corte usa Manifold (https://github.com/elalish/manifold) — un
+    // motor de CSG hecho para aguantar mallas reales imperfectas sin
+    // romperse, pero sigue sin ser instantáneo: en un modelo de varios
+    // miles de triángulos cada celda puede tardar, y con conectores se
+    // suman muchas más operaciones. Sin este aviso, alguien que sube un
+    // modelo real de un slicer (no una piececita simple) ve que "no pasa
+    // nada" durante un buen rato y piensa que está roto, cuando en
+    // realidad sigue trabajando — máxime en el celular, donde además
+    // puede sentirse trabado porque el navegador no repinta bien
+    // mientras el hilo principal está ocupado.
     const triCount = cstl.geometry.attributes.position.count / 3;
     if(triCount > 8000){
       const seguir = window.confirm('Este modelo tiene ' + triCount.toLocaleString('es') + ' triángulos. Cortarlo puede tardar varios minutos (y la pantalla puede verse como trabada mientras tanto, sobre todo en el celular) — no cierres ni recargues la página. ¿Querés continuar?');
@@ -7084,7 +7212,7 @@
     }
     cstlCortarBtn.disabled = true;
     cstlResultCard.classList.add('hidden');
-    cstlEstado.textContent = 'Cortando piezas...';
+    cstlEstado.textContent = 'Cargando motor de corte...';
     cstlEstado.style.fontWeight = '700';
     cstlEstado.style.color = 'var(--orange)';
     cstlProgreso.classList.remove('hidden');
@@ -7093,16 +7221,19 @@
     let huboError = false;
     await new Promise(r => setTimeout(r, 0));
     try{
+      const M = await window.manifoldReady;
+      cstlEstado.textContent = 'Cortando piezas...';
+      await new Promise(r => setTimeout(r, 0));
+
       const r = cstlCalcularPiezasPorEje();
       const { nx, ny, nz } = r;
       const total = nx * ny * nz;
       const bb = cstl.geometry.boundingBox;
       const cellW = (bb.max.x - bb.min.x) / nx, cellH = (bb.max.y - bb.min.y) / ny, cellD = (bb.max.z - bb.min.z) / nz;
       const EPS = Math.max(0.2, Math.min(cellW, cellH, cellD) * 0.02); // sobresale solo en las caras externas, para que el corte del borde no quede justo al ras del bbox
+      const numProp = cstl.hasColor ? 6 : 3; // xyz, o xyz+rgb si el archivo trae color de verdad
 
-      const matModelo = new THREE.MeshStandardMaterial({ color: 0x4fd1ff, roughness: 0.55, metalness: 0.05 });
-      const modeloMesh = new THREE.Mesh(cstl.geometry, matModelo);
-      modeloMesh.updateMatrix();
+      const modeloManifold = cstlGeometriaAManifold(M, cstl.geometry, numProp, null);
 
       const celdas = [];
       for(let i = 0; i < nx; i++){ celdas[i] = []; for(let j = 0; j < ny; j++) celdas[i][j] = []; }
@@ -7114,26 +7245,22 @@
             const x0 = bb.min.x + ix * cellW - (ix === 0 ? EPS : 0), x1 = bb.min.x + (ix + 1) * cellW + (ix === nx - 1 ? EPS : 0);
             const y0 = bb.min.y + iy * cellH - (iy === 0 ? EPS : 0), y1 = bb.min.y + (iy + 1) * cellH + (iy === ny - 1 ? EPS : 0);
             const z0 = bb.min.z + iz * cellD - (iz === 0 ? EPS : 0), z1 = bb.min.z + (iz + 1) * cellD + (iz === nz - 1 ? EPS : 0);
-            let piezaMesh = null;
+            let piezaManifold = null;
             if(total === 1){
               // Con una sola celda la caja ya envuelve el modelo entero —
-              // intersectar sería un no-op en teoría, pero en la práctica
-              // el CSG por BSP puede destrozar mallas reales grandes/con
-              // pequeñas imperfecciones (no perfectamente "manifold") aun
-              // en ese caso trivial. Si no hace falta cortar, se usa el
-              // modelo tal cual vino, sin pasar por CSG.
-              piezaMesh = modeloMesh;
+              // intersectar sería un no-op, así que se usa el modelo tal
+              // cual vino, sin gastar tiempo en una operación booleana.
+              piezaManifold = modeloManifold;
             } else {
-              const cajaGeo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
-              if(cstl.hasColor) cstlColorearUniforme(cajaGeo, CSTL_GRIS_CORTE); // sin esto, mezclar vértices con/sin color en el mismo CSG revienta al escribir el buffer de color
-              const cajaMesh = new THREE.Mesh(cajaGeo, matModelo);
-              cajaMesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-              cajaMesh.updateMatrix();
-              try{ piezaMesh = CSG.intersect(modeloMesh, cajaMesh); }
-              catch(errCsg){ console.error('Cortador STL: fallo al cortar celda', ix, iy, iz, errCsg); piezaMesh = null; }
+              try{
+                const cajaGeo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+                cajaGeo.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+                const cajaManifold = cstlGeometriaAManifold(M, cajaGeo, numProp, CSTL_GRIS_CORTE);
+                piezaManifold = modeloManifold.intersect(cajaManifold);
+              }catch(errCsg){ console.error('Cortador STL: fallo al cortar celda', ix, iy, iz, errCsg); piezaManifold = null; }
             }
-            celdas[ix][iy][iz] = (piezaMesh && piezaMesh.geometry.attributes.position && piezaMesh.geometry.attributes.position.count > 0)
-              ? { mesh: piezaMesh, min: { x: x0, y: y0, z: z0 }, max: { x: x1, y: y1, z: z1 } }
+            celdas[ix][iy][iz] = (piezaManifold && piezaManifold.numTri() > 0)
+              ? { manifold: piezaManifold, min: { x: x0, y: y0, z: z0 }, max: { x: x1, y: y1, z: z1 } }
               : null;
             hecho++;
             cstlEstado.textContent = 'Cortando piezas... ' + hecho + '/' + total;
@@ -7155,15 +7282,12 @@
         cstlCortarBtn.textContent = 'Agregando conectores...';
         await new Promise(res => setTimeout(res, 0));
 
-        function hacerCilindro(radio, ejeDir, centro){
+        function geoCilindro(radio, ejeDir, centro){
           const geo = new THREE.CylinderGeometry(radio, radio, largo, 16, 1, false);
           if(ejeDir === 'x') geo.rotateZ(Math.PI / 2);
           else if(ejeDir === 'z') geo.rotateX(Math.PI / 2);
-          if(cstl.hasColor) cstlColorearUniforme(geo, CSTL_GRIS_CORTE);
-          const mesh = new THREE.Mesh(geo, matModelo);
-          mesh.position.set(centro.x, centro.y, centro.z);
-          mesh.updateMatrix();
-          return mesh;
+          geo.translate(centro.x, centro.y, centro.z);
+          return geo;
         }
 
         const ejes = [{ letra: 'x', n: nx }, { letra: 'y', n: ny }, { letra: 'z', n: nz }];
@@ -7195,13 +7319,16 @@
                   if(ax.letra === 'x') centro = { x: centroCelda.x, y: centroCelda.y + po, z: centroCelda.z + pz };
                   else if(ax.letra === 'y') centro = { x: centroCelda.x + po, y: centroCelda.y, z: centroCelda.z + pz };
                   else centro = { x: centroCelda.x + po, y: centroCelda.y + pz, z: centroCelda.z };
-                  const agujero = hacerCilindro(radioAgujero, ax.letra, centro);
-                  const espiga = hacerCilindro(diam / 2, ax.letra, centro);
                   try{
-                    ca.mesh = CSG.subtract(ca.mesh, agujero);
-                    cb.mesh = CSG.subtract(cb.mesh, agujero);
+                    const agujeroManifold = cstlGeometriaAManifold(M, geoCilindro(radioAgujero, ax.letra, centro), numProp, CSTL_GRIS_CORTE);
+                    ca.manifold = ca.manifold.subtract(agujeroManifold);
+                    cb.manifold = cb.manifold.subtract(agujeroManifold);
                   }catch(errSub){ console.error('Cortador STL: fallo al perforar conector', errSub); }
-                  pegs.push({ mesh: espiga, ix, iy, iz });
+                  // La espiga en sí nunca se mezcla con el modelo — no
+                  // necesita pasar por Manifold, con la geometría alcanza.
+                  const espigaGeo = geoCilindro(diam / 2, ax.letra, centro);
+                  espigaGeo.computeVertexNormals();
+                  pegs.push({ mesh: { geometry: espigaGeo }, ix, iy, iz });
                 }
                 cstlEstado.textContent = 'Agregando conectores...';
                 await new Promise(res => setTimeout(res, 0));
@@ -7214,7 +7341,7 @@
       const piezas = [];
       for(let ix = 0; ix < nx; ix++) for(let iy = 0; iy < ny; iy++) for(let iz = 0; iz < nz; iz++){
         const c = celdas[ix][iy][iz];
-        if(c) piezas.push({ mesh: c.mesh, ix, iy, iz, min: c.min, max: c.max });
+        if(c) piezas.push({ mesh: { geometry: cstlManifoldAGeometria(c.manifold, numProp) }, ix, iy, iz, min: c.min, max: c.max });
       }
 
       cstl.piezas = piezas;
