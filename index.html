@@ -6842,15 +6842,6 @@
   // exportador (algunos usan "m:colorgroup", otros ninguno).
   async function cstlParse3MF(buffer){
     const zip = await JSZip.loadAsync(buffer);
-    let modelFile = zip.file('3D/3dmodel.model');
-    if(!modelFile){
-      const candidato = Object.keys(zip.files).find(n => /\.model$/i.test(n));
-      if(candidato) modelFile = zip.file(candidato);
-    }
-    if(!modelFile) throw new Error('El .3mf no contiene un 3dmodel.model');
-    const xmlTexto = await modelFile.async('string');
-    const xml = new DOMParser().parseFromString(xmlTexto, 'application/xml');
-    if(xml.querySelector('parsererror')) throw new Error('XML de 3MF inválido');
 
     function porNombreLocal(root, nombre){
       return Array.from(root.getElementsByTagName('*')).filter(el => el.localName === nombre);
@@ -6861,38 +6852,68 @@
       if(hex.length < 6) return null;
       return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255];
     }
+    function normalizarRuta(p){
+      if(!p) return p;
+      return p.startsWith('/') ? p : '/' + p;
+    }
 
-    const grupos = {}; // id de <colorgroup> o <basematerials> -> array de colores (o null) por índice
-    porNombreLocal(xml, 'colorgroup').forEach(cg => {
-      grupos[cg.getAttribute('id')] = porNombreLocal(cg, 'color').map(c => hexAColor(c.getAttribute('color')));
-    });
-    porNombreLocal(xml, 'basematerials').forEach(bm => {
-      grupos[bm.getAttribute('id')] = porNombreLocal(bm, 'base').map(b => hexAColor(b.getAttribute('displaycolor')));
-    });
-    function colorDe(pid, pindex){
+    // Muchos exportadores reales (Bambu Studio, Creality Print, Orca...)
+    // usan la "Production Extension" del 3MF: el XML principal
+    // (3D/3dmodel.model) no trae la malla, solo un <component p:path="...">
+    // que apunta a OTRO archivo .model dentro del mismo .zip (típicamente
+    // 3D/Objects/object_N.model). Si solo se lee el archivo principal, el
+    // modelo sale "vacío" sin ningún aviso claro de por qué. Por eso acá se
+    // parsean TODOS los .model del paquete y se resuelven los componentes
+    // siguiendo su "path" al archivo correcto.
+    const rutasModel = Object.keys(zip.files).filter(n => /\.model$/i.test(n) && !zip.files[n].dir);
+    if(!rutasModel.length) throw new Error('El .3mf no contiene ningún archivo .model');
+    const archivos = {}; // ruta normalizada -> { objetos, grupos }
+    for(const ruta of rutasModel){
+      const xmlTexto = await zip.file(ruta).async('string');
+      const xml = new DOMParser().parseFromString(xmlTexto, 'application/xml');
+      if(xml.querySelector('parsererror')) continue;
+
+      const grupos = {}; // id de <colorgroup> o <basematerials> -> array de colores (o null) por índice
+      porNombreLocal(xml, 'colorgroup').forEach(cg => {
+        grupos[cg.getAttribute('id')] = porNombreLocal(cg, 'color').map(c => hexAColor(c.getAttribute('color')));
+      });
+      porNombreLocal(xml, 'basematerials').forEach(bm => {
+        grupos[bm.getAttribute('id')] = porNombreLocal(bm, 'base').map(b => hexAColor(b.getAttribute('displaycolor')));
+      });
+
+      const objetos = {};
+      porNombreLocal(xml, 'object').forEach(obj => {
+        const o = { vertices: [], triangulos: [], pid: obj.getAttribute('pid'), pindex: obj.getAttribute('pindex'), componentes: [] };
+        const mesh = porNombreLocal(obj, 'mesh')[0];
+        if(mesh){
+          const vtxEl = porNombreLocal(mesh, 'vertices')[0];
+          if(vtxEl) porNombreLocal(vtxEl, 'vertex').forEach(v => o.vertices.push([parseFloat(v.getAttribute('x')), parseFloat(v.getAttribute('y')), parseFloat(v.getAttribute('z'))]));
+          const triEl = porNombreLocal(mesh, 'triangles')[0];
+          if(triEl) porNombreLocal(triEl, 'triangle').forEach(t => o.triangulos.push({
+            v1: +t.getAttribute('v1'), v2: +t.getAttribute('v2'), v3: +t.getAttribute('v3'),
+            pid: t.getAttribute('pid'), p1: t.getAttribute('p1'), p2: t.getAttribute('p2'), p3: t.getAttribute('p3'),
+          }));
+        }
+        const comps = porNombreLocal(obj, 'components')[0];
+        if(comps) porNombreLocal(comps, 'component').forEach(c => o.componentes.push({
+          objectid: c.getAttribute('objectid'),
+          transform: c.getAttribute('transform'),
+          path: normalizarRuta(c.getAttribute('p:path') || c.getAttribute('path')),
+        }));
+        objetos[obj.getAttribute('id')] = o;
+      });
+
+      archivos[normalizarRuta(ruta)] = { xml, objetos, grupos };
+    }
+
+    function colorDe(ruta, pid, pindex){
       if(pid == null || pindex == null) return null;
-      const g = grupos[pid];
+      const archivo = archivos[ruta];
+      if(!archivo) return null;
+      const g = archivo.grupos[pid];
       if(!g) return null;
       return g[parseInt(pindex, 10)] || null;
     }
-
-    const objetos = {};
-    porNombreLocal(xml, 'object').forEach(obj => {
-      const o = { vertices: [], triangulos: [], pid: obj.getAttribute('pid'), pindex: obj.getAttribute('pindex'), componentes: [] };
-      const mesh = porNombreLocal(obj, 'mesh')[0];
-      if(mesh){
-        const vtxEl = porNombreLocal(mesh, 'vertices')[0];
-        if(vtxEl) porNombreLocal(vtxEl, 'vertex').forEach(v => o.vertices.push([parseFloat(v.getAttribute('x')), parseFloat(v.getAttribute('y')), parseFloat(v.getAttribute('z'))]));
-        const triEl = porNombreLocal(mesh, 'triangles')[0];
-        if(triEl) porNombreLocal(triEl, 'triangle').forEach(t => o.triangulos.push({
-          v1: +t.getAttribute('v1'), v2: +t.getAttribute('v2'), v3: +t.getAttribute('v3'),
-          pid: t.getAttribute('pid'), p1: t.getAttribute('p1'), p2: t.getAttribute('p2'), p3: t.getAttribute('p3'),
-        }));
-      }
-      const comps = porNombreLocal(obj, 'components')[0];
-      if(comps) porNombreLocal(comps, 'component').forEach(c => o.componentes.push({ objectid: c.getAttribute('objectid'), transform: c.getAttribute('transform') }));
-      objetos[obj.getAttribute('id')] = o;
-    });
 
     function matrizDeTransform(str){
       const mat = new THREE.Matrix4();
@@ -6907,9 +6928,11 @@
     let huboColor = false;
     const GRIS = [0.8, 0.8, 0.8];
 
-    function emitirObjeto(objId, matrizAcum, pidHeredado, pindexHeredado, visitados){
-      if(visitados.has(objId)) return; // evita ciclos de componentes
-      const obj = objetos[objId];
+    function emitirObjeto(ruta, objId, matrizAcum, pidHeredado, pindexHeredado, visitados){
+      const clave = ruta + '#' + objId;
+      if(visitados.has(clave)) return; // evita ciclos de componentes
+      const archivo = archivos[ruta];
+      const obj = archivo && archivo.objetos[objId];
       if(!obj) return;
       const pidObj = obj.pid != null ? obj.pid : pidHeredado;
       const pindexObj = obj.pindex != null ? obj.pindex : pindexHeredado;
@@ -6920,7 +6943,7 @@
         let pid, idx1, idx2, idx3;
         if(t.pid != null){ pid = t.pid; idx1 = t.p1; idx2 = t.p2 != null ? t.p2 : t.p1; idx3 = t.p3 != null ? t.p3 : t.p1; }
         else { pid = pidObj; idx1 = idx2 = idx3 = pindexObj; }
-        const coloresTri = [colorDe(pid, idx1), colorDe(pid, idx2), colorDe(pid, idx3)];
+        const coloresTri = [colorDe(ruta, pid, idx1), colorDe(ruta, pid, idx2), colorDe(ruta, pid, idx3)];
         if(coloresTri.some(c => c)) huboColor = true;
         puntos.forEach((p, k) => {
           posiciones.push(p.x, p.y, p.z);
@@ -6928,21 +6951,29 @@
           colores.push(c[0], c[1], c[2]);
         });
       });
-      const siguientesVisitados = new Set(visitados); siguientesVisitados.add(objId);
+      const siguientesVisitados = new Set(visitados); siguientesVisitados.add(clave);
       obj.componentes.forEach(comp => {
         const subMatriz = matrizAcum.clone().multiply(matrizDeTransform(comp.transform));
-        emitirObjeto(comp.objectid, subMatriz, pidObj, pindexObj, siguientesVisitados);
+        const rutaDestino = comp.path || ruta;
+        emitirObjeto(rutaDestino, comp.objectid, subMatriz, pidObj, pindexObj, siguientesVisitados);
       });
     }
 
-    const build = porNombreLocal(xml, 'build')[0];
+    // El <build> (qué objetos se imprimen y dónde) siempre vive en el
+    // archivo raíz — Creality Print/Bambu Studio lo escriben en
+    // 3D/3dmodel.model si existe, o si no en el primer .model que tenga uno.
+    let rutaRaiz = normalizarRuta('3D/3dmodel.model');
+    if(!archivos[rutaRaiz] || !porNombreLocal(archivos[rutaRaiz].xml, 'build')[0]){
+      rutaRaiz = Object.keys(archivos).find(r => porNombreLocal(archivos[r].xml, 'build')[0]) || Object.keys(archivos)[0];
+    }
+    const build = porNombreLocal(archivos[rutaRaiz].xml, 'build')[0];
     const items = build ? porNombreLocal(build, 'item') : [];
     if(items.length){
       items.forEach(item => {
-        emitirObjeto(item.getAttribute('objectid'), matrizDeTransform(item.getAttribute('transform')), item.getAttribute('pid'), item.getAttribute('pindex'), new Set());
+        emitirObjeto(rutaRaiz, item.getAttribute('objectid'), matrizDeTransform(item.getAttribute('transform')), item.getAttribute('pid'), item.getAttribute('pindex'), new Set());
       });
     } else {
-      Object.keys(objetos).forEach(id => emitirObjeto(id, new THREE.Matrix4(), null, null, new Set()));
+      Object.keys(archivos[rutaRaiz].objetos).forEach(id => emitirObjeto(rutaRaiz, id, new THREE.Matrix4(), null, null, new Set()));
     }
 
     if(posiciones.length < 9) throw new Error('El .3mf no tiene triángulos legibles');
