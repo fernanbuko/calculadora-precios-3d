@@ -2028,14 +2028,14 @@
   <!-- CORTADOR DE STL -->
   <div class="card">
     <p class="card-title">Cortador de STL <span class="tag">DIVIDÍ UN MODELO PARA IMPRIMIRLO POR PARTES</span></p>
-    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Subí un modelo, indicá el tamaño de tu impresora y generá las piezas cortadas para imprimir por partes.</p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Subí un modelo (STL o 3MF — el 3MF conserva el color), indicá el tamaño de tu impresora y generá las piezas cortadas para imprimir por partes.</p>
 
     <div class="field field-wide">
       <div>
-        <label for="cstlArchivo">1. Archivo STL</label>
+        <label for="cstlArchivo">1. Archivo (STL o 3MF)</label>
         <small id="cstlArchivoInfo">Ningún archivo elegido</small>
       </div>
-      <div class="input-box"><input type="file" id="cstlArchivo" accept=".stl"></div>
+      <div class="input-box"><input type="file" id="cstlArchivo" accept=".stl,.3mf"></div>
     </div>
 
     <div class="field field-wide">
@@ -6774,8 +6774,16 @@
   const cstlStage = document.getElementById('cstlStage');
   const cstlDescargarBtn = document.getElementById('cstlDescargarBtn');
 
-  const cstl = { geometry: null, dims: null, fileName: '', piezas: [], pegs: [], vista: 'camas', camaDims: { x: 256, y: 256 } };
+  const cstl = { geometry: null, dims: null, fileName: '', hasColor: false, piezas: [], pegs: [], vista: 'camas', camaDims: { x: 256, y: 256 } };
   const CSTL_COLORES = [0xff4d4d, 0x4dff88, 0x4dd2ff, 0xffa94d, 0xb34dff, 0xffe14d, 0x4d6aff, 0xff4dc4];
+  const CSTL_GRIS_CORTE = [0.72, 0.72, 0.74]; // color "neutro" para las caras nuevas que aparecen al cortar (no tienen color original)
+
+  function cstlColorearUniforme(geo, rgb){
+    const n = geo.attributes.position.count;
+    const arr = new Float32Array(n * 3);
+    for(let i = 0; i < n; i++){ arr[i * 3] = rgb[0]; arr[i * 3 + 1] = rgb[1]; arr[i * 3 + 2] = rgb[2]; }
+    geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  }
 
   function cstlParseSTL(buffer){
     const dv = new DataView(buffer);
@@ -6803,32 +6811,160 @@
     return new Float32Array(positions);
   }
 
+  // Parser de 3MF: es un .zip con un XML de modelo adentro (3D/3dmodel.model).
+  // Reconstruye triángulos SIN compartir vértices entre ellos (como el STL)
+  // para poder darle a cada vértice de cada triángulo el color real que
+  // trae el archivo — un mismo vértice "geométrico" puede tener colores
+  // distintos según la cara/objeto al que pertenece en 3MF, así que
+  // compartir índices perdería esa info. El color sale de <m:colorgroup>
+  // (un color por vértice del triángulo) o de <basematerials> (un color
+  // por material, igual para todo el triángulo) — los busca por
+  // localName para no depender de qué prefijo de namespace use cada
+  // exportador (algunos usan "m:colorgroup", otros ninguno).
+  async function cstlParse3MF(buffer){
+    const zip = await JSZip.loadAsync(buffer);
+    let modelFile = zip.file('3D/3dmodel.model');
+    if(!modelFile){
+      const candidato = Object.keys(zip.files).find(n => /\.model$/i.test(n));
+      if(candidato) modelFile = zip.file(candidato);
+    }
+    if(!modelFile) throw new Error('El .3mf no contiene un 3dmodel.model');
+    const xmlTexto = await modelFile.async('string');
+    const xml = new DOMParser().parseFromString(xmlTexto, 'application/xml');
+    if(xml.querySelector('parsererror')) throw new Error('XML de 3MF inválido');
+
+    function porNombreLocal(root, nombre){
+      return Array.from(root.getElementsByTagName('*')).filter(el => el.localName === nombre);
+    }
+    function hexAColor(hex){
+      if(!hex) return null;
+      hex = hex.replace('#', '');
+      if(hex.length < 6) return null;
+      return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255];
+    }
+
+    const grupos = {}; // id de <colorgroup> o <basematerials> -> array de colores (o null) por índice
+    porNombreLocal(xml, 'colorgroup').forEach(cg => {
+      grupos[cg.getAttribute('id')] = porNombreLocal(cg, 'color').map(c => hexAColor(c.getAttribute('color')));
+    });
+    porNombreLocal(xml, 'basematerials').forEach(bm => {
+      grupos[bm.getAttribute('id')] = porNombreLocal(bm, 'base').map(b => hexAColor(b.getAttribute('displaycolor')));
+    });
+    function colorDe(pid, pindex){
+      if(pid == null || pindex == null) return null;
+      const g = grupos[pid];
+      if(!g) return null;
+      return g[parseInt(pindex, 10)] || null;
+    }
+
+    const objetos = {};
+    porNombreLocal(xml, 'object').forEach(obj => {
+      const o = { vertices: [], triangulos: [], pid: obj.getAttribute('pid'), pindex: obj.getAttribute('pindex'), componentes: [] };
+      const mesh = porNombreLocal(obj, 'mesh')[0];
+      if(mesh){
+        const vtxEl = porNombreLocal(mesh, 'vertices')[0];
+        if(vtxEl) porNombreLocal(vtxEl, 'vertex').forEach(v => o.vertices.push([parseFloat(v.getAttribute('x')), parseFloat(v.getAttribute('y')), parseFloat(v.getAttribute('z'))]));
+        const triEl = porNombreLocal(mesh, 'triangles')[0];
+        if(triEl) porNombreLocal(triEl, 'triangle').forEach(t => o.triangulos.push({
+          v1: +t.getAttribute('v1'), v2: +t.getAttribute('v2'), v3: +t.getAttribute('v3'),
+          pid: t.getAttribute('pid'), p1: t.getAttribute('p1'), p2: t.getAttribute('p2'), p3: t.getAttribute('p3'),
+        }));
+      }
+      const comps = porNombreLocal(obj, 'components')[0];
+      if(comps) porNombreLocal(comps, 'component').forEach(c => o.componentes.push({ objectid: c.getAttribute('objectid'), transform: c.getAttribute('transform') }));
+      objetos[obj.getAttribute('id')] = o;
+    });
+
+    function matrizDeTransform(str){
+      const mat = new THREE.Matrix4();
+      if(!str) return mat;
+      const m = str.trim().split(/\s+/).map(Number);
+      if(m.length < 12) return mat;
+      mat.set(m[0], m[3], m[6], m[9], m[1], m[4], m[7], m[10], m[2], m[5], m[8], m[11], 0, 0, 0, 1);
+      return mat;
+    }
+
+    const posiciones = [], colores = [];
+    let huboColor = false;
+    const GRIS = [0.8, 0.8, 0.8];
+
+    function emitirObjeto(objId, matrizAcum, pidHeredado, pindexHeredado, visitados){
+      if(visitados.has(objId)) return; // evita ciclos de componentes
+      const obj = objetos[objId];
+      if(!obj) return;
+      const pidObj = obj.pid != null ? obj.pid : pidHeredado;
+      const pindexObj = obj.pindex != null ? obj.pindex : pindexHeredado;
+      obj.triangulos.forEach(t => {
+        const corners = [t.v1, t.v2, t.v3].map(i => obj.vertices[i]);
+        if(corners.some(c => !c)) return;
+        const puntos = corners.map(c => new THREE.Vector3(c[0], c[1], c[2]).applyMatrix4(matrizAcum));
+        let pid, idx1, idx2, idx3;
+        if(t.pid != null){ pid = t.pid; idx1 = t.p1; idx2 = t.p2 != null ? t.p2 : t.p1; idx3 = t.p3 != null ? t.p3 : t.p1; }
+        else { pid = pidObj; idx1 = idx2 = idx3 = pindexObj; }
+        const coloresTri = [colorDe(pid, idx1), colorDe(pid, idx2), colorDe(pid, idx3)];
+        if(coloresTri.some(c => c)) huboColor = true;
+        puntos.forEach((p, k) => {
+          posiciones.push(p.x, p.y, p.z);
+          const c = coloresTri[k] || GRIS;
+          colores.push(c[0], c[1], c[2]);
+        });
+      });
+      const siguientesVisitados = new Set(visitados); siguientesVisitados.add(objId);
+      obj.componentes.forEach(comp => {
+        const subMatriz = matrizAcum.clone().multiply(matrizDeTransform(comp.transform));
+        emitirObjeto(comp.objectid, subMatriz, pidObj, pindexObj, siguientesVisitados);
+      });
+    }
+
+    const build = porNombreLocal(xml, 'build')[0];
+    const items = build ? porNombreLocal(build, 'item') : [];
+    if(items.length){
+      items.forEach(item => {
+        emitirObjeto(item.getAttribute('objectid'), matrizDeTransform(item.getAttribute('transform')), item.getAttribute('pid'), item.getAttribute('pindex'), new Set());
+      });
+    } else {
+      Object.keys(objetos).forEach(id => emitirObjeto(id, new THREE.Matrix4(), null, null, new Set()));
+    }
+
+    if(posiciones.length < 9) throw new Error('El .3mf no tiene triángulos legibles');
+    return { positions: new Float32Array(posiciones), colors: huboColor ? new Float32Array(colores) : null };
+  }
+
   cstlArchivo.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if(!file) return;
     cstlArchivoInfo.textContent = 'Leyendo archivo...';
     cstlResultCard.classList.add('hidden');
     cstl.piezas = []; cstl.pegs = [];
+    const esTresMF = /\.3mf$/i.test(file.name);
     try{
       const buf = await file.arrayBuffer();
-      const positions = cstlParseSTL(buf);
-      if(positions.length < 9) throw new Error('STL vacío o inválido');
+      let positions, colorsArr = null;
+      if(esTresMF){
+        const r = await cstlParse3MF(buf);
+        positions = r.positions; colorsArr = r.colors;
+      } else {
+        positions = cstlParseSTL(buf);
+        if(positions.length < 9) throw new Error('STL vacío o inválido');
+      }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      if(colorsArr) geo.setAttribute('color', new THREE.BufferAttribute(colorsArr, 3));
       geo.computeVertexNormals();
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
       cstl.geometry = geo;
-      cstl.fileName = file.name.replace(/\.stl$/i, '');
+      cstl.hasColor = !!colorsArr;
+      cstl.fileName = file.name.replace(/\.(stl|3mf)$/i, '');
       cstl.dims = { x: bb.max.x - bb.min.x, y: bb.max.y - bb.min.y, z: bb.max.z - bb.min.z };
       const triCount = positions.length / 9;
-      cstlArchivoInfo.textContent = file.name + ' — ' + cstl.dims.x.toFixed(1) + '×' + cstl.dims.y.toFixed(1) + '×' + cstl.dims.z.toFixed(1) + ' mm' + (triCount > 20000 ? ' (archivo grande: el corte puede tardar varios minutos)' : '');
+      cstlArchivoInfo.textContent = file.name + ' — ' + cstl.dims.x.toFixed(1) + '×' + cstl.dims.y.toFixed(1) + '×' + cstl.dims.z.toFixed(1) + ' mm' + (cstl.hasColor ? ' · con color' : '') + (triCount > 20000 ? ' (archivo grande: el corte puede tardar varios minutos)' : '');
       cstlCortarBtn.disabled = false;
       cstlActualizarResumen();
     }catch(err){
       console.error('Cortador STL: no se pudo leer el archivo', err);
-      cstlArchivoInfo.textContent = 'No se pudo leer el archivo (¿es un STL válido?)';
-      cstl.geometry = null; cstl.dims = null;
+      cstlArchivoInfo.textContent = esTresMF ? 'No se pudo leer el archivo (¿es un 3MF válido?)' : 'No se pudo leer el archivo (¿es un STL válido?)';
+      cstl.geometry = null; cstl.dims = null; cstl.hasColor = false;
       cstlCortarBtn.disabled = true;
       cstlActualizarResumen();
     }
@@ -6908,7 +7044,9 @@
             const x0 = bb.min.x + ix * cellW - (ix === 0 ? EPS : 0), x1 = bb.min.x + (ix + 1) * cellW + (ix === nx - 1 ? EPS : 0);
             const y0 = bb.min.y + iy * cellH - (iy === 0 ? EPS : 0), y1 = bb.min.y + (iy + 1) * cellH + (iy === ny - 1 ? EPS : 0);
             const z0 = bb.min.z + iz * cellD - (iz === 0 ? EPS : 0), z1 = bb.min.z + (iz + 1) * cellD + (iz === nz - 1 ? EPS : 0);
-            const cajaMesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), matModelo);
+            const cajaGeo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+            if(cstl.hasColor) cstlColorearUniforme(cajaGeo, CSTL_GRIS_CORTE); // sin esto, mezclar vértices con/sin color en el mismo CSG revienta al escribir el buffer de color
+            const cajaMesh = new THREE.Mesh(cajaGeo, matModelo);
             cajaMesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
             cajaMesh.updateMatrix();
             let piezaMesh = null;
@@ -6938,6 +7076,7 @@
           const geo = new THREE.CylinderGeometry(radio, radio, largo, 16, 1, false);
           if(ejeDir === 'x') geo.rotateZ(Math.PI / 2);
           else if(ejeDir === 'z') geo.rotateX(Math.PI / 2);
+          if(cstl.hasColor) cstlColorearUniforme(geo, CSTL_GRIS_CORTE);
           const mesh = new THREE.Mesh(geo, matModelo);
           mesh.position.set(centro.x, centro.y, centro.z);
           mesh.updateMatrix();
@@ -7083,7 +7222,9 @@
     const bb = cstl.geometry.boundingBox;
     const cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2, cz = (bb.min.z + bb.max.z) / 2;
     cstl.piezas.forEach((p, i) => {
-      const mat = new THREE.MeshStandardMaterial({ color: CSTL_COLORES[i % CSTL_COLORES.length], roughness: 0.55, metalness: 0.05 });
+      const mat = cstl.hasColor
+        ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05 })
+        : new THREE.MeshStandardMaterial({ color: CSTL_COLORES[i % CSTL_COLORES.length], roughness: 0.55, metalness: 0.05 });
       const mesh = new THREE.Mesh(p.mesh.geometry, mat);
       mesh.position.set(-cx, -cy, -cz);
       w.add(mesh);
@@ -7108,7 +7249,9 @@
       grid.rotation.x = -Math.PI / 2;
       bedGroup.add(grid);
 
-      const mat = new THREE.MeshStandardMaterial({ color: CSTL_COLORES[i % CSTL_COLORES.length], roughness: 0.55, metalness: 0.05 });
+      const mat = cstl.hasColor
+        ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05 })
+        : new THREE.MeshStandardMaterial({ color: CSTL_COLORES[i % CSTL_COLORES.length], roughness: 0.55, metalness: 0.05 });
       const mesh = new THREE.Mesh(p.mesh.geometry, mat);
       mesh.position.set(-cxp, -cyp, -p.min.z);
       bedGroup.add(mesh);
