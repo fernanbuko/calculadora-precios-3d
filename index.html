@@ -7019,9 +7019,27 @@
 
   async function cstlCortarModelo(){
     if(!cstl.geometry) return;
+    // El corte usa CSG por BSP (igual que Nombre 3D) — es confiable pero
+    // nada rápido: en un modelo de varios miles de triángulos cada celda
+    // puede tardar segundos, y con conectores se suman muchas más
+    // operaciones. Sin este aviso, alguien que sube un modelo real de un
+    // slicer (no una piececita simple) ve que "no pasa nada" durante un
+    // buen rato y piensa que está roto, cuando en realidad sigue
+    // trabajando — máxime en el celular, donde además puede sentirse
+    // trabado porque el navegador no repinta bien mientras el hilo
+    // principal está ocupado.
+    const triCount = cstl.geometry.attributes.position.count / 3;
+    if(triCount > 8000){
+      const seguir = window.confirm('Este modelo tiene ' + triCount.toLocaleString('es') + ' triángulos. Cortarlo puede tardar varios minutos (y la pantalla puede verse como trabada mientras tanto, sobre todo en el celular) — no cierres ni recargues la página. ¿Querés continuar?');
+      if(!seguir) return;
+    }
     cstlCortarBtn.disabled = true;
     cstlResultCard.classList.add('hidden');
     cstlEstado.textContent = 'Cortando piezas...';
+    cstlEstado.style.fontWeight = '700';
+    cstlEstado.style.color = 'var(--orange)';
+    const textoBtnOriginal = cstlCortarBtn.textContent;
+    let huboError = false;
     await new Promise(r => setTimeout(r, 0));
     try{
       const r = cstlCalcularPiezasPorEje();
@@ -7058,6 +7076,7 @@
               : null;
             hecho++;
             cstlEstado.textContent = 'Cortando piezas... ' + hecho + '/' + total;
+            cstlCortarBtn.textContent = 'Cortando... ' + hecho + '/' + total;
             await new Promise(res => setTimeout(res, 0));
           }
         }
@@ -7071,6 +7090,7 @@
         const holgura = Math.max(0, parseFloat(cstlHolgura.value) || 0.2);
         const radioAgujero = diam / 2 + holgura;
         cstlEstado.textContent = 'Agregando conectores...';
+        cstlCortarBtn.textContent = 'Agregando conectores...';
         await new Promise(res => setTimeout(res, 0));
 
         function hacerCilindro(radio, ejeDir, centro){
@@ -7140,8 +7160,12 @@
     }catch(err){
       console.error('Cortador STL: error general al cortar', err);
       cstlEstado.textContent = 'Ocurrió un error al cortar el modelo. Probá con un margen mayor o menos conectores.';
+      huboError = true;
     }finally{
       cstlCortarBtn.disabled = false;
+      cstlCortarBtn.textContent = textoBtnOriginal;
+      cstlEstado.style.fontWeight = '';
+      cstlEstado.style.color = huboError ? '#e05d44' : '';
     }
   }
   cstlCortarBtn.addEventListener('click', cstlCortarModelo);
