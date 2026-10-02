@@ -101,7 +101,7 @@
   }
   .tab-bar-btn .tab-icon{ font-size: 20px; line-height: 1; }
   .tab-bar-btn .tab-label{ font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
-  .top-ajustes-btn, .top-nombre3d-btn{
+  .top-ajustes-btn, .top-nombre3d-btn, .top-cortadorstl-btn{
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 14px);
     z-index: 41;
@@ -120,7 +120,8 @@
   }
   .top-ajustes-btn{ right: 16px; }
   .top-nombre3d-btn{ right: 62px; }
-  .top-ajustes-btn.active, .top-nombre3d-btn.active{ color: var(--orange); background: var(--orange-dim); }
+  .top-cortadorstl-btn{ right: 108px; }
+  .top-ajustes-btn.active, .top-nombre3d-btn.active, .top-cortadorstl-btn.active{ color: var(--orange); background: var(--orange-dim); }
   .tab-bar-btn.active{ color: var(--orange); background: var(--orange-dim); }
 
   header{ margin-bottom: 24px; display:flex; justify-content: space-between; align-items:flex-start; gap: 12px; }
@@ -1115,6 +1116,21 @@
   }
   .nombre3d-stage.nombre3d-dragging{ cursor: grabbing; }
   .nombre3d-stage canvas{ display: block; width: 100%; height: 100%; }
+
+  /* ---- Cortador de STL: motor 3D real con Three.js + CSG ---- */
+  .cortadorstl-stage{
+    position: relative;
+    height: 320px;
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+    background: var(--bg);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .cortadorstl-stage.cstl-dragging{ cursor: grabbing; }
+  .cortadorstl-stage canvas{ display: block; width: 100%; height: 100%; }
+  #cstlConectoresPanel.hidden{ display: none; }
   /* Modo cliente: se abrió con ?vista3d=1 — se esconde todo lo que no sea
      esta herramienta, para poder mandarle el link solo de esto a un
      cliente sin que vea nada de la calculadora de precios. */
@@ -2008,6 +2024,110 @@
   </div>
   </div><!-- /tab-panel nombre3d -->
 
+  <div class="tab-panel hidden" data-tab="cortadorstl" id="tabPanelCortadorStl">
+  <!-- CORTADOR DE STL -->
+  <div class="card">
+    <p class="card-title">Cortador de STL <span class="tag">DIVIDÍ UN MODELO PARA IMPRIMIRLO POR PARTES</span></p>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 4px;">Subí un modelo, indicá el tamaño de tu impresora y generá las piezas cortadas para imprimir por partes.</p>
+
+    <div class="field field-wide">
+      <div>
+        <label for="cstlArchivo">1. Archivo STL</label>
+        <small id="cstlArchivoInfo">Ningún archivo elegido</small>
+      </div>
+      <div class="input-box"><input type="file" id="cstlArchivo" accept=".stl"></div>
+    </div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="cstlImpresora">2. Impresora</label>
+      </div>
+      <div class="input-box">
+        <select id="cstlImpresora">
+          <option value="256,256,256">Bambu Lab A1 / P1S / P1P / X1C (256×256×256)</option>
+          <option value="180,180,180">Bambu Lab A1 mini (180×180×180)</option>
+          <option value="250,210,220">Prusa MK4 (250×210×220)</option>
+          <option value="180,180,180">Prusa Mini (180×180×180)</option>
+          <option value="220,220,250">Ender 3 (220×220×250)</option>
+          <option value="300,300,300">Ender 3 / CR-10 grande (300×300×300)</option>
+          <option value="custom">Personalizado...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" id="cstlCamaXField">
+      <div><label for="cstlCamaX">Cama X (mm)</label></div>
+      <div class="input-box"><input type="number" id="cstlCamaX" min="10" step="1" value="256"></div>
+    </div>
+    <div class="field" id="cstlCamaYField">
+      <div><label for="cstlCamaY">Cama Y (mm)</label></div>
+      <div class="input-box"><input type="number" id="cstlCamaY" min="10" step="1" value="256"></div>
+    </div>
+    <div class="field" id="cstlCamaZField">
+      <div><label for="cstlCamaZ">Cama Z (mm)</label></div>
+      <div class="input-box"><input type="number" id="cstlCamaZ" min="10" step="1" value="256"></div>
+    </div>
+
+    <div class="field field-wide">
+      <div>
+        <label for="cstlMargen">Margen de seguridad (mm)</label>
+        <small>Se resta a cada lado de la cama para que la pieza entre con holgura</small>
+      </div>
+      <div class="input-box"><input type="number" id="cstlMargen" min="0" step="0.5" value="3"></div>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--text-dim);margin:4px 0;" id="cstlResumenCorte">Subí un archivo STL para calcular en cuántas piezas se va a cortar.</p>
+
+    <div class="field field-wide">
+      <div class="input-box" style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="cstlConectoresOn" checked style="width:18px;height:18px;flex:none;">
+        <label for="cstlConectoresOn" style="margin:0;">Conectores (espigas) entre piezas</label>
+      </div>
+    </div>
+    <div id="cstlConectoresPanel">
+      <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 8px;">Se perfora un agujero con holgura en ambas caras a unir, y la espiga se genera como pieza suelta que se imprime aparte y se inserta al ensamblar. Conviene pegar con cianocrilato o epoxi.</p>
+      <div class="field" id="cstlDiametroField">
+        <div><label for="cstlDiametro">Diámetro (mm)</label></div>
+        <div class="input-box"><input type="number" id="cstlDiametro" min="1" step="0.5" value="10"></div>
+      </div>
+      <div class="field" id="cstlLargoField">
+        <div><label for="cstlLargo">Largo total (mm)</label></div>
+        <div class="input-box"><input type="number" id="cstlLargo" min="2" step="1" value="24"></div>
+      </div>
+      <div class="field" id="cstlMaxCaraField">
+        <div><label for="cstlMaxCara">Máx. por cara</label></div>
+        <div class="input-box"><input type="number" id="cstlMaxCara" min="1" step="1" value="3"></div>
+      </div>
+      <div class="field field-wide">
+        <div>
+          <label for="cstlHolgura">Holgura del agujero (mm, por lado)</label>
+          <small>0.15-0.25 mm suele dar un encastre firme. Si te queda muy apretado, subila.</small>
+        </div>
+        <div class="input-box"><input type="number" id="cstlHolgura" min="0" step="0.05" value="0.2"></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="cstlCortarBtn" disabled>3. Cortar modelo</button>
+    </div>
+    <p style="font-size:12.5px;color:var(--text-dim);margin:4px 0 0;" id="cstlEstado"></p>
+  </div>
+
+  <div class="card hidden" id="cstlResultCard">
+    <div class="btn-row" id="cstlVistaRow">
+      <button type="button" class="btn small filter-btn" data-cstl-vista="ensamblado">Ensamblado</button>
+      <button type="button" class="btn small filter-btn active" data-cstl-vista="camas">En camas</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text-dim);align-self:center;" id="cstlCamasLabel"></span>
+    </div>
+    <div class="cortadorstl-stage" id="cstlStage">
+      <p class="empty-note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;text-align:center;padding:0 20px;">Arrastrá para rotar · rueda para zoom</p>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="cstlDescargarBtn">⬇️ Descargar piezas (ZIP)</button>
+    </div>
+  </div>
+  </div><!-- /tab-panel cortadorstl -->
+
   <div class="tab-panel hidden" data-tab="ajustes" id="tabPanelAjustes">
   <!-- AJUSTES -->
   <div class="card account-banner">
@@ -2084,6 +2204,7 @@
 </nav>
 
 <button type="button" class="top-nombre3d-btn" id="topNombre3dBtn" title="Nombre 3D">🔤</button>
+<button type="button" class="top-cortadorstl-btn" id="topCortadorStlBtn" title="Cortador de STL">✂️</button>
 <button type="button" class="top-ajustes-btn" id="topAjustesBtn" title="Ajustes">⚙️</button>
 
 <div class="toast" id="toast"></div>
@@ -5257,6 +5378,7 @@
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     topAjustesBtn.classList.toggle('active', tab === 'ajustes');
     topNombre3dBtn.classList.toggle('active', tab === 'nombre3d');
+    topCortadorStlBtn.classList.toggle('active', tab === 'cortadorstl');
     if(tab === 'inicio') renderGreeting();
     window.scrollTo(0, 0);
   }
@@ -5297,6 +5419,8 @@
   topAjustesBtn.addEventListener('click', () => setActiveTab('ajustes'));
   const topNombre3dBtn = document.getElementById('topNombre3dBtn');
   topNombre3dBtn.addEventListener('click', () => setActiveTab('nombre3d'));
+  const topCortadorStlBtn = document.getElementById('topCortadorStlBtn');
+  topCortadorStlBtn.addEventListener('click', () => setActiveTab('cortadorstl'));
 
   // ---------- cuenta de Google / Firestore ----------
   const accountLabel = document.getElementById('accountLabel');
@@ -6614,10 +6738,470 @@
     tabBar.classList.add('hidden');
     topAjustesBtn.classList.add('hidden');
     topNombre3dBtn.classList.add('hidden');
+    topCortadorStlBtn.classList.add('hidden');
     document.getElementById('addOrderFab').classList.add('hidden');
     nombre3dShareRow.classList.add('hidden');
     setActiveTab('nombre3d');
   }
+
+  // ---------- Cortador de STL: corte automático en grilla + conectores ----------
+  // Parsea el STL a mano (nada de CDN) y corta el modelo con el mismo motor
+  // CSG (csg.js) que ya usa Nombre 3D: por cada celda de la grilla se arma
+  // una caja del tamaño de esa celda y se intersecta con el modelo
+  // (CSG.intersect) para obtener la pieza. Los conectores son un segundo
+  // paso: en cada cara compartida entre dos celdas vecinas se resta
+  // (CSG.subtract) un cilindro-agujero de ambas piezas, y ese mismo
+  // cilindro (sin la holgura) se guarda aparte como "espiga" para
+  // imprimir suelta e insertar al pegar.
+  const cstlArchivo = document.getElementById('cstlArchivo');
+  const cstlArchivoInfo = document.getElementById('cstlArchivoInfo');
+  const cstlImpresora = document.getElementById('cstlImpresora');
+  const cstlCamaX = document.getElementById('cstlCamaX');
+  const cstlCamaY = document.getElementById('cstlCamaY');
+  const cstlCamaZ = document.getElementById('cstlCamaZ');
+  const cstlMargen = document.getElementById('cstlMargen');
+  const cstlResumenCorte = document.getElementById('cstlResumenCorte');
+  const cstlConectoresOn = document.getElementById('cstlConectoresOn');
+  const cstlConectoresPanel = document.getElementById('cstlConectoresPanel');
+  const cstlDiametro = document.getElementById('cstlDiametro');
+  const cstlLargo = document.getElementById('cstlLargo');
+  const cstlMaxCara = document.getElementById('cstlMaxCara');
+  const cstlHolgura = document.getElementById('cstlHolgura');
+  const cstlCortarBtn = document.getElementById('cstlCortarBtn');
+  const cstlEstado = document.getElementById('cstlEstado');
+  const cstlResultCard = document.getElementById('cstlResultCard');
+  const cstlCamasLabel = document.getElementById('cstlCamasLabel');
+  const cstlStage = document.getElementById('cstlStage');
+  const cstlDescargarBtn = document.getElementById('cstlDescargarBtn');
+
+  const cstl = { geometry: null, dims: null, fileName: '', piezas: [], pegs: [], vista: 'camas', camaDims: { x: 256, y: 256 } };
+  const CSTL_COLORES = [0xff4d4d, 0x4dff88, 0x4dd2ff, 0xffa94d, 0xb34dff, 0xffe14d, 0x4d6aff, 0xff4dc4];
+
+  function cstlParseSTL(buffer){
+    const dv = new DataView(buffer);
+    let esBinario = buffer.byteLength > 84;
+    if(esBinario){
+      const triCount = dv.getUint32(80, true);
+      esBinario = (84 + triCount * 50) === buffer.byteLength;
+    }
+    if(esBinario){
+      const triCount = dv.getUint32(80, true);
+      const positions = new Float32Array(triCount * 9);
+      let off = 84;
+      for(let i = 0; i < triCount; i++){
+        off += 12; // normal del archivo — se recalcula con computeVertexNormals
+        for(let v = 0; v < 9; v++){ positions[i * 9 + v] = dv.getFloat32(off, true); off += 4; }
+        off += 2; // attribute byte count
+      }
+      return positions;
+    }
+    const texto = new TextDecoder().decode(buffer);
+    const positions = [];
+    const re = /vertex\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)/g;
+    let m;
+    while((m = re.exec(texto))) positions.push(parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]));
+    return new Float32Array(positions);
+  }
+
+  cstlArchivo.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    cstlArchivoInfo.textContent = 'Leyendo archivo...';
+    cstlResultCard.classList.add('hidden');
+    cstl.piezas = []; cstl.pegs = [];
+    try{
+      const buf = await file.arrayBuffer();
+      const positions = cstlParseSTL(buf);
+      if(positions.length < 9) throw new Error('STL vacío o inválido');
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.computeVertexNormals();
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      cstl.geometry = geo;
+      cstl.fileName = file.name.replace(/\.stl$/i, '');
+      cstl.dims = { x: bb.max.x - bb.min.x, y: bb.max.y - bb.min.y, z: bb.max.z - bb.min.z };
+      const triCount = positions.length / 9;
+      cstlArchivoInfo.textContent = file.name + ' — ' + cstl.dims.x.toFixed(1) + '×' + cstl.dims.y.toFixed(1) + '×' + cstl.dims.z.toFixed(1) + ' mm' + (triCount > 20000 ? ' (archivo grande: el corte puede tardar varios minutos)' : '');
+      cstlCortarBtn.disabled = false;
+      cstlActualizarResumen();
+    }catch(err){
+      console.error('Cortador STL: no se pudo leer el archivo', err);
+      cstlArchivoInfo.textContent = 'No se pudo leer el archivo (¿es un STL válido?)';
+      cstl.geometry = null; cstl.dims = null;
+      cstlCortarBtn.disabled = true;
+      cstlActualizarResumen();
+    }
+  });
+
+  cstlImpresora.addEventListener('change', () => {
+    const v = cstlImpresora.value;
+    if(v === 'custom') return;
+    const [x, y, z] = v.split(',').map(Number);
+    cstlCamaX.value = x; cstlCamaY.value = y; cstlCamaZ.value = z;
+    cstlActualizarResumen();
+  });
+  [cstlCamaX, cstlCamaY, cstlCamaZ, cstlMargen].forEach(inp => inp.addEventListener('input', cstlActualizarResumen));
+
+  function cstlCalcularPiezasPorEje(){
+    if(!cstl.dims) return null;
+    const bx = parseFloat(cstlCamaX.value) || 1, by = parseFloat(cstlCamaY.value) || 1, bz = parseFloat(cstlCamaZ.value) || 1;
+    const margen = Math.max(0, parseFloat(cstlMargen.value) || 0);
+    const nx = Math.max(1, Math.ceil(cstl.dims.x / Math.max(1, bx - margen)));
+    const ny = Math.max(1, Math.ceil(cstl.dims.y / Math.max(1, by - margen)));
+    const nz = Math.max(1, Math.ceil(cstl.dims.z / Math.max(1, bz - margen)));
+    return { nx, ny, nz, total: nx * ny * nz };
+  }
+  function cstlActualizarResumen(){
+    if(!cstl.dims){ cstlResumenCorte.textContent = 'Subí un archivo STL para calcular en cuántas piezas se va a cortar.'; return; }
+    const r = cstlCalcularPiezasPorEje();
+    cstlResumenCorte.textContent = 'Modelo ' + cstl.dims.x.toFixed(1) + '×' + cstl.dims.y.toFixed(1) + '×' + cstl.dims.z.toFixed(1) + ' mm → se va a cortar en ' + r.nx + '×' + r.ny + '×' + r.nz + ' = ' + r.total + ' pieza' + (r.total === 1 ? '' : 's') + '.';
+  }
+
+  cstlConectoresOn.addEventListener('change', () => {
+    cstlConectoresPanel.classList.toggle('hidden', !cstlConectoresOn.checked);
+  });
+  cstlConectoresPanel.classList.toggle('hidden', !cstlConectoresOn.checked);
+
+  function cstlPosicionesEnCara(w, h, n){
+    // Reparte hasta n puntos en una grilla dentro de un rectángulo w×h,
+    // dejando ~20% de margen hacia los bordes para no perforar cerca del canto.
+    const uw = Math.max(0.001, w * 0.6), uh = Math.max(0.001, h * 0.6);
+    const cols = Math.max(1, Math.round(Math.sqrt(n * uw / uh)));
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const pts = [];
+    for(let r = 0; r < rows && pts.length < n; r++){
+      for(let c = 0; c < cols && pts.length < n; c++){
+        const px = cols === 1 ? 0 : (-uw / 2 + uw * (c / (cols - 1)));
+        const py = rows === 1 ? 0 : (-uh / 2 + uh * (r / (rows - 1)));
+        pts.push([px, py]);
+      }
+    }
+    return pts;
+  }
+
+  async function cstlCortarModelo(){
+    if(!cstl.geometry) return;
+    cstlCortarBtn.disabled = true;
+    cstlResultCard.classList.add('hidden');
+    cstlEstado.textContent = 'Cortando piezas...';
+    await new Promise(r => setTimeout(r, 0));
+    try{
+      const r = cstlCalcularPiezasPorEje();
+      const { nx, ny, nz } = r;
+      const total = nx * ny * nz;
+      const bb = cstl.geometry.boundingBox;
+      const cellW = (bb.max.x - bb.min.x) / nx, cellH = (bb.max.y - bb.min.y) / ny, cellD = (bb.max.z - bb.min.z) / nz;
+      const EPS = Math.max(0.2, Math.min(cellW, cellH, cellD) * 0.02); // sobresale solo en las caras externas, para que el corte del borde no quede justo al ras del bbox
+
+      const matModelo = new THREE.MeshStandardMaterial({ color: 0x4fd1ff, roughness: 0.55, metalness: 0.05 });
+      const modeloMesh = new THREE.Mesh(cstl.geometry, matModelo);
+      modeloMesh.updateMatrix();
+
+      const celdas = [];
+      for(let i = 0; i < nx; i++){ celdas[i] = []; for(let j = 0; j < ny; j++) celdas[i][j] = []; }
+
+      let hecho = 0;
+      for(let ix = 0; ix < nx; ix++){
+        for(let iy = 0; iy < ny; iy++){
+          for(let iz = 0; iz < nz; iz++){
+            const x0 = bb.min.x + ix * cellW - (ix === 0 ? EPS : 0), x1 = bb.min.x + (ix + 1) * cellW + (ix === nx - 1 ? EPS : 0);
+            const y0 = bb.min.y + iy * cellH - (iy === 0 ? EPS : 0), y1 = bb.min.y + (iy + 1) * cellH + (iy === ny - 1 ? EPS : 0);
+            const z0 = bb.min.z + iz * cellD - (iz === 0 ? EPS : 0), z1 = bb.min.z + (iz + 1) * cellD + (iz === nz - 1 ? EPS : 0);
+            const cajaMesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), matModelo);
+            cajaMesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+            cajaMesh.updateMatrix();
+            let piezaMesh = null;
+            try{ piezaMesh = CSG.intersect(modeloMesh, cajaMesh); }
+            catch(errCsg){ console.error('Cortador STL: fallo al cortar celda', ix, iy, iz, errCsg); }
+            celdas[ix][iy][iz] = (piezaMesh && piezaMesh.geometry.attributes.position && piezaMesh.geometry.attributes.position.count > 0)
+              ? { mesh: piezaMesh, min: { x: x0, y: y0, z: z0 }, max: { x: x1, y: y1, z: z1 } }
+              : null;
+            hecho++;
+            cstlEstado.textContent = 'Cortando piezas... ' + hecho + '/' + total;
+            await new Promise(res => setTimeout(res, 0));
+          }
+        }
+      }
+
+      const pegs = [];
+      if(cstlConectoresOn.checked){
+        const diam = Math.max(0.5, parseFloat(cstlDiametro.value) || 10);
+        const largo = Math.max(1, parseFloat(cstlLargo.value) || 24);
+        const maxCara = Math.max(1, Math.round(parseFloat(cstlMaxCara.value) || 3));
+        const holgura = Math.max(0, parseFloat(cstlHolgura.value) || 0.2);
+        const radioAgujero = diam / 2 + holgura;
+        cstlEstado.textContent = 'Agregando conectores...';
+        await new Promise(res => setTimeout(res, 0));
+
+        function hacerCilindro(radio, ejeDir, centro){
+          const geo = new THREE.CylinderGeometry(radio, radio, largo, 16, 1, false);
+          if(ejeDir === 'x') geo.rotateZ(Math.PI / 2);
+          else if(ejeDir === 'z') geo.rotateX(Math.PI / 2);
+          const mesh = new THREE.Mesh(geo, matModelo);
+          mesh.position.set(centro.x, centro.y, centro.z);
+          mesh.updateMatrix();
+          return mesh;
+        }
+
+        const ejes = [{ letra: 'x', n: nx }, { letra: 'y', n: ny }, { letra: 'z', n: nz }];
+        for(const ax of ejes){
+          if(ax.n < 2) continue;
+          const otros = ejes.filter(e => e !== ax);
+          for(let a = 0; a < ax.n - 1; a++){
+            for(let p = 0; p < otros[0].n; p++){
+              for(let q = 0; q < otros[1].n; q++){
+                let ix, iy, iz, ixB, iyB, izB;
+                if(ax.letra === 'x'){ ix = a; iy = p; iz = q; ixB = a + 1; iyB = p; izB = q; }
+                else if(ax.letra === 'y'){ iy = a; ix = p; iz = q; iyB = a + 1; ixB = p; izB = q; }
+                else { iz = a; ix = p; iy = q; izB = a + 1; ixB = p; iyB = q; }
+                const ca = celdas[ix] && celdas[ix][iy] && celdas[ix][iy][iz];
+                const cb = celdas[ixB] && celdas[ixB][iyB] && celdas[ixB][iyB][izB];
+                if(!ca || !cb) continue;
+                let plano, w, h, centroCelda;
+                if(ax.letra === 'x'){ plano = ca.max.x; w = ca.max.y - ca.min.y; h = ca.max.z - ca.min.z; centroCelda = { x: plano, y: (ca.min.y + ca.max.y) / 2, z: (ca.min.z + ca.max.z) / 2 }; }
+                else if(ax.letra === 'y'){ plano = ca.max.y; w = ca.max.x - ca.min.x; h = ca.max.z - ca.min.z; centroCelda = { x: (ca.min.x + ca.max.x) / 2, y: plano, z: (ca.min.z + ca.max.z) / 2 }; }
+                else { plano = ca.max.z; w = ca.max.x - ca.min.x; h = ca.max.y - ca.min.y; centroCelda = { x: (ca.min.x + ca.max.x) / 2, y: (ca.min.y + ca.max.y) / 2, z: plano }; }
+                const pts = cstlPosicionesEnCara(w, h, maxCara);
+                for(const [po, pz] of pts){
+                  let centro;
+                  if(ax.letra === 'x') centro = { x: centroCelda.x, y: centroCelda.y + po, z: centroCelda.z + pz };
+                  else if(ax.letra === 'y') centro = { x: centroCelda.x + po, y: centroCelda.y, z: centroCelda.z + pz };
+                  else centro = { x: centroCelda.x + po, y: centroCelda.y + pz, z: centroCelda.z };
+                  const agujero = hacerCilindro(radioAgujero, ax.letra, centro);
+                  const espiga = hacerCilindro(diam / 2, ax.letra, centro);
+                  try{
+                    ca.mesh = CSG.subtract(ca.mesh, agujero);
+                    cb.mesh = CSG.subtract(cb.mesh, agujero);
+                  }catch(errSub){ console.error('Cortador STL: fallo al perforar conector', errSub); }
+                  pegs.push({ mesh: espiga, ix, iy, iz });
+                }
+                cstlEstado.textContent = 'Agregando conectores...';
+                await new Promise(res => setTimeout(res, 0));
+              }
+            }
+          }
+        }
+      }
+
+      const piezas = [];
+      for(let ix = 0; ix < nx; ix++) for(let iy = 0; iy < ny; iy++) for(let iz = 0; iz < nz; iz++){
+        const c = celdas[ix][iy][iz];
+        if(c) piezas.push({ mesh: c.mesh, ix, iy, iz, min: c.min, max: c.max });
+      }
+
+      cstl.piezas = piezas;
+      cstl.pegs = pegs;
+      cstl.camaDims = { x: parseFloat(cstlCamaX.value) || 256, y: parseFloat(cstlCamaY.value) || 256 };
+      cstlEstado.textContent = 'Listo: ' + piezas.length + ' pieza' + (piezas.length === 1 ? '' : 's') + (pegs.length ? ' + ' + pegs.length + ' conector' + (pegs.length === 1 ? '' : 'es') : '') + '.';
+      cstlCamasLabel.textContent = piezas.length + ' cama(s) de ' + cstl.camaDims.x + '×' + cstl.camaDims.y + ' mm';
+      cstlResultCard.classList.remove('hidden');
+      cstlRenderEscena();
+    }catch(err){
+      console.error('Cortador STL: error general al cortar', err);
+      cstlEstado.textContent = 'Ocurrió un error al cortar el modelo. Probá con un margen mayor o menos conectores.';
+    }finally{
+      cstlCortarBtn.disabled = false;
+    }
+  }
+  cstlCortarBtn.addEventListener('click', cstlCortarModelo);
+
+  // ---- visor 3D del resultado ----
+  const cstlEngine = { renderer: null, scene: null, camera: null, group: null, wrapper: null, inited: false, rotY: 0.5, rotX: 0.3, dist: 400, minDist: 10, maxDist: 5000 };
+  function cstlInitEngine(){
+    if(cstlEngine.inited) return;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 10000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    cstlStage.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const l1 = new THREE.DirectionalLight(0xffffff, 0.7); l1.position.set(4, 8, 10); scene.add(l1);
+    const l2 = new THREE.DirectionalLight(0xffffff, 0.3); l2.position.set(-5, -3, -6); scene.add(l2);
+
+    const group = new THREE.Group();
+    // La geometría del STL viene con Z como "arriba" (convención de
+    // impresión 3D); esta envoltura la pasa a Y-arriba (convención de
+    // Three.js) con una sola rotación fija, para no tener que reescribir
+    // cada coordenada a mano.
+    const wrapper = new THREE.Group();
+    wrapper.rotation.x = -Math.PI / 2;
+    group.add(wrapper);
+    scene.add(group);
+    cstlEngine.scene = scene; cstlEngine.camera = camera; cstlEngine.renderer = renderer; cstlEngine.group = group; cstlEngine.wrapper = wrapper;
+
+    function resize(){
+      const w = cstlStage.clientWidth, h = cstlStage.clientHeight;
+      if(w <= 0 || h <= 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    if(window.ResizeObserver) new ResizeObserver(resize).observe(cstlStage);
+
+    function animar(){
+      requestAnimationFrame(animar);
+      group.rotation.y = cstlEngine.rotY;
+      group.rotation.x = cstlEngine.rotX;
+      camera.position.set(0, 0, cstlEngine.dist);
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+    }
+    animar();
+    cstlEngine.inited = true;
+  }
+
+  let cstlArrastrando = false, cstlUltX = 0, cstlUltY = 0;
+  cstlStage.addEventListener('pointerdown', (e) => {
+    if(!cstlEngine.inited) return;
+    cstlArrastrando = true; cstlUltX = e.clientX; cstlUltY = e.clientY;
+    cstlStage.classList.add('cstl-dragging');
+    cstlStage.setPointerCapture(e.pointerId);
+  });
+  cstlStage.addEventListener('pointermove', (e) => {
+    if(!cstlArrastrando) return;
+    const dx = e.clientX - cstlUltX, dy = e.clientY - cstlUltY;
+    cstlUltX = e.clientX; cstlUltY = e.clientY;
+    cstlEngine.rotY += dx * 0.012;
+    cstlEngine.rotX = Math.max(-1.1, Math.min(1.1, cstlEngine.rotX - dy * 0.012));
+  });
+  function cstlSoltar(){ cstlArrastrando = false; cstlStage.classList.remove('cstl-dragging'); }
+  cstlStage.addEventListener('pointerup', cstlSoltar);
+  cstlStage.addEventListener('pointercancel', cstlSoltar);
+  cstlStage.addEventListener('wheel', (e) => {
+    if(!cstlEngine.inited) return;
+    e.preventDefault();
+    cstlEngine.dist = Math.max(cstlEngine.minDist, Math.min(cstlEngine.maxDist, cstlEngine.dist * (1 + e.deltaY * 0.001)));
+  }, { passive: false });
+
+  function cstlRenderEnsamblado(){
+    const w = cstlEngine.wrapper;
+    while(w.children.length) w.remove(w.children[0]);
+    const bb = cstl.geometry.boundingBox;
+    const cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2, cz = (bb.min.z + bb.max.z) / 2;
+    cstl.piezas.forEach((p, i) => {
+      const mat = new THREE.MeshStandardMaterial({ color: CSTL_COLORES[i % CSTL_COLORES.length], roughness: 0.55, metalness: 0.05 });
+      const mesh = new THREE.Mesh(p.mesh.geometry, mat);
+      mesh.position.set(-cx, -cy, -cz);
+      w.add(mesh);
+    });
+    const maxDim = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z, 1);
+    cstlEngine.dist = maxDim * 2.2;
+    cstlEngine.minDist = maxDim * 0.3; cstlEngine.maxDist = maxDim * 10;
+  }
+
+  function cstlRenderCamas(){
+    const w = cstlEngine.wrapper;
+    while(w.children.length) w.remove(w.children[0]);
+    const bedX = cstl.camaDims.x, bedY = cstl.camaDims.y;
+    const n = cstl.piezas.length;
+    const paso = Math.max(bedX, bedY) * 1.35;
+    cstl.piezas.forEach((p, i) => {
+      const cxp = (p.min.x + p.max.x) / 2, cyp = (p.min.y + p.max.y) / 2;
+      const bedGroup = new THREE.Group();
+      bedGroup.position.set((i - (n - 1) / 2) * paso * 0.85, (i - (n - 1) / 2) * paso * 0.45, 0);
+
+      const grid = new THREE.GridHelper(Math.max(bedX, bedY), 10, 0x888888, 0x3a3a3a);
+      grid.rotation.x = -Math.PI / 2;
+      bedGroup.add(grid);
+
+      const mat = new THREE.MeshStandardMaterial({ color: CSTL_COLORES[i % CSTL_COLORES.length], roughness: 0.55, metalness: 0.05 });
+      const mesh = new THREE.Mesh(p.mesh.geometry, mat);
+      mesh.position.set(-cxp, -cyp, -p.min.z);
+      bedGroup.add(mesh);
+
+      cstl.pegs.filter(pg => pg.ix === p.ix && pg.iy === p.iy && pg.iz === p.iz).forEach(pg => {
+        const pegMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6 });
+        const pegMesh = new THREE.Mesh(pg.mesh.geometry, pegMat);
+        pegMesh.position.set(-cxp, -cyp, -p.min.z);
+        bedGroup.add(pegMesh);
+      });
+
+      w.add(bedGroup);
+    });
+    cstlEngine.dist = Math.max(bedX, bedY) * (1.2 + n * 0.55);
+    cstlEngine.minDist = Math.max(bedX, bedY) * 0.3; cstlEngine.maxDist = Math.max(bedX, bedY) * 20;
+  }
+
+  function cstlRenderEscena(){
+    if(!cstl.piezas || !cstl.piezas.length) return;
+    cstlInitEngine();
+    const note = cstlStage.querySelector('.empty-note');
+    if(note) note.remove();
+    if(cstl.vista === 'ensamblado') cstlRenderEnsamblado();
+    else cstlRenderCamas();
+  }
+
+  document.querySelectorAll('#cstlVistaRow [data-cstl-vista]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#cstlVistaRow [data-cstl-vista]').forEach(b => b.classList.toggle('active', b === btn));
+      cstl.vista = btn.dataset.cstlVista;
+      cstlRenderEscena();
+    });
+  });
+
+  // ---- exportar piezas como STL binario dentro de un .zip ----
+  function cstlGeometriaABinarioSTL(geometry){
+    const pos = geometry.attributes.position;
+    const idx = geometry.index;
+    const triCount = (idx ? idx.count : pos.count) / 3;
+    const buffer = new ArrayBuffer(84 + triCount * 50);
+    const view = new DataView(buffer);
+    view.setUint32(80, triCount, true);
+    let offset = 84;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), nrm = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+    function vertAt(i, out){
+      const ii = idx ? idx.getX(i) : i;
+      out.set(pos.getX(ii), pos.getY(ii), pos.getZ(ii));
+    }
+    for(let t = 0; t < triCount; t++){
+      vertAt(t * 3, a); vertAt(t * 3 + 1, b); vertAt(t * 3 + 2, c);
+      e1.subVectors(b, a); e2.subVectors(c, a);
+      nrm.crossVectors(e1, e2).normalize();
+      view.setFloat32(offset, nrm.x, true); offset += 4;
+      view.setFloat32(offset, nrm.y, true); offset += 4;
+      view.setFloat32(offset, nrm.z, true); offset += 4;
+      [a, b, c].forEach(v => {
+        view.setFloat32(offset, v.x, true); offset += 4;
+        view.setFloat32(offset, v.y, true); offset += 4;
+        view.setFloat32(offset, v.z, true); offset += 4;
+      });
+      view.setUint16(offset, 0, true); offset += 2;
+    }
+    return buffer;
+  }
+
+  cstlDescargarBtn.addEventListener('click', async () => {
+    if(!cstl.piezas || !cstl.piezas.length) return;
+    cstlDescargarBtn.disabled = true;
+    const textoOriginal = cstlDescargarBtn.textContent;
+    cstlDescargarBtn.textContent = 'Generando ZIP...';
+    try{
+      const zip = new JSZip();
+      const base = cstl.fileName || 'modelo';
+      cstl.piezas.forEach((p, i) => {
+        zip.file(base + '_pieza_' + String(i + 1).padStart(2, '0') + '.stl', cstlGeometriaABinarioSTL(p.mesh.geometry));
+      });
+      cstl.pegs.forEach((pg, i) => {
+        zip.file(base + '_espiga_' + String(i + 1).padStart(2, '0') + '.stl', cstlGeometriaABinarioSTL(pg.mesh.geometry));
+      });
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = base + '_piezas.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }catch(err){
+      console.error('Cortador STL: error generando ZIP', err);
+      showToast('No se pudo generar el ZIP');
+    }finally{
+      cstlDescargarBtn.disabled = false;
+      cstlDescargarBtn.textContent = textoOriginal;
+    }
+  });
 
   // ---------- init ----------
   renderExtraCosts();
