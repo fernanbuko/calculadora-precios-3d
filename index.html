@@ -7114,14 +7114,24 @@
             const x0 = bb.min.x + ix * cellW - (ix === 0 ? EPS : 0), x1 = bb.min.x + (ix + 1) * cellW + (ix === nx - 1 ? EPS : 0);
             const y0 = bb.min.y + iy * cellH - (iy === 0 ? EPS : 0), y1 = bb.min.y + (iy + 1) * cellH + (iy === ny - 1 ? EPS : 0);
             const z0 = bb.min.z + iz * cellD - (iz === 0 ? EPS : 0), z1 = bb.min.z + (iz + 1) * cellD + (iz === nz - 1 ? EPS : 0);
-            const cajaGeo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
-            if(cstl.hasColor) cstlColorearUniforme(cajaGeo, CSTL_GRIS_CORTE); // sin esto, mezclar vértices con/sin color en el mismo CSG revienta al escribir el buffer de color
-            const cajaMesh = new THREE.Mesh(cajaGeo, matModelo);
-            cajaMesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-            cajaMesh.updateMatrix();
             let piezaMesh = null;
-            try{ piezaMesh = CSG.intersect(modeloMesh, cajaMesh); }
-            catch(errCsg){ console.error('Cortador STL: fallo al cortar celda', ix, iy, iz, errCsg); }
+            if(total === 1){
+              // Con una sola celda la caja ya envuelve el modelo entero —
+              // intersectar sería un no-op en teoría, pero en la práctica
+              // el CSG por BSP puede destrozar mallas reales grandes/con
+              // pequeñas imperfecciones (no perfectamente "manifold") aun
+              // en ese caso trivial. Si no hace falta cortar, se usa el
+              // modelo tal cual vino, sin pasar por CSG.
+              piezaMesh = modeloMesh;
+            } else {
+              const cajaGeo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+              if(cstl.hasColor) cstlColorearUniforme(cajaGeo, CSTL_GRIS_CORTE); // sin esto, mezclar vértices con/sin color en el mismo CSG revienta al escribir el buffer de color
+              const cajaMesh = new THREE.Mesh(cajaGeo, matModelo);
+              cajaMesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+              cajaMesh.updateMatrix();
+              try{ piezaMesh = CSG.intersect(modeloMesh, cajaMesh); }
+              catch(errCsg){ console.error('Cortador STL: fallo al cortar celda', ix, iy, iz, errCsg); piezaMesh = null; }
+            }
             celdas[ix][iy][iz] = (piezaMesh && piezaMesh.geometry.attributes.position && piezaMesh.geometry.attributes.position.count > 0)
               ? { mesh: piezaMesh, min: { x: x0, y: y0, z: z0 }, max: { x: x1, y: y1, z: z1 } }
               : null;
