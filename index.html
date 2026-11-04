@@ -1230,25 +1230,13 @@
     <div class="field">
       <div>
         <label for="simpleFlatToggle">Tipo de pieza</label>
-        <small>Llavero = plana y delgada (placa, insignia...): pides sus medidas en vez de un tamaño aproximado</small>
+        <small>Llavero = plana y delgada (placa, insignia...): pide sus medidas para estimar el tiempo de impresión</small>
       </div>
       <div class="input-box">
         <select id="simpleFlatToggle" style="width:100%;">
           <option value="0">Pieza 3D</option>
           <option value="1">🔑 Llavero</option>
         </select>
-      </div>
-    </div>
-
-    <div class="field field-wide" id="simpleSizeField">
-      <div>
-        <label for="simpleSizeWidth">Tamaño (ancho × alto × profundo)</label>
-        <small>En milímetros, parada como se imprime — copia acá mismo los 3 números que te muestra tu slicer en "Tamaño" (ej. Creality Print), sin convertir nada</small>
-      </div>
-      <div class="hms-row">
-        <div class="input-box"><input type="number" id="simpleSizeWidth" min="1" step="1" placeholder="Ancho"><span class="hms-unit">mm</span></div>
-        <div class="input-box"><input type="number" id="simpleSizeHeight" min="1" step="1" placeholder="Alto"><span class="hms-unit">mm</span></div>
-        <div class="input-box"><input type="number" id="simpleSizeDepth" min="1" step="1" placeholder="Prof."><span class="hms-unit">mm</span></div>
       </div>
     </div>
 
@@ -1266,8 +1254,8 @@
 
     <div class="field">
       <div>
-        <label for="simpleWeight" id="simpleWeightLabel">Peso de la pieza (opcional)</label>
-        <small id="simpleWeightHint">En gramos, si lo sabes (del slicer). Si lo dejas vacío, lo estimamos con el tamaño</small>
+        <label for="simpleWeight" id="simpleWeightLabel">Peso de la pieza</label>
+        <small id="simpleWeightHint">En gramos — pésala o mira tu slicer</small>
       </div>
       <div class="input-box"><input type="number" id="simpleWeight" value="" min="0" step="1" placeholder="Auto"></div>
     </div>
@@ -1275,7 +1263,7 @@
     <div class="field field-wide">
       <div>
         <label for="simpleHoursH">Tiempo de impresión (opcional)</label>
-        <small>Si lo sabes (del slicer), ponlo en horas, minutos y segundos. Si lo dejas todo vacío, lo calculamos con el tamaño y la velocidad de tu impresora</small>
+        <small>Si lo sabes (del slicer), ponlo en días, horas, minutos y segundos. Si es llavero y lo dejas vacío, lo calculamos con las medidas de abajo</small>
       </div>
       <div class="hms-row">
         <div class="input-box"><input type="number" id="simpleHoursD" min="0" step="1" placeholder="0"><span class="hms-unit">d</span></div>
@@ -3164,7 +3152,7 @@
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
-    ['simpleSizeWidth', ''], ['simpleSizeHeight', ''], ['simpleSizeDepth', ''], ['simpleWeight', ''], ['simpleHoursD', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', ''],
+    ['simpleWeight', ''], ['simpleHoursD', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', ''],
     ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5'],
     ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', '']
   ];
@@ -3173,24 +3161,21 @@
   const simpleSpeedCustomField = document.getElementById('simpleSpeedCustomField');
   const sparkxNote = document.getElementById('sparkxNote');
   const simpleFlatToggle = document.getElementById('simpleFlatToggle');
-  const simpleSizeField = document.getElementById('simpleSizeField');
   const simpleFlatFields = document.getElementById('simpleFlatFields');
   const simpleWeightLabel = document.getElementById('simpleWeightLabel');
   const simpleWeightHint = document.getElementById('simpleWeightHint');
   const simpleColorsField = document.getElementById('simpleColorsField');
-  const simpleFieldIds = ['simpleSizeWidth', 'simpleSizeHeight', 'simpleSizeDepth', 'simpleWeight', 'simpleHoursD', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleMultiToggle', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
+  const simpleFieldIds = ['simpleWeight', 'simpleHoursD', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleMultiToggle', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
                           'simpleFlatWidth', 'simpleFlatHeight', 'simpleFlatThickness'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
 
   simpleFlatToggle.addEventListener('change', () => {
     const isFlat = simpleFlatToggle.value === '1';
-    simpleSizeField.classList.toggle('hidden', isFlat);
     simpleFlatFields.classList.toggle('hidden', !isFlat);
-    simpleWeightLabel.textContent = isFlat ? 'Peso de la pieza' : 'Peso de la pieza (opcional)';
     simpleWeightHint.textContent = isFlat
       ? 'En gramos — pésala o mira tu slicer. Con algo tan delgado no lo adivinamos solo con las medidas'
-      : 'En gramos, si lo sabes (del slicer). Si lo dejas vacío, lo estimamos con el tamaño';
+      : 'En gramos — pésala o mira tu slicer';
     applySimpleToAdvanced();
   });
 
@@ -3220,14 +3205,10 @@
     const flatHeight = Math.max(0, parseFloat(simpleEl.simpleFlatHeight.value) || 0);
 
     // Para el tiempo (cuando no lo pones a mano) seguimos usando la misma
-    // fórmula de "tamaño al cubo", basada en el lado más largo de la
-    // pieza (en pieza normal: ancho/alto/profundo tal cual los muestra el
-    // slicer en "Tamaño"; en pieza plana: ancho/alto), ya que no hay una
-    // forma simple y confiable de estimar tiempo real solo con medidas.
-    const sizeWidth = Math.max(0, parseFloat(simpleEl.simpleSizeWidth.value) || 0);
-    const sizeHeight = Math.max(0, parseFloat(simpleEl.simpleSizeHeight.value) || 0);
-    const sizeDepth = Math.max(0, parseFloat(simpleEl.simpleSizeDepth.value) || 0);
-    const cm = (isFlat ? Math.max(flatWidth, flatHeight) : Math.max(sizeWidth, sizeHeight, sizeDepth)) / 10;
+    // fórmula de "tamaño al cubo", basada en el lado más largo — ahora
+    // solo existe para la pieza plana (ancho/alto de "Medidas"), ya que
+    // la pieza 3D no tiene más un campo de tamaño del que estimar nada.
+    const cm = Math.max(flatWidth, flatHeight) / 10;
     const cm3 = Math.pow(cm, 3);
 
     const speedFactor = simpleEl.simplePrinterSpeed.value === 'custom'
