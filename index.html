@@ -1278,7 +1278,8 @@
         <small>Si lo sabes (del slicer), ponlo en horas, minutos y segundos. Si lo dejas todo vacío, lo calculamos con el tamaño y la velocidad de tu impresora</small>
       </div>
       <div class="hms-row">
-        <div class="input-box"><input type="number" id="simpleHoursH" min="0" step="1" placeholder="0"><span class="hms-unit">h</span></div>
+        <div class="input-box"><input type="number" id="simpleHoursD" min="0" step="1" placeholder="0"><span class="hms-unit">d</span></div>
+        <div class="input-box"><input type="number" id="simpleHoursH" min="0" max="23" step="1" placeholder="0"><span class="hms-unit">h</span></div>
         <div class="input-box"><input type="number" id="simpleHoursM" min="0" max="59" step="1" placeholder="0"><span class="hms-unit">m</span></div>
         <div class="input-box"><input type="number" id="simpleHoursS" min="0" max="59" step="1" placeholder="0"><span class="hms-unit">s</span></div>
       </div>
@@ -1499,7 +1500,8 @@
         <small>Tiempo total a la medida de referencia (todo el lote, si son varias)</small>
       </div>
       <div class="hms-row">
-        <div class="input-box"><input type="number" id="hoursH" min="0" step="1" placeholder="0"><span class="hms-unit">h</span></div>
+        <div class="input-box"><input type="number" id="hoursD" min="0" step="1" placeholder="0"><span class="hms-unit">d</span></div>
+        <div class="input-box"><input type="number" id="hoursH" min="0" max="23" step="1" placeholder="0"><span class="hms-unit">h</span></div>
         <div class="input-box"><input type="number" id="hoursM" min="0" max="59" step="1" placeholder="0"><span class="hms-unit">m</span></div>
         <div class="input-box"><input type="number" id="hoursS" min="0" max="59" step="1" placeholder="0"><span class="hms-unit">s</span></div>
       </div>
@@ -2529,27 +2531,32 @@
     flatFields.classList.toggle('hidden', flatToggle.value !== '1');
   });
 
+  const hoursD = document.getElementById('hoursD');
   const hoursH = document.getElementById('hoursH');
   const hoursM = document.getElementById('hoursM');
   const hoursS = document.getElementById('hoursS');
   function syncHoursToDecimal(){
+    const d = parseFloat(hoursD.value) || 0;
     const h = parseFloat(hoursH.value) || 0;
     const m = parseFloat(hoursM.value) || 0;
     const s = parseFloat(hoursS.value) || 0;
-    el.hours.value = (h + m / 60 + s / 3600).toFixed(4);
+    el.hours.value = (d * 24 + h + m / 60 + s / 3600).toFixed(4);
     calculate();
   }
   function syncHoursFromDecimal(){
     const totalHours = Math.max(0, parseFloat(el.hours.value) || 0);
-    const h = Math.floor(totalHours);
-    const remainMin = (totalHours - h) * 60;
+    const d = Math.floor(totalHours / 24);
+    const remainHoras = totalHours - d * 24;
+    const h = Math.floor(remainHoras);
+    const remainMin = (remainHoras - h) * 60;
     const m = Math.floor(remainMin);
     const s = Math.round((remainMin - m) * 60);
+    hoursD.value = d;
     hoursH.value = h;
     hoursM.value = m;
     hoursS.value = s;
   }
-  [hoursH, hoursM, hoursS].forEach(input => {
+  [hoursD, hoursH, hoursM, hoursS].forEach(input => {
     input.addEventListener('input', syncHoursToDecimal);
     input.addEventListener('change', syncHoursToDecimal);
   });
@@ -3157,7 +3164,7 @@
   const SIMPLE_WEIGHT_PER_CM3 = 35 / 1000;
   const SIMPLE_HOURS_PER_CM3 = 2.5 / 1000;
   const SIMPLE_DEFAULTS_LIST = [
-    ['simpleSizeWidth', ''], ['simpleSizeHeight', ''], ['simpleSizeDepth', ''], ['simpleWeight', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', ''],
+    ['simpleSizeWidth', ''], ['simpleSizeHeight', ''], ['simpleSizeDepth', ''], ['simpleWeight', ''], ['simpleHoursD', ''], ['simpleHoursH', ''], ['simpleHoursM', ''], ['simpleHoursS', ''], ['simplePrinterSpeed', '0.4'], ['simpleSpeedCustom', '1'], ['simpleColors', ''],
     ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5'],
     ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', '']
   ];
@@ -3171,7 +3178,7 @@
   const simpleWeightLabel = document.getElementById('simpleWeightLabel');
   const simpleWeightHint = document.getElementById('simpleWeightHint');
   const simpleColorsField = document.getElementById('simpleColorsField');
-  const simpleFieldIds = ['simpleSizeWidth', 'simpleSizeHeight', 'simpleSizeDepth', 'simpleWeight', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleMultiToggle', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
+  const simpleFieldIds = ['simpleSizeWidth', 'simpleSizeHeight', 'simpleSizeDepth', 'simpleWeight', 'simpleHoursD', 'simpleHoursH', 'simpleHoursM', 'simpleHoursS', 'simplePrinterSpeed', 'simpleSpeedCustom', 'simpleMultiToggle', 'simpleColors', 'simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage',
                           'simpleFlatWidth', 'simpleFlatHeight', 'simpleFlatThickness'];
   const simpleEl = {};
   simpleFieldIds.forEach(id => simpleEl[id] = document.getElementById(id));
@@ -3228,11 +3235,12 @@
       : (parseFloat(simpleEl.simplePrinterSpeed.value) || 1);
 
     const manualWeight = simpleEl.simpleWeight.value.trim();
+    const hoursDVal = simpleEl.simpleHoursD.value.trim();
     const hoursHVal = simpleEl.simpleHoursH.value.trim();
     const hoursMVal = simpleEl.simpleHoursM.value.trim();
     const hoursSVal = simpleEl.simpleHoursS.value.trim();
-    const hasManualHours = hoursHVal !== '' || hoursMVal !== '' || hoursSVal !== '';
-    const manualHoursDecimal = (parseFloat(hoursHVal) || 0) + (parseFloat(hoursMVal) || 0) / 60 + (parseFloat(hoursSVal) || 0) / 3600;
+    const hasManualHours = hoursDVal !== '' || hoursHVal !== '' || hoursMVal !== '' || hoursSVal !== '';
+    const manualHoursDecimal = (parseFloat(hoursDVal) || 0) * 24 + (parseFloat(hoursHVal) || 0) + (parseFloat(hoursMVal) || 0) / 60 + (parseFloat(hoursSVal) || 0) / 3600;
     simpleWeightIsAuto = manualWeight === '';
     simpleHoursIsAuto = !hasManualHours;
 
@@ -4826,19 +4834,22 @@
   // el cálculo automático por tamaño); en modo avanzado, directo en los
   // campos de peso y horas/minutos/segundos.
   function aplicarPesoHorasACalculadora(pesoTotal, horasTotal){
-    const h = Math.floor(horasTotal);
-    const remainMin = (horasTotal - h) * 60;
+    const d = Math.floor(horasTotal / 24);
+    const remainHoras = horasTotal - d * 24;
+    const h = Math.floor(remainHoras);
+    const remainMin = (remainHoras - h) * 60;
     const m = Math.floor(remainMin);
     const s = Math.round((remainMin - m) * 60);
     if(simpleModeToggle.checked){
       simpleEl.simpleWeight.value = pesoTotal.toFixed(1);
+      simpleEl.simpleHoursD.value = d;
       simpleEl.simpleHoursH.value = h;
       simpleEl.simpleHoursM.value = m;
       simpleEl.simpleHoursS.value = s;
       applySimpleToAdvanced();
     } else {
       el.pieceWeight.value = pesoTotal.toFixed(1);
-      hoursH.value = h; hoursM.value = m; hoursS.value = s;
+      hoursD.value = d; hoursH.value = h; hoursM.value = m; hoursS.value = s;
       syncHoursToDecimal();
     }
     calculate();
