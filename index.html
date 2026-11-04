@@ -1729,14 +1729,9 @@
     </div>
 
     <div class="btn-row" style="margin-top:10px;">
-      <button type="button" class="btn" id="copyTextBtn">📋 Copiar texto</button>
       <button type="button" class="btn" id="shareBtn">📤 Compartir</button>
       <button type="button" class="btn" id="pdfBtn">📄 Exportar PDF</button>
-      <button type="button" class="btn" id="imageBtn">🖼️ Exportar imagen</button>
-      <button type="button" class="btn" id="linkBtn">🔗 Copiar link</button>
-      <button type="button" class="btn" id="qrBtn">▦ Ver QR</button>
     </div>
-    <div class="qr-box hidden" id="qrBox"></div>
   </div>
 
   <footer>
@@ -2274,8 +2269,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="three.min.js"></script>
 <script src="csg.js"></script>
@@ -2588,7 +2581,6 @@
   const targetPriceField = document.getElementById('targetPriceField');
   const extraCostList = document.getElementById('extraCostList');
   const toast = document.getElementById('toast');
-  const qrBox = document.getElementById('qrBox');
 
   // ---------- utils ----------
   function num(id){
@@ -5137,16 +5129,6 @@
     return lines.join('\n');
   }
 
-  document.getElementById('copyTextBtn').addEventListener('click', async () => {
-    const text = buildSummaryText();
-    try{
-      await navigator.clipboard.writeText(text);
-      showToast('Cotización copiada');
-    }catch(e){
-      showToast('No se pudo copiar automáticamente');
-    }
-  });
-
   document.getElementById('shareBtn').addEventListener('click', async () => {
     const text = buildSummaryText();
     if(navigator.share){
@@ -5336,44 +5318,6 @@
     btn.disabled = false;
   });
 
-  document.getElementById('imageBtn').addEventListener('click', () => {
-    if(!window.html2canvas){ showToast('No se pudo cargar el generador de imagen'); return; }
-    calculate();
-    qrBox.classList.add('hidden');
-    const target = document.getElementById('resultCard');
-    html2canvas(target, { backgroundColor: null, scale: 2 }).then(async canvas => {
-      await guardarArchivoGenerado(canvas.toDataURL('image/png'), 'cotizacion-3d.png');
-      if(!enAppNativa()) showToast('Imagen descargada');
-    }).catch(() => showToast('No se pudo generar la imagen'));
-  });
-
-  function buildShareLink(){
-    const params = new URLSearchParams();
-    ids.forEach(id => {
-      const val = el[id].type === 'checkbox' ? (el[id].checked ? '1' : '0') : el[id].value;
-      params.set(id, val);
-    });
-    return location.origin + location.pathname + '?' + params.toString();
-  }
-
-  document.getElementById('linkBtn').addEventListener('click', async () => {
-    const link = buildShareLink();
-    try{
-      await navigator.clipboard.writeText(link);
-      showToast('Link copiado');
-    }catch(e){
-      showToast('No se pudo copiar el link');
-    }
-  });
-
-  document.getElementById('qrBtn').addEventListener('click', () => {
-    const isHidden = qrBox.classList.contains('hidden');
-    if(!isHidden){ qrBox.classList.add('hidden'); return; }
-    if(!window.QRCode){ showToast('No se pudo cargar el generador de QR'); return; }
-    qrBox.innerHTML = '';
-    qrBox.classList.remove('hidden');
-    new QRCode(qrBox, { text: buildShareLink(), width: 168, height: 168, colorDark: '#0d1b2a', colorLight: '#ffffff' });
-  });
 
   // ---------- load shared link (if any) ----------
   function loadFromQuery(){
