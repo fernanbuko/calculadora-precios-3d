@@ -1528,7 +1528,7 @@
 
   <!-- TIEMPO -->
   <div class="card">
-    <p class="card-title">03 · Tu tiempo <span class="tag">MANO DE OBRA</span></p>
+    <p class="card-title">03 · Mano de obra <span class="tag">TU TIEMPO</span></p>
 
     <div class="field">
       <div>
@@ -1699,7 +1699,7 @@
     <div class="breakdown-row hidden" id="rowSupport"><span>Soportes (material)</span><span id="outSupport">—</span></div>
     <div class="breakdown-row"><span>Electricidad</span><span id="outElectricity">—</span></div>
     <div class="breakdown-row"><span>Desgaste de máquina</span><span id="outWear">—</span></div>
-    <div class="breakdown-row"><span>Tu tiempo</span><span id="outLabor">—</span></div>
+    <div class="breakdown-row"><span>Mano de obra</span><span id="outLabor">—</span></div>
     <div class="breakdown-row hidden" id="rowPurge"><span>Purga multicolor (material)</span><span id="outPurge">—</span></div>
     <div class="breakdown-row hidden" id="rowExtraTime"><span>Tiempo extra multicolor</span><span id="outExtraTime">—</span></div>
     <div class="breakdown-row hidden" id="rowExtraItems"><span>Consumibles extra</span><span id="outExtraItems">—</span></div>
@@ -5116,7 +5116,7 @@
       'Material: ' + outMaterial.textContent,
       'Electricidad: ' + outElectricity.textContent,
       'Desgaste de máquina: ' + outWear.textContent,
-      'Tu tiempo: ' + outLabor.textContent
+      'Mano de obra: ' + outLabor.textContent
     ];
     if(!rowPurge.classList.contains('hidden')) lines.push('Purga multicolor: ' + outPurge.textContent);
     if(!rowExtraTime.classList.contains('hidden')) lines.push('Tiempo extra multicolor: ' + outExtraTime.textContent);
@@ -5162,7 +5162,7 @@
       !rowSupport.classList.contains('hidden') ? ['Soportes', outSupport.textContent] : null,
       ['Electricidad', outElectricity.textContent],
       ['Desgaste de máquina', outWear.textContent],
-      ['Tu tiempo', outLabor.textContent],
+      ['Mano de obra', outLabor.textContent],
       !rowPurge.classList.contains('hidden') ? ['Purga multicolor', outPurge.textContent] : null,
       !rowExtraTime.classList.contains('hidden') ? ['Tiempo extra multicolor', outExtraTime.textContent] : null,
       !rowExtraItems.classList.contains('hidden') ? ['Consumibles extra', outExtraItems.textContent] : null,
