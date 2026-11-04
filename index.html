@@ -1155,9 +1155,9 @@
 
   <header>
     <div>
-      <div class="eyebrow">CALCULADORA DE COSTOS</div>
-      <h1>¿Cuánto cobrar por tu impresión?</h1>
-      <p>Mete tus números en tu propia moneda. El precio final se recalcula solo, en tiempo real.</p>
+      <div class="eyebrow" id="headerEyebrow">CALCULADORA DE COSTOS</div>
+      <h1 id="headerTitle">¿Cuánto cobrar por tu impresión?</h1>
+      <p id="headerSubtitle">Mete tus números en tu propia moneda. El precio final se recalcula solo, en tiempo real.</p>
     </div>
   </header>
 
@@ -5351,12 +5351,31 @@
   const tabBarBtns = document.querySelectorAll('.tab-bar-btn');
   const tabPanels = document.querySelectorAll('.tab-panel');
 
+  const headerEyebrow = document.getElementById('headerEyebrow');
+  const headerTitle = document.getElementById('headerTitle');
+  const headerSubtitle = document.getElementById('headerSubtitle');
+  const HEADER_POR_TAB = {
+    inicio: { eyebrow: 'INICIO', h1: 'Tu panel del día', p: 'Pedidos y pendientes de un vistazo.' },
+    calc: { eyebrow: 'CALCULADORA DE COSTOS', h1: '¿Cuánto cobrar por tu impresión?', p: 'Mete tus números en tu propia moneda. El precio final se recalcula solo, en tiempo real.' },
+    perfiles: { eyebrow: 'PERFILES', h1: 'Impresora y filamento', p: 'Guarda tu impresora + filamento para no volver a escribirlos.' },
+    historial: { eyebrow: 'HISTORIAL', h1: 'Cotizaciones guardadas', p: 'Guardadas en este dispositivo.' },
+    pedidos: { eyebrow: 'PEDIDOS', h1: 'Qué entregar y cobrar', p: 'Todos tus pedidos en un solo lugar.' },
+    finanzas: { eyebrow: 'FINANZAS', h1: 'Dinero de tus pedidos', p: 'Cuánto generaste y cuánto te falta cobrar.' },
+    notas: { eyebrow: 'NOTAS', h1: 'Pendientes y apuntes', p: 'Anota lo que tengas que hacer o recordar.' },
+    ajustes: { eyebrow: 'AJUSTES', h1: 'Preferencias de la app', p: 'Cuenta, tema, moneda y más.' },
+    nombre3d: { eyebrow: 'NOMBRE 3D', h1: 'Vista previa para el cliente', p: 'Escribe un nombre y mira cómo quedaría en 3D.' },
+    cortadorstl: { eyebrow: 'CORTADOR DE STL', h1: 'Dividí un modelo para imprimirlo por partes', p: 'Subí un modelo, indicá tu impresora y generá las piezas.' },
+  };
   function applyActiveTab(tab){
     tabPanels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
     tabBarBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     topAjustesBtn.classList.toggle('active', tab === 'ajustes');
     topNombre3dBtn.classList.toggle('active', tab === 'nombre3d');
     topCortadorStlBtn.classList.toggle('active', tab === 'cortadorstl');
+    const h = HEADER_POR_TAB[tab] || HEADER_POR_TAB.calc;
+    headerEyebrow.textContent = h.eyebrow;
+    headerTitle.textContent = h.h1;
+    headerSubtitle.textContent = h.p;
     if(tab === 'inicio') renderGreeting();
     window.scrollTo(0, 0);
   }
