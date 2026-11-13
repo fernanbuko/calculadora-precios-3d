@@ -944,19 +944,17 @@
     transform: translateX(-50%) translateY(-60px);
     display: flex;
     align-items: center;
-    gap: 7px;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
     background: var(--surface);
     border: 1px solid var(--line);
     color: var(--text-dim);
-    font-family: 'Inter', sans-serif;
-    font-weight: 600;
-    font-size: 12px;
-    padding: 8px 14px;
-    border-radius: 999px;
+    font-size: 16px;
+    border-radius: 50%;
     box-shadow: 0 10px 24px -12px rgba(0,0,0,.35);
     z-index: 96;
     pointer-events: none;
-    white-space: nowrap;
   }
   .ptr-indicator.ptr-lista{ color: var(--orange); border-color: var(--orange); }
   .ptr-indicator.ptr-soltando, .ptr-indicator.ptr-actualizando{ transition: transform .2s ease; }
@@ -1187,7 +1185,7 @@
 </style>
 </head>
 <body>
-<div class="ptr-indicator" id="ptrIndicator"><span id="ptrIndicatorIcon">↓</span><span id="ptrIndicatorText">Deslizá para actualizar</span></div>
+<div class="ptr-indicator" id="ptrIndicator"><span id="ptrIndicatorIcon">↓</span></div>
 <div class="wrap">
 
   <header>
@@ -5637,7 +5635,6 @@
   (function(){
     const ptrIndicator = document.getElementById('ptrIndicator');
     const ptrIcon = document.getElementById('ptrIndicatorIcon');
-    const ptrTexto = document.getElementById('ptrIndicatorText');
     const PTR_UMBRAL = 70;
     const PTR_TOPE = 100;
     let inicioY = 0, arrastrando = false, distancia = 0;
@@ -5657,7 +5654,6 @@
       const lista = dist > PTR_UMBRAL;
       ptrIndicator.classList.toggle('ptr-lista', lista);
       ptrIcon.textContent = lista ? '↑' : '↓';
-      ptrTexto.textContent = lista ? 'Soltá para actualizar' : 'Deslizá para actualizar';
       ptrIndicator.style.transform = 'translateX(-50%) translateY(' + (-60 + Math.min(dist, PTR_TOPE)) + 'px)';
     }
     function soltar(){
@@ -5665,7 +5661,6 @@
       if(distancia > PTR_UMBRAL){
         ptrIndicator.classList.add('ptr-actualizando');
         ptrIcon.textContent = '⟳';
-        ptrTexto.textContent = 'Actualizando...';
         ptrIndicator.style.transform = 'translateX(-50%) translateY(40px)';
         setTimeout(() => window.location.reload(), 250);
       } else {
