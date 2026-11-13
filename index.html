@@ -929,25 +929,22 @@
   }
   .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  /* Ícono de "deslizá para actualizar" — aparece mientras se arrastra el
-     dedo hacia abajo desde arriba de todo (pull-to-refresh) y desaparece
-     de golpe al soltar, sin texto ni animación de carga: nada más que la
-     flechita siguiendo el dedo mientras dura el gesto. */
+  /* Spinner de "deslizá para actualizar" (pull-to-refresh), al estilo
+     Instagram: el contenido se empuja hacia abajo con el dedo (ver
+     moverContenido() más abajo) dejándole lugar a este círculo, que va
+     girando según cuánto se arrastró y, al soltar pasado el umbral, gira
+     en bucle mientras se recarga la página. */
   .ptr-indicator{
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    top: calc(env(safe-area-inset-top, 0px) + 14px);
     left: 50%;
-    transform: translateX(-50%);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    color: var(--text-dim);
-    font-size: 15px;
+    width: 26px;
+    height: 26px;
+    margin-left: -13px;
     border-radius: 50%;
+    border: 2.5px solid var(--line);
+    border-top-color: var(--text-dim);
+    background: var(--surface);
     box-shadow: 0 10px 24px -12px rgba(0,0,0,.35);
     z-index: 96;
     pointer-events: none;
@@ -955,7 +952,12 @@
     visibility: hidden;
   }
   .ptr-indicator.ptr-visible{ opacity: 1; visibility: visible; }
-  .ptr-indicator.ptr-lista{ color: var(--orange); border-color: var(--orange); }
+  .ptr-indicator.ptr-lista{ border-top-color: var(--orange); }
+  .ptr-indicator.ptr-loading{
+    border-top-color: var(--orange);
+    animation: ptr-spin .7s linear infinite;
+  }
+  @keyframes ptr-spin{ to{ transform: rotate(360deg); } }
 
   .modal-overlay{
     position: fixed;
@@ -1180,7 +1182,7 @@
 </style>
 </head>
 <body>
-<div class="ptr-indicator" id="ptrIndicator">↓</div>
+<div class="ptr-indicator" id="ptrIndicator"></div>
 <div class="wrap">
 
   <header>
@@ -5621,18 +5623,22 @@
     }
   }
 
-  // "Deslizá hacia abajo para actualizar" (pull-to-refresh) — para no
-  // tener que cerrar y volver a abrir la app para ver una versión nueva.
-  // Recargar la página hace que todo lo que corre al abrir la app se
-  // vuelva a ejecutar (el service worker trae el index.html más nuevo si
-  // hay internet, y comprobarActualizacionApk() se vuelve a fijar si hay
-  // un APK más nuevo), así que alcanza con eso. El ícono solo se muestra
-  // mientras el dedo sigue abajo (durante el arrastre) y desaparece de
-  // golpe al soltar, sin texto ni animación.
+  // "Deslizá hacia abajo para actualizar" (pull-to-refresh), al estilo
+  // Instagram — para no tener que cerrar y volver a abrir la app para ver
+  // una versión nueva. Recargar la página hace que todo lo que corre al
+  // abrir la app se vuelva a ejecutar (el service worker trae el
+  // index.html más nuevo si hay internet, y comprobarActualizacionApk()
+  // se vuelve a fijar si hay un APK más nuevo), así que alcanza con eso.
+  // Mientras se arrastra, el contenido se empuja hacia abajo y el
+  // círculo va girando según cuánto se tiró; al soltar pasado el umbral
+  // queda girando en bucle un instante (para que se note que está
+  // "cargando") y recién ahí recarga.
   (function(){
     const PTR_UMBRAL = 70;
+    const PTR_EMPUJE_MAX = 80;
     let inicioY = 0, arrastrando = false;
     const ptrIndicator = document.getElementById('ptrIndicator');
+    const ptrWrap = document.querySelector('.wrap');
 
     function elementoScrolleable(){
       return document.scrollingElement || document.documentElement;
@@ -5644,8 +5650,18 @@
       if(backLayerStack.length) return false;
       return elementoScrolleable().scrollTop <= 0;
     }
+    function empujarContenido(px, conTransicion){
+      ptrWrap.style.transition = conTransicion ? 'transform .25s cubic-bezier(.22,.61,.36,1)' : 'none';
+      ptrWrap.style.transform = px ? `translateY(${px}px)` : '';
+    }
     function ocultarIndicador(){
-      ptrIndicator.classList.remove('ptr-visible', 'ptr-lista');
+      ptrIndicator.classList.remove('ptr-visible', 'ptr-lista', 'ptr-loading');
+      ptrIndicator.style.transform = '';
+    }
+    function soltar(conTransicion){
+      arrastrando = false;
+      empujarContenido(0, conTransicion);
+      ocultarIndicador();
     }
 
     window.addEventListener('touchstart', (e) => {
@@ -5655,20 +5671,30 @@
     }, { passive: true });
     window.addEventListener('touchmove', (e) => {
       if(!arrastrando) return;
-      const delta = e.touches[0].clientY - inicioY;
-      if(delta <= 0 || elementoScrolleable().scrollTop > 0){ arrastrando = false; ocultarIndicador(); return; }
+      const deltaCrudo = e.touches[0].clientY - inicioY;
+      if(deltaCrudo <= 0 || elementoScrolleable().scrollTop > 0){ soltar(true); return; }
       e.preventDefault();
+      const delta = deltaCrudo * 0.5;
+      empujarContenido(Math.min(delta, PTR_EMPUJE_MAX), false);
       ptrIndicator.classList.add('ptr-visible');
-      ptrIndicator.classList.toggle('ptr-lista', delta * 0.5 > PTR_UMBRAL);
+      ptrIndicator.classList.toggle('ptr-lista', delta > PTR_UMBRAL);
+      ptrIndicator.style.transform = `rotate(${Math.min(delta / PTR_UMBRAL, 1) * 360}deg)`;
     }, { passive: false });
     window.addEventListener('touchend', (e) => {
       if(!arrastrando) return;
       arrastrando = false;
       const delta = (e.changedTouches[0].clientY - inicioY) * 0.5;
-      ocultarIndicador();
-      if(delta > PTR_UMBRAL) window.location.reload();
+      if(delta > PTR_UMBRAL){
+        empujarContenido(PTR_EMPUJE_MAX, true);
+        ptrIndicator.classList.remove('ptr-lista');
+        ptrIndicator.style.transform = '';
+        ptrIndicator.classList.add('ptr-loading');
+        setTimeout(() => window.location.reload(), 450);
+      } else {
+        soltar(true);
+      }
     });
-    window.addEventListener('touchcancel', () => { arrastrando = false; ocultarIndicador(); });
+    window.addEventListener('touchcancel', () => soltar(true));
   })();
 
   // El botón FÍSICO de "atrás" en Android no está conectado al historial
