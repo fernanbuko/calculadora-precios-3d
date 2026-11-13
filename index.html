@@ -5624,18 +5624,22 @@
   }
 
   // "Deslizá hacia abajo para actualizar" (pull-to-refresh), al estilo
-  // Instagram — para no tener que cerrar y volver a abrir la app para ver
-  // una versión nueva. Recargar la página hace que todo lo que corre al
-  // abrir la app se vuelva a ejecutar (el service worker trae el
-  // index.html más nuevo si hay internet, y comprobarActualizacionApk()
-  // se vuelve a fijar si hay un APK más nuevo), así que alcanza con eso.
-  // Mientras se arrastra, el contenido se empuja hacia abajo y el
-  // círculo va girando según cuánto se tiró; al soltar pasado el umbral
-  // queda girando en bucle un instante (para que se note que está
-  // "cargando") y recién ahí recarga.
+  // Instagram. OJO: a propósito NO recarga la página (window.location.
+  // reload) — eso resetea el documento entero y, mientras el script vuelve
+  // a correr, se ve inevitablemente un instante de pantalla "en blanco"
+  // (saludo genérico, tarjetas vacías, pestaña sin resaltar) antes de que
+  // los datos reales se vuelvan a pintar. En cambio, refrescarContenido()
+  // vuelve a pintar todo con los datos que ya hay en memoria/localStorage,
+  // trae lo último de la nube si hay sesión iniciada, y de paso chequea si
+  // hay un APK más nuevo — todo sin tocar el documento, así que no hay
+  // ningún flash. Mientras se arrastra, el contenido se empuja hacia abajo
+  // y el círculo va girando según cuánto se tiró; al soltar pasado el
+  // umbral queda girando en bucle mientras refrescarContenido() hace lo
+  // suyo, y recién ahí vuelve todo a su lugar.
   (function(){
     const PTR_UMBRAL = 70;
     const PTR_EMPUJE_MAX = 80;
+    const PTR_ESPERA_MIN_MS = 450;
     let inicioY = 0, arrastrando = false;
     const ptrIndicator = document.getElementById('ptrIndicator');
     const ptrWrap = document.querySelector('.wrap');
@@ -5663,6 +5667,19 @@
       empujarContenido(0, conTransicion);
       ocultarIndicador();
     }
+    async function refrescarContenido(){
+      const esperaMinima = new Promise(r => setTimeout(r, PTR_ESPERA_MIN_MS));
+      renderGreeting();
+      renderOrders();
+      renderProfiles();
+      renderHistory();
+      renderCuentasBancarias();
+      renderNotes();
+      const tareas = [esperaMinima, comprobarActualizacionApk()];
+      if(currentUser) tareas.push(loadCloudData());
+      await Promise.all(tareas);
+      soltar(true);
+    }
 
     window.addEventListener('touchstart', (e) => {
       if(!puedeArrancar()) return;
@@ -5689,7 +5706,7 @@
         ptrIndicator.classList.remove('ptr-lista');
         ptrIndicator.style.transform = '';
         ptrIndicator.classList.add('ptr-loading');
-        setTimeout(() => window.location.reload(), 450);
+        refrescarContenido();
       } else {
         soltar(true);
       }
