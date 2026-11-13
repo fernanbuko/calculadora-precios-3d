@@ -414,6 +414,7 @@
   .hms-row{ display: flex; gap: 8px; }
   .hms-row .input-box{ flex: 1; min-width: 0; position: relative; }
   .hms-row input{ padding-right: 32px; }
+  input.valor-por-defecto{ color: var(--text-faint); }
   .hms-unit{
     position: absolute;
     right: 10px;
@@ -4008,6 +4009,16 @@
       nombreInput.value = item.nombre;
       cantInput.value = item.cantidad;
       precioInput.value = item.precio;
+      // El precio de un artículo nuevo arranca en 0 para que la cuenta no
+      // rompa sin eso, pero mostrado tal cual obliga a borrarlo antes de
+      // poner el precio real. Si sigue en 0 (todavía no se tocó), se ve
+      // como un placeholder en gris y, al tocarlo, se selecciona todo
+      // para que con escribir alcance.
+      if(Number(item.precio) === 0){
+        precioInput.classList.add('valor-por-defecto');
+        precioInput.addEventListener('focus', function(){ this.select(); });
+        precioInput.addEventListener('input', function quitar(e){ e.target.classList.remove('valor-por-defecto'); e.target.removeEventListener('input', quitar); }, { once: true });
+      }
       nombreInput.addEventListener('input', () => { currentOrderItems[idx].nombre = nombreInput.value; });
       cantInput.addEventListener('input', () => { currentOrderItems[idx].cantidad = parseFloat(cantInput.value) || 0; updateItemsSubtotal(); });
       precioInput.addEventListener('input', () => { currentOrderItems[idx].precio = parseFloat(precioInput.value) || 0; updateItemsSubtotal(); });
