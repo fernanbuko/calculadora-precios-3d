@@ -927,6 +927,41 @@
     text-align: center;
     box-shadow: 0 16px 32px -14px rgba(0,0,0,.4);
   }
+
+  /* "Deslizá hacia abajo para actualizar" — igual que en las apps nativas:
+     se arrastra desde arriba de todo con el dedo (solo cuando la página ya
+     está scrolleada hasta el tope, para no robarle el gesto al scroll
+     normal) y al soltar pasado el umbral recarga la página — eso de paso
+     dispara de nuevo todo lo que corre al abrir la app (chequeo de
+     versión del APK incluido), sin tener que cerrarla y reabrirla.
+     Arranca arriba de todo (fuera de la pantalla) y JS la va bajando a
+     mano según cuánto se arrastra; "transition" solo entra al soltar,
+     para que el seguimiento del dedo mientras se arrastra sea inmediato. */
+  .ptr-indicator{
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    box-shadow: 0 10px 24px -12px rgba(0,0,0,.35);
+    z-index: 96;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .ptr-indicator.ptr-lista{ color: var(--orange); border-color: var(--orange); }
+  .ptr-indicator.ptr-soltando, .ptr-indicator.ptr-actualizando{ transition: transform .2s ease; }
+  .ptr-indicator.ptr-actualizando #ptrIndicatorIcon{ display: inline-block; animation: ptr-girar .7s linear infinite; }
+  @keyframes ptr-girar{ to{ transform: rotate(360deg); } }
   .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
 
   .modal-overlay{
@@ -1152,6 +1187,7 @@
 </style>
 </head>
 <body>
+<div class="ptr-indicator" id="ptrIndicator"><span id="ptrIndicatorIcon">↓</span><span id="ptrIndicatorText">Deslizá para actualizar</span></div>
 <div class="wrap">
 
   <header>
@@ -5587,6 +5623,71 @@
       // nuevo la próxima vez que se abra la app.
     }
   }
+
+  // "Deslizá hacia abajo para actualizar" (pull-to-refresh) — para no
+  // tener que cerrar y volver a abrir la app para ver una versión nueva.
+  // Recargar la página hace que todo lo que corre al abrir la app se
+  // vuelva a ejecutar (el service worker trae el index.html más nuevo si
+  // hay internet, y comprobarActualizacionApk() se vuelve a fijar si hay
+  // un APK más nuevo), así que alcanza con eso.
+  (function(){
+    const ptrIndicator = document.getElementById('ptrIndicator');
+    const ptrIcon = document.getElementById('ptrIndicatorIcon');
+    const ptrTexto = document.getElementById('ptrIndicatorText');
+    const PTR_UMBRAL = 70;
+    const PTR_TOPE = 100;
+    let inicioY = 0, arrastrando = false, distancia = 0;
+
+    function elementoScrolleable(){
+      return document.scrollingElement || document.documentElement;
+    }
+    function puedeArrancar(){
+      // No interferir en la vista aislada para el cliente (Nombre 3D vía
+      // link compartido) ni mientras haya un modal/ventana abierta encima.
+      if(document.body.classList.contains('modo-cliente-nombre3d')) return false;
+      if(backLayerStack.length) return false;
+      return elementoScrolleable().scrollTop <= 0;
+    }
+    function mover(dist){
+      distancia = dist;
+      const lista = dist > PTR_UMBRAL;
+      ptrIndicator.classList.toggle('ptr-lista', lista);
+      ptrIcon.textContent = lista ? '↑' : '↓';
+      ptrTexto.textContent = lista ? 'Soltá para actualizar' : 'Deslizá para actualizar';
+      ptrIndicator.style.transform = 'translateX(-50%) translateY(' + (-60 + Math.min(dist, PTR_TOPE)) + 'px)';
+    }
+    function soltar(){
+      ptrIndicator.classList.add('ptr-soltando');
+      if(distancia > PTR_UMBRAL){
+        ptrIndicator.classList.add('ptr-actualizando');
+        ptrIcon.textContent = '⟳';
+        ptrTexto.textContent = 'Actualizando...';
+        ptrIndicator.style.transform = 'translateX(-50%) translateY(40px)';
+        setTimeout(() => window.location.reload(), 250);
+      } else {
+        ptrIndicator.style.transform = 'translateX(-50%) translateY(-60px)';
+        setTimeout(() => { ptrIndicator.classList.remove('ptr-soltando', 'ptr-lista'); }, 200);
+      }
+      arrastrando = false;
+      distancia = 0;
+    }
+
+    window.addEventListener('touchstart', (e) => {
+      if(!puedeArrancar()) return;
+      inicioY = e.touches[0].clientY;
+      arrastrando = true;
+      ptrIndicator.classList.remove('ptr-soltando', 'ptr-actualizando');
+    }, { passive: true });
+    window.addEventListener('touchmove', (e) => {
+      if(!arrastrando) return;
+      const delta = e.touches[0].clientY - inicioY;
+      if(delta <= 0 || elementoScrolleable().scrollTop > 0){ arrastrando = false; ptrIndicator.style.transform = 'translateX(-50%) translateY(-60px)'; return; }
+      e.preventDefault();
+      mover(delta * 0.5);
+    }, { passive: false });
+    window.addEventListener('touchend', () => { if(arrastrando) soltar(); });
+    window.addEventListener('touchcancel', () => { if(arrastrando) soltar(); });
+  })();
 
   // El botón FÍSICO de "atrás" en Android no está conectado al historial
   // del navegador por defecto dentro de una app empaquetada con
