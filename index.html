@@ -414,6 +414,7 @@
   .hms-row{ display: flex; gap: 8px; }
   .hms-row .input-box{ flex: 1; min-width: 0; position: relative; }
   .hms-row input{ padding-right: 32px; }
+  .input-box input.valor-por-defecto{ color: var(--text-faint); }
   .hms-unit{
     position: absolute;
     right: 10px;
@@ -3131,6 +3132,7 @@
     el.profit.disabled = false;
     profitField.style.opacity = '1';
     SIMPLE_DEFAULTS_LIST.forEach(([id, val]) => { document.getElementById(id).value = val; });
+    CAMPOS_VALOR_POR_DEFECTO.forEach(id => aplicarEstiloValorPorDefecto(id));
     document.getElementById('simpleMultiToggle').checked = false;
     document.getElementById('simpleColorsField').classList.add('hidden');
     document.getElementById('simpleSpeedCustomField').classList.add('hidden');
@@ -3155,6 +3157,27 @@
     ['simpleRollPrice', '25'], ['simpleWatts', '400'], ['simpleKwhPrice', '0.50'], ['simpleWage', '5'], ['simpleWorkHours', '0.5'], ['simpleShippingCost', '0'],
     ['simpleFlatWidth', ''], ['simpleFlatHeight', ''], ['simpleFlatThickness', '']
   ];
+
+  // Varios campos de precio del modo simple vienen con un valor de
+  // ejemplo precargado (25, 400, 5...) para que la calculadora funcione
+  // aunque no se toque nada — pero eso hace que, al querer poner el
+  // propio número, haya que borrar el de ejemplo a mano primero. Esto
+  // los pinta en gris (como un placeholder) hasta que se editan de
+  // verdad, y selecciona todo el texto al enfocarlos para que con
+  // escribir alcance, sin tener que borrar nada.
+  const CAMPOS_VALOR_POR_DEFECTO = ['simpleRollPrice', 'simpleWatts', 'simpleKwhPrice', 'simpleWage', 'simpleWorkHours', 'simpleShippingCost', 'simpleSpeedCustom'];
+  function quitarValorPorDefecto(e){ e.target.classList.remove('valor-por-defecto'); }
+  function aplicarEstiloValorPorDefecto(id){
+    const input = document.getElementById(id);
+    input.classList.add('valor-por-defecto');
+    input.removeEventListener('input', quitarValorPorDefecto);
+    input.addEventListener('input', quitarValorPorDefecto, { once: true });
+  }
+  CAMPOS_VALOR_POR_DEFECTO.forEach(id => {
+    aplicarEstiloValorPorDefecto(id);
+    document.getElementById(id).addEventListener('focus', function(){ this.select(); });
+  });
+
   const simpleModeToggle = document.getElementById('simpleModeToggle');
   const simpleCard = document.getElementById('simpleCard');
   const simpleSpeedCustomField = document.getElementById('simpleSpeedCustomField');
