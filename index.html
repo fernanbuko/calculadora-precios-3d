@@ -4048,11 +4048,15 @@
       // El precio de un artículo nuevo arranca en 0 para que la cuenta no
       // rompa sin eso, pero mostrado tal cual obliga a borrarlo antes de
       // poner el precio real. Si sigue en 0 (todavía no se tocó), se ve
-      // como un placeholder en gris y, al tocarlo, se selecciona todo
-      // para que con escribir alcance.
+      // como un placeholder en gris y, al tocarlo, se vacía sola (en vez
+      // de seleccionar el texto, que en el celular dispara el menú nativo
+      // de "Cortar/Copiar/Pegar") para que quede solo el cursor, listo
+      // para escribir el precio real. Si se sale sin escribir nada,
+      // vuelve a mostrar "0".
       if(Number(item.precio) === 0){
         precioInput.classList.add('valor-por-defecto');
-        precioInput.addEventListener('focus', function(){ this.select(); });
+        precioInput.addEventListener('focus', function(){ if(this.value === '0') this.value = ''; });
+        precioInput.addEventListener('blur', function(){ if(this.value.trim() === '') this.value = '0'; });
         precioInput.addEventListener('input', function quitar(e){ e.target.classList.remove('valor-por-defecto'); e.target.removeEventListener('input', quitar); }, { once: true });
       }
       nombreInput.addEventListener('input', () => { currentOrderItems[idx].nombre = nombreInput.value; });
