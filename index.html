@@ -2629,11 +2629,13 @@
   const modalCancelBtn = document.getElementById('modalCancelBtn');
   const modalOkBtn = document.getElementById('modalOkBtn');
 
-  function openModal({ title, message, withInput, inputValue, inputMode }){
+  function openModal({ title, message, withInput, inputValue, inputMode, confirmLabel, cancelLabel }){
     return new Promise(resolve => {
       modalTitle.textContent = title || '';
       modalTitle.classList.toggle('hidden', !title);
       modalMessage.textContent = message || '';
+      modalOkBtn.textContent = confirmLabel || 'Aceptar';
+      modalCancelBtn.textContent = cancelLabel || 'Cancelar';
       modalInput.classList.toggle('hidden', !withInput);
       if(withInput){
         modalInput.value = inputValue != null ? inputValue : '';
@@ -5546,6 +5548,35 @@
     return typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
   }
 
+  // Aviso de "hay una nueva versión del APK disponible" — solo aplica
+  // dentro de la app empaquetada (Android/iOS), nunca en la versión web
+  // (que ya se actualiza sola, ver sw.js). Como esta app no se distribuye
+  // por Play Store, no existe el mecanismo automático de actualización de
+  // Google; en su lugar, cada compilación del APK guarda su propio
+  // número de build (ver version.json y mobile-build.yml) y se compara
+  // contra el número de la última publicación en GitHub Releases.
+  async function comprobarActualizacionApk(){
+    if(!enAppNativa()) return;
+    try{
+      const propia = await fetch('./version.json').then(r => r.json());
+      const release = await fetch('https://api.github.com/repos/fernanbuko/calculadora-precios-3d/releases/tags/mobile-debug-latest').then(r => r.json());
+      const match = (release && release.body || '').match(/\[build (\d+)\]/);
+      const buildRemoto = match ? parseInt(match[1], 10) : null;
+      if(buildRemoto && propia && propia.buildNumber && buildRemoto > propia.buildNumber){
+        const descargar = await openModal({
+          title: '🔄 Hay una nueva versión de la app',
+          message: 'Descárgala e instálala para tener los últimos cambios.',
+          confirmLabel: 'Descargar',
+          cancelLabel: 'Después'
+        });
+        if(descargar) window.open('https://github.com/fernanbuko/calculadora-precios-3d/releases/download/mobile-debug-latest/precios3d.apk', '_blank');
+      }
+    }catch(e){
+      // Sin conexión o la comprobación falló: no es grave, se intenta de
+      // nuevo la próxima vez que se abra la app.
+    }
+  }
+
   // El botón FÍSICO de "atrás" en Android no está conectado al historial
   // del navegador por defecto dentro de una app empaquetada con
   // Capacitor — sin este listener, cualquier toque en él cierra la app
@@ -7543,6 +7574,7 @@
   setActiveTab('inicio');
   renderNombre3D();
   if(new URLSearchParams(location.search).get('vista3d') === '1') activarModoClienteNombre3D();
+  comprobarActualizacionApk();
 
   if("serviceWorker" in navigator){
     window.addEventListener("load", () => {
