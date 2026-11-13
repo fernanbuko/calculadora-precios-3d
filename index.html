@@ -1881,8 +1881,6 @@
   </div>
   </div><!-- /tab-panel finanzas -->
 
-  <button type="button" class="fab" id="addOrderFab" title="Agregar pedido">+</button>
-
   <div class="modal-overlay hidden" id="orderModalOverlay">
     <div class="modal-card order-modal-card">
       <div class="modal-header-row">
@@ -2217,6 +2215,14 @@
   </div><!-- /tab-panel ajustes -->
 
 </div>
+
+<!-- El botón de "+" para agregar pedido es position:fixed y por eso tiene
+     que quedar FUERA de .wrap: si quedara adentro, el transform que .wrap
+     recibe durante el gesto de pull-to-refresh lo convierte en el
+     contenedor de posicionamiento de este botón (así funciona position:
+     fixed en CSS cuando un ancestro tiene transform), y el botón se movía
+     con el contenido en vez de quedarse fijo en pantalla. -->
+<button type="button" class="fab" id="addOrderFab" title="Agregar pedido">+</button>
 
 <nav class="tab-bar" id="tabBar">
   <button type="button" class="tab-bar-btn" data-tab="inicio">
