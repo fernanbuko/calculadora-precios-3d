@@ -929,6 +929,34 @@
   }
   .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* Ícono de "deslizá para actualizar" — aparece mientras se arrastra el
+     dedo hacia abajo desde arriba de todo (pull-to-refresh) y desaparece
+     de golpe al soltar, sin texto ni animación de carga: nada más que la
+     flechita siguiendo el dedo mientras dura el gesto. */
+  .ptr-indicator{
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    font-size: 15px;
+    border-radius: 50%;
+    box-shadow: 0 10px 24px -12px rgba(0,0,0,.35);
+    z-index: 96;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+  .ptr-indicator.ptr-visible{ opacity: 1; visibility: visible; }
+  .ptr-indicator.ptr-lista{ color: var(--orange); border-color: var(--orange); }
+
   .modal-overlay{
     position: fixed;
     inset: 0;
@@ -1152,6 +1180,7 @@
 </style>
 </head>
 <body>
+<div class="ptr-indicator" id="ptrIndicator">↓</div>
 <div class="wrap">
 
   <header>
@@ -5597,11 +5626,13 @@
   // Recargar la página hace que todo lo que corre al abrir la app se
   // vuelva a ejecutar (el service worker trae el index.html más nuevo si
   // hay internet, y comprobarActualizacionApk() se vuelve a fijar si hay
-  // un APK más nuevo), así que alcanza con eso. Sin ningún indicador
-  // visual propio — es un gesto que ya se conoce de memoria.
+  // un APK más nuevo), así que alcanza con eso. El ícono solo se muestra
+  // mientras el dedo sigue abajo (durante el arrastre) y desaparece de
+  // golpe al soltar, sin texto ni animación.
   (function(){
     const PTR_UMBRAL = 70;
     let inicioY = 0, arrastrando = false;
+    const ptrIndicator = document.getElementById('ptrIndicator');
 
     function elementoScrolleable(){
       return document.scrollingElement || document.documentElement;
@@ -5613,6 +5644,9 @@
       if(backLayerStack.length) return false;
       return elementoScrolleable().scrollTop <= 0;
     }
+    function ocultarIndicador(){
+      ptrIndicator.classList.remove('ptr-visible', 'ptr-lista');
+    }
 
     window.addEventListener('touchstart', (e) => {
       if(!puedeArrancar()) return;
@@ -5622,16 +5656,19 @@
     window.addEventListener('touchmove', (e) => {
       if(!arrastrando) return;
       const delta = e.touches[0].clientY - inicioY;
-      if(delta <= 0 || elementoScrolleable().scrollTop > 0){ arrastrando = false; return; }
+      if(delta <= 0 || elementoScrolleable().scrollTop > 0){ arrastrando = false; ocultarIndicador(); return; }
       e.preventDefault();
+      ptrIndicator.classList.add('ptr-visible');
+      ptrIndicator.classList.toggle('ptr-lista', delta * 0.5 > PTR_UMBRAL);
     }, { passive: false });
     window.addEventListener('touchend', (e) => {
       if(!arrastrando) return;
       arrastrando = false;
       const delta = (e.changedTouches[0].clientY - inicioY) * 0.5;
+      ocultarIndicador();
       if(delta > PTR_UMBRAL) window.location.reload();
     });
-    window.addEventListener('touchcancel', () => { arrastrando = false; });
+    window.addEventListener('touchcancel', () => { arrastrando = false; ocultarIndicador(); });
   })();
 
   // El botón FÍSICO de "atrás" en Android no está conectado al historial
